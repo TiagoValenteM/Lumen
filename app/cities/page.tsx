@@ -4,19 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Search, Building2, Loader2 } from "lucide-react";
-
-interface City {
-  id: string;
-  name: string;
-  slug: string;
-  country: string;
-  workspace_count: number;
-}
-
-interface CountryGroup {
-  name: string;
-  cities: City[];
-}
+import type { City, CountryGroup } from "@/lib/types";
 
 export default function CitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");

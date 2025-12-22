@@ -9,19 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Toast } from "@/components/ui/toast";
 import { Loader2, Upload, Save } from "lucide-react";
+import { getInitials } from "@/lib/utils";
+import { useToast } from "@/hooks/useToast";
+import type { Profile } from "@/lib/types";
 
-interface Profile {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  tag: string | null;
-  avatar_url: string | null;
-  bio?: string | null;
-}
-
-const MAX_BIO_LENGTH = 300;
+const MAX_BIO_LENGTH = 500;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
 
 export default function ProfilePage() {
@@ -33,13 +27,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bio, setBio] = useState("");
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const { toast, showSuccess, showError } = useToast();
   const remainingBio = MAX_BIO_LENGTH - bio.length;
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const initials = useMemo(() => {
     const tag = profile?.tag || profile?.email?.split("@")[0] || "user";
-    return tag.substring(0, 2).toUpperCase();
+    return getInitials(tag);
   }, [profile]);
 
   useEffect(() => {
@@ -66,8 +60,7 @@ export default function ProfilePage() {
   const uploadAvatar = async () => {
     if (!avatarFile || !user) return null;
     if (avatarFile.size > MAX_AVATAR_BYTES) {
-      setToast({ message: "Avatar file is too large. Max size is 2MB.", type: "error" });
-      setTimeout(() => setToast(null), 4000);
+      showError("Avatar file is too large. Max size is 2MB.", 4000);
       return null;
     }
     const fileExt = avatarFile.name.split(".").pop();
@@ -112,15 +105,13 @@ export default function ProfilePage() {
       if (error) throw error;
       setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
       setAvatarFile(null);
-      setToast({ message: "Profile updated successfully.", type: "success" });
-      setTimeout(() => setToast(null), 3000);
+      showSuccess("Profile updated successfully.");
       
       // Notify navbar to refresh profile data
       window.dispatchEvent(new Event("profileUpdated"));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving profile:", error);
-      setToast({ message: error?.message || "Failed to save profile", type: "error" });
-      setTimeout(() => setToast(null), 4000);
+      showError((error as Error)?.message || "Failed to save profile", 4000);
     } finally {
       setSaving(false);
     }
@@ -248,23 +239,9 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-      {toast && <Toast message={toast.message} type={toast.type} />}
-    </div>
-  );
-}
 
-// Toast banner
-function Toast({ message, type }: { message: string; type: "success" | "error" }) {
-  return (
-    <div
-      className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-full px-4 py-2 shadow-lg border text-sm ${
-        type === "success"
-          ? "bg-emerald-600 text-white border-emerald-500"
-          : "bg-destructive text-destructive-foreground border-destructive/70"
-      }`}
-    >
-      {message}
+        {toast && <Toast message={toast.message} type={toast.type} />}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,78 +19,22 @@ import { Globe, Plus, User, MapPin, Loader2, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useLocation } from "@/contexts/LocationContext";
 import { useAuth } from "@/contexts/AuthContext";
-import CoffeeLogo from "@/components/CoffeeLogo";
+import { CoffeeLogo } from "@/components/shared";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { createClient } from "@/lib/supabase/client";
+import { getDisplayName, getInitials } from "@/lib/utils";
+import { useProfile } from "@/hooks/useProfile";
 
 export default function NavBar() {
   const { latitude, longitude, error, loading, requestLocation } = useLocation();
   const { user, signOut } = useAuth();
-  const supabase = useMemo(() => createClient(), []);
-  const [profile, setProfile] = useState<{
-    first_name: string | null;
-    last_name: string | null;
-    avatar_url: string | null;
-    email: string | null;
-    tag: string | null;
-  } | null>(null);
+  const { profile } = useProfile(user?.id);
 
-  const resolveAvatarUrl = (avatarPath: string | null) => {
-    if (!avatarPath) return null;
-    if (avatarPath.startsWith("http://") || avatarPath.startsWith("https://")) {
-      return avatarPath;
-    }
-    const { data } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
-    return data.publicUrl ?? null;
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchProfile() {
-      if (!user) {
-        setProfile(null);
-        return;
-      }
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, avatar_url, email, tag")
-        .eq("id", user.id)
-        .single();
-      if (error) {
-        console.error("Error loading profile:", error);
-        return;
-      }
-      if (isMounted && data) {
-        setProfile({
-          ...data,
-          avatar_url: resolveAvatarUrl(data.avatar_url),
-        });
-      }
-    }
-    fetchProfile();
-
-    const handleProfileUpdate = () => {
-      fetchProfile();
-    };
-
-    window.addEventListener("profileUpdated", handleProfileUpdate);
-
-    return () => {
-      isMounted = false;
-      window.removeEventListener("profileUpdated", handleProfileUpdate);
-    };
-  }, [supabase, user]);
-
-  const displayName =
-    (profile?.first_name && profile?.last_name
-      ? `${profile.first_name} ${profile.last_name}`
-      : profile?.tag) ||
-    (user?.user_metadata?.first_name && user?.user_metadata?.last_name
-      ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
-      : user?.user_metadata?.full_name) ||
-    profile?.email ||
-    user?.email ||
-    "User";
+  const displayName = getDisplayName(
+    profile?.first_name,
+    profile?.last_name,
+    profile?.tag,
+    profile?.email || user?.email
+  );
 
   const avatarUrl =
     profile?.avatar_url ||
@@ -99,15 +42,7 @@ export default function NavBar() {
     user?.user_metadata?.picture ||
     undefined;
 
-  const initials =
-    (!avatarUrl &&
-      displayName
-        .split(" ")
-        .filter(Boolean)
-        .map((part) => part[0]?.toUpperCase() || "")
-        .join("")
-        .slice(0, 2)) ||
-    undefined;
+  const initials = !avatarUrl ? getInitials(displayName) : undefined;
 
   const handleLocationClick = () => {
     requestLocation();

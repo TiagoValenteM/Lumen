@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+*.test.ts.snap
+*.test.tsx.snap
 
 # next.js
 /.next/
@@ -19,6 +21,7 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
@@ -32,6 +35,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +43,43 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# IDEs and Editors
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Supabase
+.supabase/
+supabase/.branches/
+supabase/.temp/
+
+# Local development
+.turbo
+.contentlayer
+.cache/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+.npmrc.local

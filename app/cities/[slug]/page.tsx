@@ -1,60 +1,21 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState, useEffect, useMemo, type ComponentType } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { WorkspaceCard } from "@/components/WorkspaceCard";
+import { WorkspaceCard } from "@/components/features/workspace";
+import type { City, Workspace } from "@/lib/types";
+import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } from "@/lib/constants/filters";
 import {
   ArrowLeft,
   MapPin,
   Loader2,
   Building2,
   SlidersHorizontal,
-  Bookmark,
-  Wifi,
-  Plug,
-  Coffee,
-  Moon,
-  Clock3,
-  UtensilsCrossed,
-  Sprout,
-  Wine,
-  Sun,
-  ShowerHead,
-  Accessibility,
-  PawPrint,
-  Car,
-  Users,
 } from "lucide-react";
-
-interface City {
-  id: string;
-  name: string;
-  slug: string;
-  country: string;
-  workspace_count: number;
-  description: string | null;
-}
-
-interface Workspace {
-  id: string;
-  name: string;
-  slug: string;
-  type: string;
-  short_description: string | null;
-  address: string | null;
-  has_wifi: boolean;
-  has_power_outlets: boolean;
-  has_coffee: boolean;
-  overall_rating: number | null;
-  total_reviews: number;
-  primary_photo?: {
-    url: string;
-  } | null;
-}
 
 export default function CityPage() {
   const params = useParams();
@@ -65,88 +26,32 @@ export default function CityPage() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  const filterIcons: Record<string, ComponentType<{ className?: string }>> = {
-    Saved: Bookmark,
-    "Wi-Fi": Wifi,
-    Power: Plug,
-    Coffee: Coffee,
-    Quiet: Moon,
-    "Long stays": Clock3,
-    Food: UtensilsCrossed,
-    Veggie: Sprout,
-    Alcohol: Wine,
-    Outdoor: Sun,
-    Restroom: ShowerHead,
-    Accessible: Accessibility,
-    Pets: PawPrint,
-    Parking: Car,
-    Light: Sun,
-    Groups: Users,
-  };
-
-  const filterGroups = [
-    {
-      label: "Saved",
-      options: ["Saved"],
-    },
-    {
-      label: "Essentials",
-      options: ["Wi-Fi", "Power", "Coffee"],
-    },
-    {
-      label: "Focus & Duration",
-      options: ["Quiet", "Long stays"],
-    },
-    {
-      label: "Food & Drink",
-      options: ["Food", "Veggie", "Alcohol"],
-    },
-    {
-      label: "Space & Access",
-      options: ["Outdoor", "Restroom", "Accessible", "Pets", "Parking", "Light"],
-    },
-    {
-      label: "Community",
-      options: ["Groups"],
-    },
-  ];
-
   const toggleFilter = (option: string) => {
     setSelectedFilters((prev) => {
       const next = new Set(prev);
       if (next.has(option)) {
         next.delete(option);
       } else {
-        if (next.size >= 5) return prev; // cap at 5 active filters
+        if (next.size >= MAX_ACTIVE_FILTERS) return prev;
         next.add(option);
       }
       return next;
     });
   };
 
-  const activeFilters = useMemo(() => Array.from(selectedFilters), [selectedFilters]);
-
-  // Only filter on attributes we actually have; others are visual for now.
-  const supportedFilters: Record<string, keyof Workspace> = useMemo(
-    () => ({
-      "Wi-Fi": "has_wifi",
-      Power: "has_power_outlets",
-      Coffee: "has_coffee",
-    }),
-    []
-  );
+  const activeFilters = Array.from(selectedFilters);
 
   const filteredWorkspaces = useMemo(() => {
     if (!activeFilters.length) return workspaces;
     return workspaces.filter((workspace) => {
       return activeFilters.every((filter) => {
-        const key = supportedFilters[filter];
+        const key = SUPPORTED_FILTERS[filter];
         if (!key) return true; // filters we don't have data for are ignored
         const value = workspace[key];
         return value === true;
       });
     });
-  }, [activeFilters, supportedFilters, workspaces]);
+  }, [activeFilters, workspaces]);
 
   useEffect(() => {
     async function fetchCityAndWorkspaces() {
@@ -290,7 +195,7 @@ export default function CityPage() {
               )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filterGroups.map((group) => (
+              {FILTER_GROUPS.map((group) => (
                 <div key={group.label} className="space-y-2">
                   <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
                     {group.label}
@@ -298,7 +203,7 @@ export default function CityPage() {
                   <div className="flex flex-wrap gap-2">
                     {group.options.map((option) => {
                       const isActive = selectedFilters.has(option);
-                      const Icon = filterIcons[option];
+                      const Icon = FILTER_ICONS[option];
                       return (
                         <Button
                           key={option}
