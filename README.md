@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lumen
 
-## Getting Started
+A Next.js 13 App Router app to discover and manage work-friendly spaces (cafés, coworking, etc.) with Supabase as backend. Users can browse cities, filter workspaces, save/visit places, and write reviews. Profiles stay in sync with the navbar.
 
-First, run the development server:
+## Tech Stack
+- Next.js 13 (App Router), TypeScript, React
+- shadcn/ui + Tailwind CSS, lucide-react icons
+- Supabase (auth, DB, storage, RLS)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Features
+- **City & workspace browsing:** filters for amenities and “Saved”; workspace detail pages with photos, ratings, and reviews.
+- **Saved & visited:** dedicated pages `/saved` and `/visited`; quick actions on workspace detail; stats on profile.
+- **Reviews:** write/read reviews with ratings.
+- **Profile:** view-only profile header with join date; edit at `/profile/edit`; navbar auto-refreshes on profile updates.
+- **Toasts & utilities:** reusable toast hook/component; shared Supabase helpers; centralized types/constants.
+
+## Project Structure
+```
+app/
+  cities/        # city list + city detail
+  saved/         # saved workspaces
+  visited/       # visited workspaces
+  profile/       # profile view + /profile/edit
+components/
+  features/      # feature components (workspace, review, auth, navigation)
+  shared/        # shared UI (logo, uploads)
+  ui/            # shadcn primitives
+hooks/           # useToast, useProfile, useSavedWorkspace, useVisitedWorkspace
+lib/
+  api/           # profiles, workspaces, reviews, saved, visited
+  constants/     # filters
+  types/         # shared types
+  utils/         # supabase utils, cn
+supabase/
+  migrations/    # SQL migrations incl. saved/visited tables
+docs/            # project docs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment Variables
+Create `.env.local` from `.env.example`:
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-anon-public-key
+```
+`.env.local` is gitignored—never commit secrets.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Setup
+```bash
+pnpm install
+pnpm dev      # http://localhost:3000
+pnpm lint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Database & Migrations (Supabase)
+Key tables/policies: `saved_workspaces`, `visited_workspaces`, `reviews`, `profiles`, `workspaces`, `cities`.
+Run migrations (Supabase CLI):
+```bash
+supabase db push
+```
 
-## Learn More
+## Usage Notes
+- “Saved” filter on city page requires login; filters workspaces saved by the user in that city.
+- Navbar “Saved” links to `/saved`; profile cards link to `/saved` and `/visited`.
+- Quick actions on workspace detail: Save, Mark as Visited, Write Review.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Conventions
+- Kebab-case files; feature-based folders.
+- shadcn/ui + Tailwind for styling.
+- Conventional Commits recommended.

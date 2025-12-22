@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,12 @@ import {
   Loader2,
   Building2,
   SlidersHorizontal,
+  Map as MapIcon,
 } from "lucide-react";
+
+type MapInstance = import("maplibre-gl").Map & {
+  _markers?: import("maplibre-gl").Marker[];
+};
 
 export default function CityPage() {
   const params = useParams();
@@ -27,6 +32,8 @@ export default function CityPage() {
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
   const [savedWorkspaceIds, setSavedWorkspaceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<MapInstance | null>(null);
   const supabase = createClient();
 
   const toggleFilter = (option: string) => {
@@ -90,6 +97,8 @@ export default function CityPage() {
             type,
             short_description,
             address,
+            latitude,
+            longitude,
             has_wifi,
             has_power_outlets,
             has_coffee,
@@ -129,6 +138,7 @@ export default function CityPage() {
     fetchCityAndWorkspaces();
   }, [slug, supabase]);
 
+  // Load saved workspaces for Saved filter
   useEffect(() => {
     async function loadSavedWorkspaces() {
       if (!user) {
@@ -148,6 +158,223 @@ export default function CityPage() {
 
     loadSavedWorkspaces();
   }, [supabase, user]);
+
+  // Map integration using MapLibre (free, no key) + OSM raster tiles
+  useEffect(() => {
+    if (!city) return;
+
+    const workspaceWithCoords = workspaces.filter(
+      (w) => typeof w.latitude === "number" && typeof w.longitude === "number"
+    );
+    if (!workspaceWithCoords.length) return;
+
+    let isMounted = true;
+
+    async function loadMapLibre(): Promise<typeof import("maplibre-gl") | null> {
+      if (typeof window === "undefined") return null;
+      // Load CSS if not present
+      if (!document.querySelector('link[data-maplibre="css"]')) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = "https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css";
+        link.dataset.maplibre = "css";
+        document.head.appendChild(link);
+      }
+
+      // Attribution/readability styling (matches app palette)
+      if (!document.querySelector('style[data-maplibre="theme"]')) {
+        const style = document.createElement("style");
+        style.dataset.maplibre = "theme";
+        style.innerHTML = `
+          /* Force light palette inside map for readability */
+          .maplibregl-map {
+            color-scheme: light;
+            --background: hsl(0 0% 100%);
+            --foreground: hsl(240 10% 3.9%);
+            --muted-foreground: hsl(240 4.8% 46.1%);
+            --card: hsl(0 0% 100%);
+            --border: hsl(240 5.9% 90%);
+          }
+          .maplibregl-popup-content {
+            color: var(--foreground);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 30px -12px rgba(0,0,0,0.35);
+            padding: 16px 20px;
+            padding-right: 64px; /* generous space for close button */
+            min-width: 190px;
+            text-align: center;
+          }
+          .maplibregl-popup-tip {
+            border-top-color: var(--card);
+          }
+          .maplibregl-popup-close-button {
+            color: var(--foreground);
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            width: 30px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 600;
+            top: 12px;
+            right: 12px;
+            padding-bottom: 2px;
+            box-shadow: none;
+          }
+          .maplibregl-popup-content a {
+            color: var(--foreground);
+            font-weight: 800;
+            font-size: 17px;
+            text-decoration: none;
+            line-height: 1.2;
+          }
+          .maplibregl-popup-content a:hover {
+            text-decoration: underline;
+          }
+          .map-marker {
+            --marker-color: #0ea5e9;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #fff;
+            border-radius: 999px;
+            background: var(--marker-color);
+            box-shadow: 0 8px 18px -8px rgba(0,0,0,0.4);
+            transition: transform 150ms ease, box-shadow 150ms ease;
+            cursor: pointer;
+          }
+          .map-marker:hover {
+            transform: scale(1.2);
+            box-shadow: 0 10px 24px -10px rgba(0,0,0,0.45);
+          }
+          .maplibregl-canvas {
+            filter: saturate(1.05) contrast(1.03);
+          }
+          .maplibregl-ctrl-attrib {
+            color: var(--foreground);
+            background: transparent;
+            border: none;
+            padding: 4px 6px;
+            margin: 8px;
+            box-shadow: none;
+          }
+          .maplibregl-ctrl-attrib a {
+            color: var(--foreground);
+            text-decoration: underline;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Load JS if not present
+      if (!(window as unknown as { maplibregl?: typeof import("maplibre-gl") }).maplibregl) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = "https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js";
+          script.onload = () => resolve();
+          script.onerror = (err) => reject(err);
+          document.body.appendChild(script);
+        });
+      }
+      return (window as unknown as { maplibregl: typeof import("maplibre-gl") }).maplibregl || null;
+    }
+
+    loadMapLibre()
+      .then((maplibregl) => {
+        if (!isMounted || !mapContainerRef.current || !maplibregl) return;
+
+        const first = workspaceWithCoords[0];
+        const center: [number, number] = [first.longitude!, first.latitude!];
+
+        const primaryColor =
+          typeof window !== "undefined"
+            ? getComputedStyle(document.documentElement)
+                .getPropertyValue("--primary")
+                .trim() || "#0ea5e9"
+            : "#0ea5e9";
+
+        // Initialize map once
+        if (!mapInstanceRef.current) {
+          mapInstanceRef.current = new maplibregl.Map({
+            container: mapContainerRef.current,
+            style: {
+              version: 8,
+              sources: {
+                osm: {
+                  type: "raster",
+                  tiles: [
+                    "https://cartodb-basemaps-a.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
+                    "https://cartodb-basemaps-b.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
+                    "https://cartodb-basemaps-c.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
+                    "https://cartodb-basemaps-d.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png"
+                  ],
+                  tileSize: 256,
+                  attribution: "© OpenStreetMap contributors, © CARTO",
+                },
+              },
+              layers: [
+                {
+                  id: "osm",
+                  type: "raster",
+                  source: "osm",
+                },
+              ],
+            },
+            center,
+            zoom: 13,
+            attributionControl: true,
+          });
+        }
+
+        // Remove existing markers (stored on map instance)
+        const mapInstance = mapInstanceRef.current;
+        if (!mapInstance) return;
+
+        if (mapInstance._markers) {
+          mapInstance._markers.forEach((m: import("maplibre-gl").Marker) => m.remove());
+        }
+        mapInstance._markers = [];
+
+        const bounds = new maplibregl.LngLatBounds();
+
+        workspaceWithCoords.forEach((workspace) => {
+          const coords: [number, number] = [workspace.longitude!, workspace.latitude!];
+          const markerEl = document.createElement("div");
+          markerEl.className = "map-marker";
+          markerEl.style.setProperty("--marker-color", primaryColor || "#0ea5e9");
+
+          const popupHtml = `
+            <a href="/cities/${city.slug}/${workspace.slug}">
+              ${workspace.name}
+            </a>
+          `;
+
+          const marker = new maplibregl.Marker({ element: markerEl })
+            .setLngLat(coords)
+            .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(popupHtml))
+            .addTo(mapInstance);
+          mapInstance._markers = mapInstance._markers ?? [];
+          mapInstance._markers.push(marker);
+          bounds.extend(coords);
+        });
+
+        if (workspaceWithCoords.length > 1) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: 48 });
+        } else {
+          mapInstanceRef.current.setCenter(center);
+          mapInstanceRef.current.setZoom(14);
+        }
+      })
+      .catch((err) => console.error("Failed to load map", err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [workspaces]);
 
   if (loading) {
     return (
@@ -203,6 +430,21 @@ export default function CityPage() {
             </p>
           )}
         </div>
+
+        {/* Map View */}
+        {workspaces.some((w) => w.latitude && w.longitude) && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-3xl font-bold flex items-center gap-3">
+                <MapIcon className="h-8 w-8" />
+                Map
+              </h2>
+            </div>
+            <div className="rounded-xl border border-border bg-card overflow-hidden h-[420px]">
+              <div ref={mapContainerRef} className="w-full h-full" />
+            </div>
+          </div>
+        )}
 
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">

@@ -16,6 +16,8 @@ export interface Workspace {
   type: string;
   short_description: string | null;
   address: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   has_wifi: boolean;
   has_power_outlets: boolean;
   has_coffee: boolean;
