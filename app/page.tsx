@@ -155,6 +155,17 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="border-t border-border px-6 py-6">
+        <div className="max-w-4xl mx-auto text-sm text-muted-foreground flex flex-col md:flex-row items-center justify-center md:justify-between gap-3 text-center md:text-left">
+          <div className="hidden md:block">© {new Date().getFullYear()} Lumen</div>
+          <div className="inline-flex items-center justify-center gap-2">
+            <span>Proudly developed in Switzerland</span>
+            <span role="img" aria-label="Switzerland flag">🇨🇭</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

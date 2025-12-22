@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -22,8 +22,21 @@ export default function SignupPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    async function checkSession() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        router.replace("/");
+        return;
+      }
+      setCheckingSession(false);
+    }
+    checkSession();
+  }, [router, supabase]);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,19 +64,22 @@ export default function SignupPage() {
     }
   };
 
-  return (
+  return checkingSession ? null : (
     <div className="relative flex min-h-full items-center justify-center py-12 px-4">
       <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
-      <Card className="relative mx-auto w-full max-w-sm z-10">
-        <CardHeader>
-          <CardTitle className="text-xl">Sign Up</CardTitle>
-          <CardDescription>
-            Enter your information to create an account
+      <Card className="relative mx-auto w-full max-w-md z-10 shadow-lg">
+        <CardHeader className="space-y-0.5 text-center pb-4">
+          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+          <CardDescription className="text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/login" className="underline">
+              Sign in
+            </Link>
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <form onSubmit={handleSignup} className="grid gap-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="first-name">First name</Label>
                 <Input
@@ -92,7 +108,7 @@ export default function SignupPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -111,19 +127,22 @@ export default function SignupPage() {
                 minLength={6}
               />
             </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
+            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create an account"}
+              {loading ? "Creating account..." : "Create account"}
             </Button>
           </form>
-          <div className="mt-4 text-center text-sm">
-            Already have an account?{" "}
-            <Link href="/login" className="underline">
-              Sign in
+          <p className="text-center text-xs text-muted-foreground">
+            By continuing you agree to our{" "}
+            <Link href="#" className="underline">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="#" className="underline">
+              Privacy Policy
             </Link>
-          </div>
+            .
+          </p>
         </CardContent>
       </Card>
     </div>
