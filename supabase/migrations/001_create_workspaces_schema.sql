@@ -123,36 +123,43 @@ CREATE TABLE workspaces (
     view_count INTEGER DEFAULT 0
 );
 
--- Reviews table
-CREATE TABLE reviews (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
-    workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-    
-    -- Ratings
-    overall_rating INTEGER NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
-    productivity_rating INTEGER CHECK (productivity_rating BETWEEN 1 AND 5),
-    comfort_rating INTEGER CHECK (comfort_rating BETWEEN 1 AND 5),
-    service_rating INTEGER CHECK (service_rating BETWEEN 1 AND 5),
-    
-    -- Review content
-    title VARCHAR(255),
-    comment TEXT,
-    
-    -- Visit details
-    visited_at DATE,
-    would_recommend BOOLEAN,
-    
-    -- Moderation
-    is_verified BOOLEAN DEFAULT false,
-    is_flagged BOOLEAN DEFAULT false,
-    
-    -- Prevent duplicate reviews
-    UNIQUE(workspace_id, user_id)
-);
+-- Reviews table - REMOVED
+-- The reviews table is now created in migration 004_create_reviews_table.sql
+-- with a simpler schema (rating, comment, timestamps)
+-- If you already ran this migration, you need to:
+-- 1. DROP TABLE IF EXISTS reviews CASCADE;
+-- 2. Run migration 004_create_reviews_table.sql
+
+-- Old schema kept here for reference:
+-- CREATE TABLE reviews (
+--     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+--     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+--     
+--     workspace_id UUID REFERENCES workspaces(id) ON DELETE CASCADE,
+--     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+--     
+--     -- Ratings
+--     overall_rating INTEGER NOT NULL CHECK (overall_rating BETWEEN 1 AND 5),
+--     productivity_rating INTEGER CHECK (productivity_rating BETWEEN 1 AND 5),
+--     comfort_rating INTEGER CHECK (comfort_rating BETWEEN 1 AND 5),
+--     service_rating INTEGER CHECK (service_rating BETWEEN 1 AND 5),
+--     
+--     -- Review content
+--     title VARCHAR(255),
+--     comment TEXT,
+--     
+--     -- Visit details
+--     visited_at DATE,
+--     would_recommend BOOLEAN,
+--     
+--     -- Moderation
+--     is_verified BOOLEAN DEFAULT false,
+--     is_flagged BOOLEAN DEFAULT false,
+--     
+--     -- Prevent duplicate reviews
+--     UNIQUE(workspace_id, user_id)
+-- );
 
 -- Photos table
 CREATE TABLE workspace_photos (

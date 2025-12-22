@@ -47,6 +47,21 @@ This will create:
 - ✅ Initializes counts for existing cities
 - ✅ Handles city changes automatically
 
+## Step 2c: Run Reviews Table Migration
+
+Run this migration to add the reviews system:
+
+1. In **SQL Editor**, click **New Query**
+2. Copy the entire contents of `/supabase/migrations/004_create_reviews_table.sql`
+3. Paste into the SQL Editor
+4. Click **Run**
+
+This will create:
+- ✅ `reviews` table with rating, comment, and timestamps
+- ✅ RLS policies for authenticated users to create/update/delete their own reviews
+- ✅ Auto-trigger to update workspace `overall_rating` and `total_reviews` when reviews change
+- ✅ Indexes for optimal query performance
+
 ## Step 3: Seed Sample Data (Optional)
 
 To add sample cities and workspaces for testing:

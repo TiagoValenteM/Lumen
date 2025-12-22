@@ -4,9 +4,12 @@ import { useParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { WorkspaceImage } from "@/components/WorkspaceImage";
 import {
   ArrowLeft,
@@ -30,6 +33,8 @@ import {
   PawPrint,
   Loader2,
   ChevronRight,
+  MessageSquare,
+  User,
 } from "lucide-react";
 
 interface City {
@@ -105,16 +110,77 @@ interface Photo {
   is_primary: boolean;
 }
 
+interface Review {
+  id: string;
+  user_id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+}
+
+interface ProfileSummary {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  avatar_url: string | null;
+  email: string | null;
+}
+
 export default function WorkspacePage() {
   const params = useParams();
   const citySlug = params.slug as string;
   const workspaceSlug = params.workspace as string;
+  const { user } = useAuth();
   
   const [city, setCity] = useState<City | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [profilesById, setProfilesById] = useState<Record<string, ProfileSummary>>({});
   const [loading, setLoading] = useState(true);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const MAX_COMMENT_LENGTH = 500;
   const supabase = createClient();
+  const remainingChars = MAX_COMMENT_LENGTH - reviewComment.length;
+
+  const loadReviews = async (workspaceId: string) => {
+    const { data: reviewsData, error: reviewsError } = await supabase
+      .from("reviews")
+      .select("id, user_id, rating, comment, created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false });
+
+    if (reviewsError) {
+      console.error("Error fetching reviews:", reviewsError);
+      return;
+    }
+
+    if (reviewsData) {
+      setReviews(reviewsData);
+
+      // Fetch profile summaries for unique user_ids
+      const userIds = Array.from(new Set(reviewsData.map((r) => r.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("id, first_name, last_name, avatar_url, email")
+          .in("id", userIds);
+
+        if (profileError) {
+          console.error("Error fetching profiles:", profileError);
+        } else if (profileData) {
+          const map: Record<string, ProfileSummary> = {};
+          profileData.forEach((p) => {
+            map[p.id] = p as ProfileSummary;
+          });
+          setProfilesById(map);
+        }
+      }
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -153,6 +219,8 @@ export default function WorkspacePage() {
           if (photosData) {
             setPhotos(photosData);
           }
+
+          await loadReviews(workspaceData.id);
         }
       }
 
@@ -161,6 +229,57 @@ export default function WorkspacePage() {
 
     fetchData();
   }, [citySlug, workspaceSlug, supabase]);
+
+  const handleSubmitReview = async () => {
+    if (!user || !workspace) return;
+    if (reviewRating === 0) {
+      alert("Please select a rating");
+      return;
+    }
+    if (reviewComment.trim().length > MAX_COMMENT_LENGTH) {
+      alert(`Comment is too long. Please keep it under ${MAX_COMMENT_LENGTH} characters.`);
+      return;
+    }
+
+    setSubmittingReview(true);
+    try {
+      // Ensure profile exists to satisfy FK
+      await supabase.from('profiles').upsert(
+        {
+          id: user.id,
+          first_name: user.user_metadata?.first_name || null,
+          last_name: user.user_metadata?.last_name || null,
+          avatar_url: user.user_metadata?.avatar_url || null,
+        },
+        { onConflict: 'id' }
+      );
+
+      const { error } = await supabase
+        .from('reviews')
+        .insert({
+          workspace_id: workspace.id,
+          user_id: user.id,
+          rating: reviewRating,
+          comment: reviewComment.trim() || null,
+        });
+
+      if (error) throw error;
+
+      // Refresh reviews (no profile join)
+      await loadReviews(workspace.id);
+
+      // Reset form
+      setReviewRating(0);
+      setReviewComment("");
+      setShowReviewForm(false);
+    } catch (error: any) {
+      console.error('Error submitting review:', error);
+      const errorMessage = error?.message || 'Failed to submit review';
+      alert(`Error: ${errorMessage}\n\nPlease make sure the reviews table migration has been run in Supabase.`);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -483,12 +602,194 @@ export default function WorkspacePage() {
               <Button className="w-full" size="lg">
                 Save Workspace
               </Button>
-              <Button variant="outline" className="w-full" size="lg">
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                size="lg"
+                onClick={() => {
+                  if (!user) {
+                    alert("Please sign in to write a review");
+                    return;
+                  }
+                  setShowReviewForm(!showReviewForm);
+                }}
+              >
                 Write a Review
               </Button>
             </div>
           </div>
         </div>
+
+        {/* Reviews Section */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Reviews ({reviews.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Review Form */}
+            {showReviewForm && user && (
+              <div className="mb-8 p-6 border border-border rounded-lg bg-muted/30">
+                <h3 className="text-lg font-semibold mb-4">Write a Review</h3>
+                <div className="space-y-6">
+                  <div>
+                    <Label>
+                      Rating <span className="text-destructive">*</span>
+                    </Label>
+                    <div className="flex items-center gap-1 mt-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          className="cursor-pointer transition-colors"
+                        >
+                          <Star
+                            className={`h-8 w-8 ${
+                              star <= reviewRating
+                                ? 'fill-primary text-primary'
+                                : 'text-muted-foreground hover:text-primary'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="review-comment">Your Review (Optional)</Label>
+                    <Textarea
+                      id="review-comment"
+                      placeholder="Share your experience..."
+                      value={reviewComment}
+                      onChange={(e) => setReviewComment(e.target.value)}
+                      rows={4}
+                      className="mt-2"
+                      maxLength={MAX_COMMENT_LENGTH}
+                    />
+                    <div className={`mt-1 text-xs ${remainingChars < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {remainingChars < 0
+                        ? `Too long by ${Math.abs(remainingChars)} characters (max ${MAX_COMMENT_LENGTH})`
+                        : `${remainingChars} characters remaining (max ${MAX_COMMENT_LENGTH})`}
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleSubmitReview}
+                      disabled={submittingReview || reviewRating === 0}
+                      className="cursor-pointer"
+                    >
+                      {submittingReview ? 'Submitting...' : 'Submit Review'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowReviewForm(false);
+                        setReviewRating(0);
+                        setReviewComment("");
+                      }}
+                      disabled={submittingReview}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {reviews.length === 0 ? (
+              <div className="text-center py-12">
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
+                <p className="text-muted-foreground mb-6">
+                  Be the first to share your experience at {workspace.name}
+                </p>
+                <Button
+                  onClick={() => {
+                    if (!user) {
+                      alert("Please sign in to write a review");
+                      return;
+                    }
+                    setShowReviewForm(true);
+                  }}
+                >
+                  Write the First Review
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map((review) => {
+                  const profile = profilesById[review.user_id];
+                  const tag =
+                    profile?.email?.split('@')[0] ||
+                    review.user_id?.slice(0, 6) ||
+                    'user';
+                  const initials = tag.substring(0, 2).toUpperCase();
+                  const avatarUrl = profile?.avatar_url;
+
+                  return (
+                    <div
+                      key={review.id}
+                      className="rounded-xl border border-border/60 bg-card/50 p-5 shadow-sm"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
+                        {/* User Avatar */}
+                        <div className="flex-shrink-0">
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt={tag}
+                              className="h-11 w-11 rounded-full object-cover ring-2 ring-border"
+                            />
+                          ) : (
+                            <div className="h-11 w-11 rounded-full bg-primary/10 ring-2 ring-border flex items-center justify-center">
+                              <span className="text-sm font-semibold text-primary">{initials}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Review Content */}
+                        <div className="flex-1 min-w-0 space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                            <div className="space-y-1.5">
+                              <p className="text-sm font-semibold tracking-tight">@{tag}</p>
+                              <div className="inline-flex w-full sm:w-auto items-center justify-start sm:justify-start gap-2 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                                <span className="text-[11px] uppercase tracking-wide">Rating</span>
+                                <span className="flex items-center gap-1">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-4 w-4 ${
+                                        i < review.rating
+                                          ? 'fill-primary text-primary'
+                                          : 'text-muted-foreground'
+                                      }`}
+                                    />
+                                  ))}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap sm:text-right">
+                              {new Date(review.created_at).toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                          {review.comment && (
+                            <p className="text-sm leading-relaxed text-foreground/90">{review.comment}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

@@ -26,14 +26,14 @@ interface WorkspaceCardProps {
 
 export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
   return (
-    <Link href={`/cities/${citySlug}/${workspace.slug}`}>
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full">
+    <Link href={`/cities/${citySlug}/${workspace.slug}`} className="block h-full">
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300 h-full rounded-2xl p-0">
         <div className="relative aspect-video w-full overflow-hidden">
           <WorkspaceImage
             src={workspace.primary_photo?.url}
             alt={workspace.name}
             fill
-            className="object-cover hover:scale-105 transition-transform duration-300"
+            className="object-cover hover:scale-105 transition-transform duration-300 rounded-t-2xl"
           />
           <Badge className="absolute top-3 right-3 capitalize">
             {workspace.type.replace('_', ' ')}
@@ -57,7 +57,7 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
             </p>
           )}
 
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm mb-3">
             {workspace.has_wifi && (
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Wifi className="h-4 w-4" />
@@ -79,7 +79,7 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
           </div>
 
           {workspace.overall_rating !== null && workspace.total_reviews > 0 && (
-            <div className="flex items-center gap-2 pt-2 border-t">
+            <div className="flex items-center gap-2 pt-2 pb-2 mt-1 border-t">
               <div className="flex items-center gap-1">
                 <Star className="h-4 w-4 fill-primary text-primary" />
                 <span className="font-semibold">{workspace.overall_rating.toFixed(1)}</span>
