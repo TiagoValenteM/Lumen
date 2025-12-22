@@ -157,12 +157,19 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border px-6 py-6">
-        <div className="max-w-4xl mx-auto text-sm text-muted-foreground flex flex-col md:flex-row items-center justify-center md:justify-between gap-3 text-center md:text-left">
-          <div className="hidden md:block">© {new Date().getFullYear()} Lumen</div>
-          <div className="inline-flex items-center justify-center gap-2">
-            <span>Proudly developed in Switzerland</span>
-            <span role="img" aria-label="Switzerland flag">🇨🇭</span>
+      <footer className="border-t border-border px-6 py-8 bg-card/40">
+        <div className="max-w-6xl mx-auto text-sm text-muted-foreground flex flex-col md:flex-row items-center md:items-center justify-center md:justify-between gap-3 text-center md:text-left">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+            <span>© {new Date().getFullYear()} Lumen</span>
+            <div className="inline-flex items-center justify-center gap-2 text-xs">
+              <span>Proudly developed in Switzerland</span>
+              <span role="img" aria-label="Switzerland flag">🇨🇭</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            <Link href="/legal/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link href="/legal/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+            <Link href="mailto:support@lumen.com" className="hover:text-foreground transition-colors">Contact</Link>
           </div>
         </div>
       </footer>

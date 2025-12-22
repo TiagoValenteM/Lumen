@@ -147,6 +147,15 @@ export default function WorkspacePage() {
   const supabase = createClient();
   const remainingChars = MAX_COMMENT_LENGTH - reviewComment.length;
 
+  const resolveAvatarUrl = (avatarPath: string | null) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith("http://") || avatarPath.startsWith("https://")) {
+      return avatarPath;
+    }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
+    return data.publicUrl ?? null;
+  };
+
   const loadReviews = async (workspaceId: string) => {
     const { data: reviewsData, error: reviewsError } = await supabase
       .from("reviews")
@@ -175,7 +184,10 @@ export default function WorkspacePage() {
         } else if (profileData) {
           const map: Record<string, ProfileSummary> = {};
           profileData.forEach((p) => {
-            map[p.id] = p as ProfileSummary;
+            map[p.id] = {
+              ...(p as ProfileSummary),
+              avatar_url: resolveAvatarUrl((p as ProfileSummary).avatar_url),
+            };
           });
           setProfilesById(map);
         }

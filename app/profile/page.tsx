@@ -114,6 +114,9 @@ export default function ProfilePage() {
       setAvatarFile(null);
       setToast({ message: "Profile updated successfully.", type: "success" });
       setTimeout(() => setToast(null), 3000);
+      
+      // Notify navbar to refresh profile data
+      window.dispatchEvent(new Event("profileUpdated"));
     } catch (error: any) {
       console.error("Error saving profile:", error);
       setToast({ message: error?.message || "Failed to save profile", type: "error" });

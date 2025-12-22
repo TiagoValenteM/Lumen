@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,10 +21,93 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { useLocation } from "@/contexts/LocationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import CoffeeLogo from "@/components/CoffeeLogo";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { createClient } from "@/lib/supabase/client";
 
 export default function NavBar() {
   const { latitude, longitude, error, loading, requestLocation } = useLocation();
   const { user, signOut } = useAuth();
+  const supabase = useMemo(() => createClient(), []);
+  const [profile, setProfile] = useState<{
+    first_name: string | null;
+    last_name: string | null;
+    avatar_url: string | null;
+    email: string | null;
+    tag: string | null;
+  } | null>(null);
+
+  const resolveAvatarUrl = (avatarPath: string | null) => {
+    if (!avatarPath) return null;
+    if (avatarPath.startsWith("http://") || avatarPath.startsWith("https://")) {
+      return avatarPath;
+    }
+    const { data } = supabase.storage.from("avatars").getPublicUrl(avatarPath);
+    return data.publicUrl ?? null;
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchProfile() {
+      if (!user) {
+        setProfile(null);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, avatar_url, email, tag")
+        .eq("id", user.id)
+        .single();
+      if (error) {
+        console.error("Error loading profile:", error);
+        return;
+      }
+      if (isMounted && data) {
+        setProfile({
+          ...data,
+          avatar_url: resolveAvatarUrl(data.avatar_url),
+        });
+      }
+    }
+    fetchProfile();
+
+    const handleProfileUpdate = () => {
+      fetchProfile();
+    };
+
+    window.addEventListener("profileUpdated", handleProfileUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("profileUpdated", handleProfileUpdate);
+    };
+  }, [supabase, user]);
+
+  const displayName =
+    (profile?.first_name && profile?.last_name
+      ? `${profile.first_name} ${profile.last_name}`
+      : profile?.tag) ||
+    (user?.user_metadata?.first_name && user?.user_metadata?.last_name
+      ? `${user.user_metadata.first_name} ${user.user_metadata.last_name}`
+      : user?.user_metadata?.full_name) ||
+    profile?.email ||
+    user?.email ||
+    "User";
+
+  const avatarUrl =
+    profile?.avatar_url ||
+    user?.user_metadata?.avatar_url ||
+    user?.user_metadata?.picture ||
+    undefined;
+
+  const initials =
+    (!avatarUrl &&
+      displayName
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part[0]?.toUpperCase() || "")
+        .join("")
+        .slice(0, 2)) ||
+    undefined;
 
   const handleLocationClick = () => {
     requestLocation();
@@ -37,7 +121,7 @@ export default function NavBar() {
   };
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between px-6 h-12 border-b bg-background">
+    <nav className="sticky top-0 z-50 flex items-center justify-between px-6 h-14 border-b bg-background">
       <Link href="/" className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity">
         <CoffeeLogo className="h-6 w-6" />
         <span>Lumen</span>
@@ -118,9 +202,18 @@ export default function NavBar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
-                {user.email}
-              </DropdownMenuItem>
+              <div className="flex items-center gap-3 px-3 py-2">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={avatarUrl} alt={displayName} />
+                  <AvatarFallback>{initials}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium leading-tight">{displayName}</span>
+                  {profile?.tag && (
+                    <span className="text-xs text-muted-foreground leading-tight">@{profile.tag}</span>
+                  )}
+                </div>
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/profile">Profile</Link>
