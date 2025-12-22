@@ -21,6 +21,22 @@ export interface Workspace {
   has_wifi: boolean;
   has_power_outlets: boolean;
   has_coffee: boolean;
+  has_food?: boolean;
+  has_veg?: boolean;
+  has_alcohol?: boolean;
+  has_outdoor_seating?: boolean;
+  has_restrooms?: boolean;
+  has_bike_parking?: boolean;
+  has_parking?: boolean;
+  has_natural_light?: boolean;
+  is_accessible?: boolean;
+  allows_pets?: boolean;
+  good_for_meetings?: boolean;
+  good_for_calls?: boolean;
+  good_for_groups?: boolean;
+  noise_level?: string | null;
+  music_volume?: number | null;
+  time_limit_hours?: number | null;
   overall_rating: number | null;
   total_reviews: number;
   primary_photo?: {
@@ -43,8 +59,12 @@ export interface WorkspaceDetail extends Workspace {
   power_outlet_availability: number | null;
   seating_capacity: number | null;
   has_food: boolean;
+  has_veg?: boolean;
+  has_outdoor_seating?: boolean;
+  has_restrooms?: boolean;
   has_natural_light: boolean;
   has_air_conditioning: boolean;
+  has_heating?: boolean;
   has_parking: boolean;
   has_bike_parking: boolean;
   is_accessible: boolean;
@@ -55,6 +75,7 @@ export interface WorkspaceDetail extends Workspace {
   minimum_purchase_required: boolean;
   good_for_meetings: boolean;
   good_for_calls: boolean;
+  good_for_groups?: boolean;
 }
 
 export interface Photo {

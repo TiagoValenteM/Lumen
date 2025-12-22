@@ -14,6 +14,7 @@ import {
   Accessibility,
   PawPrint,
   Car,
+  Bike,
   Users,
 } from "lucide-react";
 import type { Workspace } from "@/lib/types";
@@ -42,7 +43,7 @@ export const FILTER_GROUPS: FilterGroup[] = [
   },
   {
     label: "Space & Access",
-    options: ["Outdoor", "Restroom", "Accessible", "Pets", "Parking", "Light"],
+    options: ["Outdoor", "Restroom", "Accessible", "Pets", "Parking", "Bike parking", "Light"],
   },
   {
     label: "Community",
@@ -65,6 +66,7 @@ export const FILTER_ICONS: Record<string, ComponentType<{ className?: string }>>
   Accessible: Accessibility,
   Pets: PawPrint,
   Parking: Car,
+  "Bike parking": Bike,
   Light: Sun,
   Groups: Users,
 };
@@ -74,6 +76,17 @@ export const SUPPORTED_FILTERS: Record<string, keyof Workspace> = {
   "Wi-Fi": "has_wifi",
   Power: "has_power_outlets",
   Coffee: "has_coffee",
+  Food: "has_food",
+  Veggie: "has_veg",
+  Alcohol: "has_alcohol",
+  Outdoor: "has_outdoor_seating",
+  Restroom: "has_restrooms",
+  Accessible: "is_accessible",
+  Pets: "allows_pets",
+  Parking: "has_parking",
+  "Bike parking": "has_bike_parking",
+  Light: "has_natural_light",
+  Groups: "good_for_groups",
 };
 
 export const MAX_ACTIVE_FILTERS = 5;

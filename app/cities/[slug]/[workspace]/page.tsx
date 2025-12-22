@@ -30,6 +30,7 @@ import {
   Globe,
   DollarSign,
   Users,
+  Sprout,
   Volume2,
   Sun,
   Wind,
@@ -413,6 +414,12 @@ export default function WorkspacePage() {
                       <span className="text-sm">Food</span>
                     </div>
                   )}
+                  {workspace.has_veg && (
+                    <div className="flex items-center gap-2">
+                      <Sprout className="h-4 w-4 text-primary" />
+                      <span className="text-sm">Vegetarian/Vegan options</span>
+                    </div>
+                  )}
                   {workspace.has_natural_light && (
                     <div className="flex items-center gap-2">
                       <Sun className="h-4 w-4 text-primary" />
@@ -491,12 +498,17 @@ export default function WorkspacePage() {
                 <CardTitle>Policies</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                {workspace.time_limit_hours && (
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span>{workspace.time_limit_hours}h time limit</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  {workspace.time_limit_hours && workspace.time_limit_hours > 0 ? (
+                    <span>
+                      {workspace.time_limit_hours}{" "}
+                      {workspace.time_limit_hours === 1 ? "hour" : "hours"} time limit
+                    </span>
+                  ) : (
+                    <span className="text-foreground font-medium">No maximum time</span>
+                  )}
+                </div>
                 {workspace.minimum_purchase_required && (
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-muted-foreground" />

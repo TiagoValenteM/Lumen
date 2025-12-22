@@ -61,6 +61,7 @@ interface FormData {
   
   // Food & Beverage
   has_food: boolean;
+  has_veg: boolean;
   has_coffee: boolean;
   has_alcohol: boolean;
   price_range: number;
@@ -71,6 +72,7 @@ interface FormData {
   minimum_purchase_required: boolean;
   good_for_meetings: boolean;
   good_for_calls: boolean;
+  good_for_groups: boolean;
 }
 
 export default function AddWorkspacePage() {
@@ -110,6 +112,7 @@ export default function AddWorkspacePage() {
     is_accessible: true,
     allows_pets: false,
     has_food: true,
+    has_veg: false,
     has_coffee: true,
     has_alcohol: false,
     price_range: 2,
@@ -118,6 +121,7 @@ export default function AddWorkspacePage() {
     minimum_purchase_required: true,
     good_for_meetings: true,
     good_for_calls: false,
+    good_for_groups: false,
   });
 
   useEffect(() => {
@@ -662,20 +666,30 @@ export default function AddWorkspacePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="has_coffee"
-                    checked={formData.has_coffee}
-                    onCheckedChange={(checked) => updateField('has_coffee', checked)}
-                  />
-                  <Label htmlFor="has_coffee" className="font-normal">Serves Coffee</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
                     id="has_food"
                     checked={formData.has_food}
                     onCheckedChange={(checked) => updateField('has_food', checked)}
                   />
                   <Label htmlFor="has_food" className="font-normal">Serves Food</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="has_veg"
+                    checked={formData.has_veg}
+                    onCheckedChange={(checked) => updateField('has_veg', checked)}
+                    disabled={!formData.has_food}
+                  />
+                  <Label htmlFor="has_veg" className="font-normal">Vegetarian/Vegan options</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="has_coffee"
+                    checked={formData.has_coffee}
+                    onCheckedChange={(checked) => updateField('has_coffee', checked)}
+                  />
+                  <Label htmlFor="has_coffee" className="font-normal">Serves Coffee</Label>
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -755,6 +769,15 @@ export default function AddWorkspacePage() {
                       onCheckedChange={(checked) => updateField('good_for_calls', checked)}
                     />
                     <Label htmlFor="good_for_calls" className="font-normal">Good for Phone Calls</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="good_for_groups"
+                      checked={formData.good_for_groups}
+                      onCheckedChange={(checked) => updateField('good_for_groups', checked)}
+                    />
+                    <Label htmlFor="good_for_groups" className="font-normal">Good for Groups</Label>
                   </div>
                 </div>
               </div>

@@ -55,12 +55,32 @@ export default function CityPage() {
     if (!activeFilters.length) return workspaces;
 
     const hasSavedFilter = activeFilters.includes("Saved");
-    const otherFilters = activeFilters.filter((f) => f !== "Saved");
+    const hasQuiet = activeFilters.includes("Quiet");
+    const hasLongStays = activeFilters.includes("Long stays");
+    const otherFilters = activeFilters.filter(
+      (f) => f !== "Saved" && f !== "Quiet" && f !== "Long stays"
+    );
 
     return workspaces.filter((workspace) => {
       // Saved filter
       if (hasSavedFilter && !savedWorkspaceIds.has(workspace.id)) {
         return false;
+      }
+
+      // Quiet: noise level quiet or music volume <=2
+      if (hasQuiet) {
+        const noiseOk = workspace.noise_level === "quiet";
+        const musicOk =
+          typeof workspace.music_volume === "number"
+            ? workspace.music_volume <= 2
+            : workspace.music_volume === null;
+        if (!noiseOk && !musicOk) return false;
+      }
+
+      // Long stays: time_limit_hours is 0 or null
+      if (hasLongStays) {
+        const tl = workspace.time_limit_hours;
+        if (!(tl === null || tl === 0)) return false;
       }
 
       // Other supported filters
@@ -102,6 +122,20 @@ export default function CityPage() {
             has_wifi,
             has_power_outlets,
             has_coffee,
+            has_food,
+            has_veg,
+            has_alcohol,
+            has_outdoor_seating,
+            has_restrooms,
+            has_bike_parking,
+            has_parking,
+            has_natural_light,
+            is_accessible,
+            allows_pets,
+            good_for_groups,
+            noise_level,
+            music_volume,
+            time_limit_hours,
             overall_rating,
             total_reviews
           `)
@@ -123,6 +157,33 @@ export default function CityPage() {
 
               return {
                 ...workspace,
+                has_wifi: Boolean(workspace.has_wifi),
+                has_power_outlets: Boolean(workspace.has_power_outlets),
+                has_coffee: Boolean(workspace.has_coffee),
+                has_food: Boolean(workspace.has_food),
+                has_veg: Boolean(workspace.has_veg),
+                has_alcohol: Boolean(workspace.has_alcohol),
+                has_outdoor_seating: Boolean(workspace.has_outdoor_seating),
+                has_restrooms: Boolean(workspace.has_restrooms),
+                has_bike_parking: Boolean(workspace.has_bike_parking),
+                has_parking: Boolean(workspace.has_parking),
+                has_natural_light: Boolean(workspace.has_natural_light),
+                is_accessible: Boolean(workspace.is_accessible),
+                allows_pets: Boolean(workspace.allows_pets),
+                good_for_groups: Boolean(workspace.good_for_groups),
+                noise_level: workspace.noise_level,
+                music_volume:
+                  typeof workspace.music_volume === "number"
+                    ? workspace.music_volume
+                    : workspace.music_volume === null
+                      ? null
+                      : undefined,
+                time_limit_hours:
+                  typeof workspace.time_limit_hours === "number"
+                    ? workspace.time_limit_hours
+                    : workspace.time_limit_hours === null
+                      ? null
+                      : undefined,
                 primary_photo: photoData,
               };
             })
