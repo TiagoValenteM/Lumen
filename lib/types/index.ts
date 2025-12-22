@@ -78,6 +78,7 @@ export interface Profile {
   email: string | null;
   tag: string | null;
   bio?: string | null;
+  created_at?: string;
 }
 
 export type ProfileSummary = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'avatar_url' | 'email' | 'tag'>;

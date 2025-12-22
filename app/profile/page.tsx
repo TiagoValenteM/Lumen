@@ -1,22 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Toast } from "@/components/ui/toast";
-import { Loader2, Upload, Save } from "lucide-react";
-import { getInitials } from "@/lib/utils";
-import { useToast } from "@/hooks/useToast";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Bookmark, MapPinCheck, ArrowRight, Settings, Mail, AtSign, Calendar } from "lucide-react";
+import Link from "next/link";
+import { getInitials, getDisplayName } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
-
-const MAX_BIO_LENGTH = 500;
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -24,25 +18,31 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [bio, setBio] = useState("");
-  const { toast, showSuccess, showError } = useToast();
-  const remainingBio = MAX_BIO_LENGTH - bio.length;
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
+  const [visitedCount, setVisitedCount] = useState(0);
+
+  const displayName = useMemo(() => {
+    return getDisplayName(
+      profile?.first_name,
+      profile?.last_name,
+      profile?.tag,
+      profile?.email
+    );
+  }, [profile]);
 
   const initials = useMemo(() => {
-    const tag = profile?.tag || profile?.email?.split("@")[0] || "user";
-    return getInitials(tag);
-  }, [profile]);
+    return getInitials(displayName);
+  }, [displayName]);
 
   useEffect(() => {
     if (!user) return;
     async function loadProfile() {
       setLoading(true);
+      
+      // Load profile data
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, tag, avatar_url")
+        .select("id, first_name, last_name, email, tag, avatar_url, bio, created_at")
         .eq("id", user?.id)
         .maybeSingle();
 
@@ -50,72 +50,27 @@ export default function ProfilePage() {
         console.error("Failed to fetch profile", error);
       } else if (data) {
         setProfile(data as Profile);
-        setBio((data as any).bio || "");
+        
+        // Load saved workspaces count
+        const { count: savedWorkspacesCount } = await supabase
+          .from("saved_workspaces")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user!.id);
+        
+        setSavedCount(savedWorkspacesCount || 0);
+        
+        // Load visited workspaces count
+        const { count: visitedWorkspacesCount } = await supabase
+          .from("visited_workspaces")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user!.id);
+        
+        setVisitedCount(visitedWorkspacesCount || 0);
       }
       setLoading(false);
     }
     loadProfile();
-  }, [supabase, user]);
-
-  const uploadAvatar = async () => {
-    if (!avatarFile || !user) return null;
-    if (avatarFile.size > MAX_AVATAR_BYTES) {
-      showError("Avatar file is too large. Max size is 2MB.", 4000);
-      return null;
-    }
-    const fileExt = avatarFile.name.split(".").pop();
-    const filePath = `${user.id}/avatar.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("avatars")
-      .upload(filePath, avatarFile, { upsert: true });
-
-    if (uploadError) {
-      throw new Error(uploadError.message || "Failed to upload avatar");
-    }
-
-    const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-    return data.publicUrl;
-  };
-
-  const handleSave = async () => {
-    if (!user || !profile) return;
-    setSaving(true);
-    try {
-      let newAvatarUrl = profile.avatar_url;
-      if (avatarFile) {
-        newAvatarUrl = await uploadAvatar();
-        if (!newAvatarUrl) throw new Error("Avatar upload failed");
-      }
-
-      const updates = {
-        first_name: profile.first_name?.trim() || null,
-        last_name: profile.last_name?.trim() || null,
-        tag: profile.tag?.trim() || null,
-        avatar_url: newAvatarUrl,
-        bio: bio.trim() || null,
-        email: profile.email, // do not change email here; it mirrors auth
-      };
-
-      const { error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", user.id);
-
-      if (error) throw error;
-      setProfile((prev) => (prev ? { ...prev, ...updates } : prev));
-      setAvatarFile(null);
-      showSuccess("Profile updated successfully.");
-      
-      // Notify navbar to refresh profile data
-      window.dispatchEvent(new Event("profileUpdated"));
-    } catch (error: unknown) {
-      console.error("Error saving profile:", error);
-      showError((error as Error)?.message || "Failed to save profile", 4000);
-    } finally {
-      setSaving(false);
-    }
-  };
+  }, [user, supabase]);
 
   if (!user) {
     return (
@@ -138,109 +93,110 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-4 py-10">
-        <Card>
-          <CardHeader className="space-y-1">
-            <CardTitle>Profile</CardTitle>
-            <CardDescription>View and edit your profile information.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={profile?.avatar_url || undefined} alt={initials} />
-                <AvatarFallback>{initials}</AvatarFallback>
+      <div className="max-w-5xl mx-auto px-4 py-10">
+        {/* User Header */}
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+              <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
+                <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Profile picture</Label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    ref={fileInputRef}
-                    onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex items-center gap-2"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload
+              
+              <div className="flex-1 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <h1 className="text-3xl font-bold">{displayName}</h1>
+                    {profile?.tag && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <AtSign className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">{profile.tag}</span>
+                      </div>
+                    )}
+                  </div>
+                  <Button asChild>
+                    <Link href="/profile/edit">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Link>
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Max size 2MB.
-                </p>
+                
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                  {profile?.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <span>{profile.email}</span>
+                    </div>
+                  )}
+                  {profile?.created_at && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>Joined {new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {profile?.bio && (
+                  <p className="text-muted-foreground leading-relaxed">{profile.bio}</p>
+                )}
               </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first_name">First name</Label>
-                <Input
-                  id="first_name"
-                  value={profile?.first_name || ""}
-                  onChange={(e) => setProfile((p) => (p ? { ...p, first_name: e.target.value } : p))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last_name">Last name</Label>
-                <Input
-                  id="last_name"
-                  value={profile?.last_name || ""}
-                  onChange={(e) => setProfile((p) => (p ? { ...p, last_name: e.target.value } : p))}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" value={profile?.email || ""} disabled />
-                <p className="text-xs text-muted-foreground">Email comes from authentication.</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tag">Tag</Label>
-                <Input
-                  id="tag"
-                  value={profile?.tag || ""}
-                  onChange={(e) => setProfile((p) => (p ? { ...p, tag: e.target.value } : p))}
-                />
-                <p className="text-xs text-muted-foreground">Shown as @tag on reviews.</p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="bio">Bio</Label>
-              <Textarea
-                id="bio"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                rows={3}
-                maxLength={MAX_BIO_LENGTH}
-                placeholder="Tell others about you..."
-              />
-              <p className={`text-xs ${remainingBio < 0 ? "text-destructive" : "text-muted-foreground"}`}>
-                {remainingBio} characters remaining
-              </p>
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={saving}
-                className="flex items-center gap-2"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save changes
-              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {toast && <Toast message={toast.message} type={toast.type} />}
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <Link href="/saved">
+            <Card className="hover:border-primary transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Bookmark className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Saved Workspaces</CardTitle>
+                      <CardDescription>Your favorite places</CardDescription>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{savedCount}</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {savedCount === 1 ? "workspace saved" : "workspaces saved"}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/visited">
+            <Card className="hover:border-primary transition-colors cursor-pointer h-full">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <MapPinCheck className="h-6 w-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Visited Workspaces</CardTitle>
+                      <CardDescription>Places you&apos;ve been to</CardDescription>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold">{visitedCount}</div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {visitedCount === 1 ? "workspace visited" : "workspaces visited"}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       </div>
     </div>
   );

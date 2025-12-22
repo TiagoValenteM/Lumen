@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveAvatarUrl, getInitials } from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
+import { useSavedWorkspace } from "@/hooks/useSavedWorkspace";
+import { useVisitedWorkspace } from "@/hooks/useVisitedWorkspace";
 import type { City, WorkspaceDetail, Photo, Review, ProfileSummary } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,6 +42,9 @@ import {
   ChevronRight,
   MessageSquare,
   User,
+  Bookmark,
+  BookmarkCheck,
+  MapPinCheck,
 } from "lucide-react";
 
 export default function WorkspacePage() {
@@ -57,6 +62,8 @@ export default function WorkspacePage() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
   const { toast, showSuccess, showError } = useToast();
+  const { isSaved, toggleSave } = useSavedWorkspace(user?.id, workspace?.id || "");
+  const { hasVisited, toggleVisited } = useVisitedWorkspace(user?.id, workspace?.id || "");
   const MAX_COMMENT_LENGTH = 500;
   const supabase = createClient();
 
@@ -513,13 +520,52 @@ export default function WorkspacePage() {
 
             {/* Quick Actions */}
             <div className="space-y-3">
-              <Button className="w-full" size="lg">
-                Save Workspace
-              </Button>
+              <div className="flex gap-3">
+                <Button 
+                  variant={hasVisited ? "default" : "outline"}
+                  size="lg"
+                  className="flex-1 gap-2"
+                  onClick={async () => {
+                    if (!user) {
+                      showError("Please sign in to mark as visited");
+                      return;
+                    }
+                    try {
+                      await toggleVisited();
+                      showSuccess(hasVisited ? "Removed from visited" : "Marked as been here!");
+                    } catch (error) {
+                      showError("Failed to update visited status");
+                    }
+                  }}
+                >
+                  <MapPinCheck className="h-5 w-5" />
+                  {hasVisited ? "Been Here" : "Mark as Visited"}
+                </Button>
+                <Button 
+                  variant={isSaved ? "default" : "outline"}
+                  size="lg"
+                  className="flex-1 gap-2"
+                  onClick={async () => {
+                    if (!user) {
+                      showError("Please sign in to save workspaces");
+                      return;
+                    }
+                    try {
+                      await toggleSave();
+                      showSuccess(isSaved ? "Workspace removed from saved" : "Workspace saved!");
+                    } catch (error) {
+                      showError("Failed to save workspace");
+                    }
+                  }}
+                >
+                  {isSaved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
+                  {isSaved ? "Saved" : "Save Place"}
+                </Button>
+              </div>
               <Button 
                 variant="outline" 
-                className="w-full" 
                 size="lg"
+                className="w-full gap-2"
                 onClick={() => {
                   if (!user) {
                     showError("Please sign in to write a review");
@@ -528,7 +574,8 @@ export default function WorkspacePage() {
                   setShowReviewForm(!showReviewForm);
                 }}
               >
-                Write a Review
+                <MessageSquare className="h-5 w-5" />
+                Write Review
               </Button>
             </div>
           </div>
