@@ -147,8 +147,10 @@ export default function Home() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline">
-              Sign Up Free
+            <Button size="lg" variant="outline" asChild>
+              <Link href="/signup">
+                Sign Up Free
+              </Link>
             </Button>
           </div>
         </div>

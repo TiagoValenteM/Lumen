@@ -15,13 +15,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Globe, Plus, User, MapPin, Loader2 } from "lucide-react";
+import { Globe, Plus, User, MapPin, Loader2, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useLocation } from "@/contexts/LocationContext";
+import { useAuth } from "@/contexts/AuthContext";
 import CoffeeLogo from "@/components/CoffeeLogo";
 
 export default function NavBar() {
-  const { latitude, longitude, error, loading, requestLocation, permissionStatus } = useLocation();
+  const { latitude, longitude, error, loading, requestLocation } = useLocation();
+  const { user, signOut } = useAuth();
 
   const handleLocationClick = () => {
     requestLocation();
@@ -86,25 +88,57 @@ export default function NavBar() {
           </Tooltip>
         </TooltipProvider>
         <div className="h-6 w-px bg-border" />
-        <Button variant="ghost" size="icon" aria-label="Add">
-          <Plus className="h-6 w-6" />
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                aria-label="Add workspace"
+                asChild
+              >
+                <Link href="/add-workspace">
+                  <Plus className="h-6 w-6" />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add Workspace</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <div className="h-6 w-px bg-border" />
         <ThemeToggle />
         <div className="h-6 w-px bg-border" />
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="User menu">
+        {user ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="User menu">
+                <User className="h-6 w-6" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+                {user.email}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>Profile</DropdownMenuItem>
+              <DropdownMenuItem>Settings</DropdownMenuItem>
+              <DropdownMenuItem>Saved Places</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Log Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button variant="ghost" size="icon" asChild aria-label="Sign in">
+            <Link href="/login">
               <User className="h-6 w-6" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Profile</DropdownMenuItem>
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">Log Out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </Link>
+          </Button>
+        )}
       </div>
     </nav>
   );

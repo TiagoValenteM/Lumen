@@ -4,6 +4,7 @@ import "./globals.css";
 import NavBar from "@/components/NavBar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { LocationProvider } from "@/contexts/LocationContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 
 const geist = Geist({
   variable: "--font-sans",
@@ -36,12 +37,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <LocationProvider>
-            <NavBar />
-            <div id="root-content">
-              {children}
-            </div>
-          </LocationProvider>
+          <AuthProvider>
+            <LocationProvider>
+              <NavBar />
+              <div id="root-content">
+                {children}
+              </div>
+            </LocationProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
