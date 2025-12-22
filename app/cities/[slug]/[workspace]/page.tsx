@@ -124,6 +124,7 @@ interface ProfileSummary {
   last_name: string | null;
   avatar_url: string | null;
   email: string | null;
+  tag: string | null;
 }
 
 export default function WorkspacePage() {
@@ -166,7 +167,7 @@ export default function WorkspacePage() {
       if (userIds.length > 0) {
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("id, first_name, last_name, avatar_url, email")
+          .select("id, first_name, last_name, avatar_url, email, tag")
           .in("id", userIds);
 
         if (profileError) {
@@ -722,6 +723,7 @@ export default function WorkspacePage() {
                 {reviews.map((review) => {
                   const profile = profilesById[review.user_id];
                   const tag =
+                    profile?.tag ||
                     profile?.email?.split('@')[0] ||
                     review.user_id?.slice(0, 6) ||
                     'user';

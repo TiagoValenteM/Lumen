@@ -122,7 +122,9 @@ export default function NavBar() {
                 {user.email}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>Profile</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/profile">Profile</Link>
+              </DropdownMenuItem>
               <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuItem>Saved Places</DropdownMenuItem>
               <DropdownMenuSeparator />
