@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WorkspaceCard } from "@/components/features/workspace";
@@ -20,9 +21,11 @@ import {
 export default function CityPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const { user } = useAuth();
   const [city, setCity] = useState<City | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
+  const [savedWorkspaceIds, setSavedWorkspaceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -43,15 +46,25 @@ export default function CityPage() {
 
   const filteredWorkspaces = useMemo(() => {
     if (!activeFilters.length) return workspaces;
+
+    const hasSavedFilter = activeFilters.includes("Saved");
+    const otherFilters = activeFilters.filter((f) => f !== "Saved");
+
     return workspaces.filter((workspace) => {
-      return activeFilters.every((filter) => {
+      // Saved filter
+      if (hasSavedFilter && !savedWorkspaceIds.has(workspace.id)) {
+        return false;
+      }
+
+      // Other supported filters
+      return otherFilters.every((filter) => {
         const key = SUPPORTED_FILTERS[filter];
         if (!key) return true; // filters we don't have data for are ignored
         const value = workspace[key];
         return value === true;
       });
     });
-  }, [activeFilters, workspaces]);
+  }, [activeFilters, workspaces, savedWorkspaceIds]);
 
   useEffect(() => {
     async function fetchCityAndWorkspaces() {
@@ -115,6 +128,26 @@ export default function CityPage() {
 
     fetchCityAndWorkspaces();
   }, [slug, supabase]);
+
+  useEffect(() => {
+    async function loadSavedWorkspaces() {
+      if (!user) {
+        setSavedWorkspaceIds(new Set());
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("saved_workspaces")
+        .select("workspace_id")
+        .eq("user_id", user.id);
+
+      if (!error && data) {
+        setSavedWorkspaceIds(new Set(data.map((item) => item.workspace_id)));
+      }
+    }
+
+    loadSavedWorkspaces();
+  }, [supabase, user]);
 
   if (loading) {
     return (
