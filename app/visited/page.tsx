@@ -7,8 +7,11 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { WorkspaceCard } from "@/components/features/workspace";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Loader2, MapPinCheck, ArrowLeft } from "lucide-react";
 import type { Workspace } from "@/lib/types";
+import { MEDAL_ICON_URL, VISITED_LEVELS, VISITED_LEVEL_ICONS, getVisitedLevel } from "@/lib/constants/profileLevels";
 
 interface WorkspaceWithCity extends Workspace {
   city_slug?: string;
@@ -19,6 +22,7 @@ export default function VisitedWorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceWithCity[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const visitedLevel = getVisitedLevel(workspaces.length);
 
   useEffect(() => {
     async function loadVisitedWorkspaces() {
@@ -145,15 +149,57 @@ export default function VisitedWorkspacesPage() {
           </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardDescription>Total Visited</CardDescription>
-              <CardTitle className="text-3xl">{workspaces.length}</CardTitle>
-            </CardHeader>
-          </Card>
-        </div>
+        {/* Level & progress */}
+        <Card className="mb-8">
+          <CardHeader className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-5">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <img src={MEDAL_ICON_URL} alt="Medal icon" className="h-6 w-6" />
+                </div>
+                <div>
+                  <CardTitle>Visited level & progress</CardTitle>
+                </div>
+              </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <Badge variant="secondary" className="inline-flex items-center gap-2">
+                    <img
+                      src={VISITED_LEVEL_ICONS[visitedLevel.levelNumber - 1] ?? MEDAL_ICON_URL}
+                      alt={visitedLevel.title}
+                      className="h-4 w-4"
+                    />
+                    <span>Lv {visitedLevel.levelNumber} · {visitedLevel.title}</span>
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {visitedLevel.isMax
+                      ? "Top tier unlocked"
+                      : `${workspaces.length}/${visitedLevel.nextThreshold} to level up`}
+                  </span>
+                </div>
+                <Progress value={visitedLevel.progress} className="h-2" />
+                <div className="flex flex-wrap gap-2.5">
+                  {VISITED_LEVELS.map((lvl, idx) => (
+                    <Badge
+                      key={lvl.title}
+                      variant="outline"
+                      className="text-[11px] inline-flex items-center gap-2"
+                    >
+                      <img
+                        src={VISITED_LEVEL_ICONS[idx] ?? MEDAL_ICON_URL}
+                        alt={lvl.title}
+                        className="h-4 w-4"
+                      />
+                      <span>
+                        Lv {idx + 1}: {lvl.title} ({lvl.min}{lvl.max === Infinity ? "+" : `-${lvl.max}`})
+                      </span>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+        </Card>
 
         {/* Workspaces Grid */}
         {workspaces.length === 0 ? (

@@ -20,7 +20,7 @@ import { getInitials, getDisplayName } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCallback } from "react";
-import { LEVEL_ICONS, getLevel } from "@/lib/constants/profileLevels";
+import { LEVEL_ICONS, VISITED_LEVEL_ICONS, getLevel, getVisitedLevel } from "@/lib/constants/profileLevels";
 import {
   Tooltip,
   TooltipContent,
@@ -117,6 +117,34 @@ export default function ProfilePage() {
     }
     loadProfile();
   }, [user, supabase]);
+
+  const refreshVisited = useCallback(async () => {
+    if (!user) return;
+    const { data: visitedRows, count: visitedWorkspacesCount } = await supabase
+      .from("visited_workspaces")
+      .select("workspace_id", { count: "exact", head: false })
+      .eq("user_id", user.id);
+    setVisitedCount(visitedWorkspacesCount || 0);
+    setVisitedIds(new Set(visitedRows?.map((r) => r.workspace_id) || []));
+  }, [supabase, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel(`visited-updates-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "visited_workspaces", filter: `user_id=eq.${user.id}` },
+        () => {
+          refreshVisited();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, user, refreshVisited]);
 
   useEffect(() => {
     const loadNearby = async () => {
@@ -279,15 +307,33 @@ export default function ProfilePage() {
       try {
         setBadgesLoading(true);
         setBadgesError(null);
+
         const levelData = getLevel(myWorkspacesCount);
-        const badgePayload = {
-          user_id: user.id,
-          badge_key: "level.current",
-          badge_title: levelData.title,
-          badge_level: levelData.levelNumber,
-          icon_url: LEVEL_ICONS[levelData.levelNumber - 1] ?? LEVEL_ICONS[0],
-        };
-        await supabase.from("user_badges").upsert(badgePayload);
+        const visitedLevelData = getVisitedLevel(visitedCount);
+
+        const badgePayloads = [
+          {
+            user_id: user.id,
+            badge_key: "level.current",
+            badge_title: levelData.title,
+            badge_level: levelData.levelNumber,
+            icon_url: LEVEL_ICONS[levelData.levelNumber - 1] ?? LEVEL_ICONS[0],
+          },
+          {
+            user_id: user.id,
+            badge_key: "visited.level.current",
+            badge_title: visitedLevelData.title,
+            badge_level: visitedLevelData.levelNumber,
+            icon_url: VISITED_LEVEL_ICONS[visitedLevelData.levelNumber - 1] ?? VISITED_LEVEL_ICONS[0],
+          },
+        ];
+
+        await Promise.all(
+          badgePayloads.map((payload) =>
+            supabase.from("user_badges").upsert(payload, { onConflict: "user_id,badge_key" })
+          )
+        );
+
         const { data, error } = await supabase
           .from("user_badges")
           .select("id, badge_key, badge_title, badge_level, icon_url")
@@ -303,7 +349,7 @@ export default function ProfilePage() {
       }
     };
     syncBadges();
-  }, [user, supabase, myWorkspacesCount]);
+  }, [user, supabase, myWorkspacesCount, visitedCount]);
 
   if (!user) {
     return (
