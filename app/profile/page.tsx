@@ -7,12 +7,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2, Bookmark, MapPinCheck, ArrowRight, Settings, Mail, AtSign, Calendar, MapPin, Navigation } from "lucide-react";
 import Link from "next/link";
 import { getInitials, getDisplayName } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCallback } from "react";
+import { LEVEL_ICONS, getLevel } from "@/lib/constants/profileLevels";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type NearbyWorkspace = {
   id: string;
@@ -37,6 +51,7 @@ export default function ProfilePage() {
   const [visitedIds, setVisitedIds] = useState<Set<string>>(new Set());
   const [nearby, setNearby] = useState<NearbyWorkspace[]>([]);
   const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [radiusKm, setRadiusKm] = useState(10);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
   const [placeLabel, setPlaceLabel] = useState<string | null>(null);
   const [myWorkspaces, setMyWorkspaces] = useState<
@@ -45,6 +60,9 @@ export default function ProfilePage() {
   const [myWorkspacesCount, setMyWorkspacesCount] = useState(0);
   const [myWorkspacesLoading, setMyWorkspacesLoading] = useState(false);
   const [myWorkspacesError, setMyWorkspacesError] = useState<string | null>(null);
+  const [badgesLoading, setBadgesLoading] = useState(false);
+  const [badgesError, setBadgesError] = useState<string | null>(null);
+  const [badges, setBadges] = useState<{ id: string; badge_key: string; badge_title: string; badge_level: number | null; icon_url: string | null }[]>([]);
 
   const displayName = useMemo(() => {
     return getDisplayName(
@@ -58,6 +76,8 @@ export default function ProfilePage() {
   const initials = useMemo(() => {
     return getInitials(displayName);
   }, [displayName]);
+
+  const level = useMemo(() => getLevel(myWorkspacesCount), [myWorkspacesCount]);
 
   useEffect(() => {
     if (!user) return;
@@ -104,9 +124,9 @@ export default function ProfilePage() {
       setNearbyLoading(true);
       setNearbyError(null);
       try {
-        // Rough bounding box to prefilter server-side (~10km radius)
-        const latRadiusDeg = 10 / 111; // ~111km per degree latitude
-        const lonRadiusDeg = 10 / (111 * Math.cos((latitude * Math.PI) / 180) || 1);
+        // Rough bounding box to prefilter server-side (~radiusKm)
+        const latRadiusDeg = radiusKm / 111; // ~111km per degree latitude
+        const lonRadiusDeg = radiusKm / (111 * Math.cos((latitude * Math.PI) / 180) || 1);
 
         const { data, error } = await supabase
           .from("workspaces")
@@ -160,9 +180,9 @@ export default function ProfilePage() {
               longitude: w.longitude,
               distanceKm: haversine(w.latitude as number, w.longitude as number),
             }))
-            .filter((w) => w.distanceKm <= 10)
+            .filter((w) => w.distanceKm <= radiusKm)
             .sort((a, b) => a.distanceKm - b.distanceKm)
-            .slice(0, 5) || [];
+            .slice(0, 4) || [];
 
         setNearby(filtered);
       } catch (err: any) {
@@ -174,7 +194,7 @@ export default function ProfilePage() {
     };
 
     loadNearby();
-  }, [user, latitude, longitude, supabase, visitedIds]);
+  }, [user, latitude, longitude, supabase, visitedIds, radiusKm]);
 
   const reverseGeocode = useCallback(async () => {
     if (latitude === null || longitude === null) return;
@@ -252,6 +272,38 @@ export default function ProfilePage() {
 
     loadMyWorkspaces();
   }, [user, supabase]);
+
+  useEffect(() => {
+    if (!user) return;
+    const syncBadges = async () => {
+      try {
+        setBadgesLoading(true);
+        setBadgesError(null);
+        const levelData = getLevel(myWorkspacesCount);
+        const badgePayload = {
+          user_id: user.id,
+          badge_key: "level.current",
+          badge_title: levelData.title,
+          badge_level: levelData.levelNumber,
+          icon_url: LEVEL_ICONS[levelData.levelNumber - 1] ?? LEVEL_ICONS[0],
+        };
+        await supabase.from("user_badges").upsert(badgePayload);
+        const { data, error } = await supabase
+          .from("user_badges")
+          .select("id, badge_key, badge_title, badge_level, icon_url")
+          .eq("user_id", user.id)
+          .order("awarded_at", { ascending: false });
+        if (error) throw error;
+        setBadges(data || []);
+      } catch (err) {
+        console.error("Failed to sync badges", err);
+        setBadgesError("Could not load badges.");
+      } finally {
+        setBadgesLoading(false);
+      }
+    };
+    syncBadges();
+  }, [user, supabase, myWorkspacesCount]);
 
   if (!user) {
     return (
@@ -379,6 +431,56 @@ export default function ProfilePage() {
           </Link>
         </div>
 
+        {/* Achievements */}
+        <Card>
+          <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>Achievements</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {badgesLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading badges...</span>
+              </div>
+            )}
+            {badgesError && <p className="text-sm text-destructive">{badgesError}</p>}
+            {!badgesLoading && !badgesError && badges.length === 0 && (
+              <p className="text-sm text-muted-foreground">No badges yet. Keep adding places to unlock levels.</p>
+            )}
+            <TooltipProvider>
+              <div className="flex flex-wrap gap-3">
+                {badges.map((b) => (
+                  <Tooltip key={b.id}>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant="secondary"
+                        className="inline-flex items-center justify-center h-14 w-14 rounded-full p-0"
+                      >
+                        {b.icon_url && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={b.icon_url} alt={b.badge_title} className="h-10 w-10" />
+                        )}
+                        <span className="sr-only">
+                          {b.badge_level ? `Lv ${b.badge_level} · ` : ""}
+                          {b.badge_title}
+                        </span>
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">
+                        {b.badge_level ? `Lv ${b.badge_level} · ` : ""}
+                        {b.badge_title}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </TooltipProvider>
+          </CardContent>
+        </Card>
+
         {/* Nearby suggestions */}
         <Card className="overflow-hidden">
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b">
@@ -390,20 +492,37 @@ export default function ProfilePage() {
                 </p>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={requestLocation}
-              disabled={geoLoading}
-              className="inline-flex items-center gap-2 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-md"
-            >
-              {geoLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Navigation className="h-4 w-4" />
-              )}
-              Use my location
-            </Button>
+            <div className="flex items-center gap-3">
+              <Select
+                value={radiusKm.toString()}
+                onValueChange={(val) => setRadiusKm(Number(val))}
+              >
+                <SelectTrigger className="w-27.5">
+                  <SelectValue placeholder="Radius" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[5, 10, 15, 20].map((km) => (
+                    <SelectItem key={km} value={km.toString()}>
+                      {km} km
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestLocation}
+                disabled={geoLoading}
+                className="inline-flex items-center gap-2 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-md"
+              >
+                {geoLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Navigation className="h-4 w-4" />
+                )}
+                Use my location
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {geoError && (
@@ -411,7 +530,7 @@ export default function ProfilePage() {
             )}
             {!geoError && latitude === null && longitude === null && (
               <p className="text-sm text-muted-foreground">
-                Share your location to see the closest work-friendly spots within 10 km.
+                Share your location to see the closest work-friendly spots near you.
               </p>
             )}
             {(geoLoading || nearbyLoading) && (
@@ -425,7 +544,7 @@ export default function ProfilePage() {
             )}
             {!nearbyLoading && nearby.length === 0 && latitude !== null && longitude !== null && !nearbyError && (
               <p className="text-sm text-muted-foreground">
-                Oops, we couldn’t find any new spots within 10 km. Try exploring cities to discover more places.
+                Oops, we couldn’t find any new spots in your selected radius. Try exploring cities to discover more places.
               </p>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -476,21 +595,15 @@ export default function ProfilePage() {
         <Card className="overflow-hidden">
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b">
             <div className="space-y-1">
-              <CardTitle>Your added places</CardTitle>
-              <CardDescription>
-                You&apos;ve added {myWorkspacesCount} {myWorkspacesCount === 1 ? "place" : "places"}. Keep them coming!
-              </CardDescription>
-              <div className="flex flex-wrap gap-2">
+              <CardTitle className="flex items-center gap-3">
+                Your added places
                 <Badge variant="secondary">
-                  {myWorkspacesCount >= 20
-                    ? "Explorer Lv3"
-                    : myWorkspacesCount >= 10
-                      ? "Explorer Lv2"
-                      : myWorkspacesCount >= 5
-                        ? "Explorer Lv1"
-                        : "Rising Contributor"}
+                  Lv {level.levelNumber} · {level.title}
                 </Badge>
-              </div>
+              </CardTitle>
+              <CardDescription>
+                You&apos;ve added {myWorkspacesCount} {myWorkspacesCount === 1 ? "place" : "places"}. Keep sharing your favorites.
+              </CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
               <Link href="/profile/my-workspaces">
@@ -520,7 +633,12 @@ export default function ProfilePage() {
                   <Card key={ws.id} className="border-muted hover:border-primary/70 transition-colors shadow-sm">
                     <CardContent className="pt-3 pb-4 space-y-1.5">
                       <div className="flex items-center justify-between gap-2">
-                        <h4 className="font-semibold text-base">{ws.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <MapPin className="h-4 w-4" />
+                          </span>
+                          <h4 className="font-semibold text-base">{ws.name}</h4>
+                        </div>
                         <Badge variant="outline" className="text-[11px]">
                           {cityName}
                         </Badge>
