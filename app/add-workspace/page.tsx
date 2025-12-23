@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
@@ -15,19 +15,16 @@ import { ImageUpload } from "@/components/shared";
 import { Loader2, ArrowLeft, ArrowRight, Check } from "lucide-react";
 import Link from "next/link";
 
-interface City {
-  id: string;
-  name: string;
-  slug: string;
-  country: string;
-}
-
 interface FormData {
   // Basic Info
   name: string;
   type: string;
-  city_id: string;
+  city_id: string | null;
+  city_name: string;
+  country: string;
   address: string;
+  latitude: number | null;
+  longitude: number | null;
   website: string;
   phone: string;
   description: string;
@@ -79,16 +76,23 @@ export default function AddWorkspacePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [cities, setCities] = useState<City[]>([]);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
+  const [geocodeLabel, setGeocodeLabel] = useState<string | null>(null);
   const supabase = createClient();
 
   const [formData, setFormData] = useState<FormData>({
     name: "",
     type: "cafe",
-    city_id: "",
+    city_id: null,
+    city_name: "",
+    country: "",
     address: "",
+    latitude: null,
+    longitude: null,
     website: "",
     phone: "",
     description: "",
@@ -124,17 +128,6 @@ export default function AddWorkspacePage() {
     good_for_groups: false,
   });
 
-  useEffect(() => {
-    async function fetchCities() {
-      const { data } = await supabase
-        .from('cities')
-        .select('id, name, slug, country')
-        .order('name');
-      
-      if (data) setCities(data);
-    }
-    fetchCities();
-  }, [supabase]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -142,6 +135,7 @@ export default function AddWorkspacePage() {
       router.push('/login?redirect=/add-workspace');
     }
   }, [user, authLoading, router]);
+
 
   if (authLoading) {
     return (
@@ -164,88 +158,292 @@ export default function AddWorkspacePage() {
       alert("Please upload at least one photo before submitting.");
       return;
     }
-    
-    setSubmitting(true);
-    try {
-      // Create slug from name
-      const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      
-      // Insert workspace
-      const { data: workspace, error: workspaceError } = await supabase
-        .from('workspaces')
-        .insert({
-          ...formData,
-          slug,
-          submitted_by: user.id,
-          status: 'approved',
-        })
-        .select()
-        .single();
+    if (formData.latitude === null || formData.longitude === null) {
+      alert("Please find the workspace location so we can save its coordinates.");
+      return;
+    }
 
-      if (workspaceError) throw workspaceError;
+    const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-      // Insert photos and wait for completion
-      if (uploadedPhotos.length > 0 && workspace) {
-        const photoInserts = uploadedPhotos.map((url, index) => ({
-          workspace_id: workspace.id,
-          user_id: user.id,
-          url,
-          is_primary: index === 0,
-          is_approved: true,
-        }));
+    const resolveCity = async (): Promise<{ cityId: string | null; citySlug: string }> => {
+      let cityId = formData.city_id;
+      let citySlug = formData.city_name
+        ? formData.city_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+        : "global";
 
-        const { data: insertedPhotos, error: photosError } = await supabase
-          .from('workspace_photos')
-          .insert(photoInserts)
-          .select();
+      if (!cityId && formData.city_name) {
+        const { data: existingCity } = await supabase
+          .from("cities")
+          .select("id, slug")
+          .ilike("name", formData.city_name)
+          .eq("country", formData.country || null)
+          .maybeSingle();
 
-        if (photosError) {
-          console.error('Photo insert error:', photosError);
-          throw photosError;
+        if (existingCity) {
+          cityId = existingCity.id;
+          citySlug = existingCity.slug;
+        } else {
+          const { data: newCity, error: cityInsertError } = await supabase
+            .from("cities")
+            .insert({
+              name: formData.city_name,
+              slug: citySlug,
+              country: formData.country || null,
+              latitude: formData.latitude,
+              longitude: formData.longitude,
+              workspace_count: 0,
+            })
+            .select("id, slug")
+            .single();
+          if (cityInsertError) throw cityInsertError;
+          if (newCity) {
+            cityId = newCity.id;
+            citySlug = newCity.slug;
+          }
         }
-
-        console.log('Photos inserted successfully:', insertedPhotos);
       }
 
-      // Update city workspace count
-      const { error: countError } = await supabase.rpc('increment', {
-        table_name: 'cities',
-        row_id: formData.city_id,
-        column_name: 'workspace_count'
-      });
+      return { cityId: cityId ?? null, citySlug };
+    };
 
-      // If RPC doesn't exist, manually update the count
+    const buildWorkspacePayload = (cityId: string | null) => {
+      const {
+        name,
+        type,
+        address,
+        latitude,
+        longitude,
+        website,
+        phone,
+        description,
+        short_description,
+        has_wifi,
+        wifi_speed,
+        has_power_outlets,
+        power_outlet_availability,
+        seating_capacity,
+        seating_comfort,
+        has_outdoor_seating,
+        has_standing_desks,
+        noise_level,
+        has_natural_light,
+        has_air_conditioning,
+        has_heating,
+        music_volume,
+        has_restrooms,
+        has_parking,
+        has_bike_parking,
+        is_accessible,
+        allows_pets,
+        has_food,
+        has_veg,
+        has_coffee,
+        has_alcohol,
+        price_range,
+        laptop_friendly,
+        time_limit_hours,
+        minimum_purchase_required,
+        good_for_meetings,
+        good_for_calls,
+        good_for_groups,
+      } = formData;
+
+      return {
+        name,
+        type,
+        city_id: cityId,
+        address,
+        latitude,
+        longitude,
+        website,
+        phone,
+        description,
+        short_description,
+        has_wifi,
+        wifi_speed,
+        has_power_outlets,
+        power_outlet_availability,
+        seating_capacity,
+        seating_comfort,
+        has_outdoor_seating,
+        has_standing_desks,
+        noise_level,
+        has_natural_light,
+        has_air_conditioning,
+        has_heating,
+        music_volume,
+        has_restrooms,
+        has_parking,
+        has_bike_parking,
+        is_accessible,
+        allows_pets,
+        has_food,
+        has_veg,
+        has_coffee,
+        has_alcohol,
+        price_range,
+        laptop_friendly,
+        time_limit_hours,
+        minimum_purchase_required,
+        good_for_meetings,
+        good_for_calls,
+        good_for_groups,
+        wifi_password_required: false,
+        slug,
+        submitted_by: user.id,
+        status: "approved",
+      };
+    };
+
+    const insertPhotos = async (workspaceId: string) => {
+      if (uploadedPhotos.length === 0) return;
+      const photoInserts = uploadedPhotos.map((url, index) => ({
+        workspace_id: workspaceId,
+        user_id: user.id,
+        url,
+        is_primary: index === 0,
+        is_approved: true,
+      }));
+      const { error: photosError } = await supabase.from("workspace_photos").insert(photoInserts).select();
+      if (photosError) {
+        console.error("Photo insert error:", photosError);
+        throw photosError;
+      }
+    };
+
+    const incrementCity = async (cityId: string | null) => {
+      if (!cityId) return;
+      const { error: countError } = await supabase.rpc("increment", {
+        table_name: "cities",
+        row_id: cityId,
+        column_name: "workspace_count",
+      });
       if (countError) {
         const { data: currentCity } = await supabase
-          .from('cities')
-          .select('workspace_count')
-          .eq('id', formData.city_id)
+          .from("cities")
+          .select("workspace_count")
+          .eq("id", cityId)
           .single();
-
         if (currentCity) {
           await supabase
-            .from('cities')
+            .from("cities")
             .update({ workspace_count: (currentCity.workspace_count || 0) + 1 })
-            .eq('id', formData.city_id);
+            .eq("id", cityId);
         }
       }
+    };
 
-      // Small delay to ensure database consistency
-      await new Promise(resolve => setTimeout(resolve, 500));
+    setSubmitting(true);
+    try {
+      const { cityId, citySlug } = await resolveCity();
+      const workspacePayload = buildWorkspacePayload(cityId);
 
-      // Redirect to the new workspace page
-      const citySlug = cities.find(c => c.id === formData.city_id)?.slug;
+      const { data: workspace, error: workspaceError } = await supabase
+        .from("workspaces")
+        .insert(workspacePayload)
+        .select()
+        .single();
+      if (workspaceError) throw workspaceError;
+
+      await insertPhotos(workspace.id);
+      await incrementCity(cityId);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
       router.push(`/cities/${citySlug}/${slug}`);
-    } catch (error: any) {
-      console.error('Error submitting workspace:', error);
-      alert('Failed to submit workspace. Please try again.');
+    } catch (error) {
+      console.error("Error submitting workspace:", error);
+      alert("Failed to submit workspace. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const updateField = (field: keyof FormData, value: any) => {
+  const updateField = (field: keyof FormData, value: string | number | boolean | null) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const geocodeLocation = async (query?: string) => {
+    const effectiveQuery = query ?? locationQuery;
+    if (!effectiveQuery.trim()) {
+      setGeocodeError("Please enter a city or address to search.");
+      return;
+    }
+    const extractPostcode = (text: string) => {
+      const match = text.match(/\d{4}[- ]?\d{3}/);
+      return match ? match[0].replace(" ", "-") : null;
+    };
+    const targetPostcode = extractPostcode(effectiveQuery);
+
+    const pickBestResult = (results: any[]) => {
+      if (!Array.isArray(results) || results.length === 0) return null;
+      const postcodeMatch = results.find((r) => {
+        const rp = r.address?.postcode ? r.address.postcode.replace(" ", "-") : "";
+        return targetPostcode && rp === targetPostcode;
+      });
+      if (postcodeMatch) return postcodeMatch;
+
+      const cityMatch = results.find((r) => {
+        const rc =
+          r.address?.city ||
+          r.address?.town ||
+          r.address?.village ||
+          r.address?.hamlet ||
+          "";
+        return formData.city_name && rc && rc.toLowerCase() === formData.city_name.toLowerCase();
+      });
+      if (cityMatch) return cityMatch;
+
+      return results[0];
+    };
+
+    setGeocodeLoading(true);
+    setGeocodeError(null);
+    setGeocodeLabel(null);
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+        effectiveQuery,
+      )}&format=jsonv2&limit=5&addressdetails=1`;
+      const res = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "LumenApp/1.0 (contact@example.com)",
+        },
+      });
+      if (!res.ok) throw new Error("Geocoding failed");
+      const results = await res.json();
+      const hit = pickBestResult(results);
+      if (!hit) {
+        setGeocodeError("No results found. Try a more specific address.");
+        return;
+      }
+      const lat = parseFloat(hit.lat);
+      const lon = parseFloat(hit.lon);
+      
+      // Extract city and country for display and grouping
+      const city = hit.address?.city || hit.address?.town || hit.address?.village || hit.address?.hamlet || "";
+      const country = hit.address?.country || "";
+      const cityLabel = [city, country].filter(Boolean).join(", ");
+      
+      updateField("latitude", lat);
+      updateField("longitude", lon);
+      updateField("city_name", city);
+      updateField("country", country);
+      
+      // Store full street address for Google Maps integration
+      // Use display_name which preserves all address details including apartment numbers
+      const fullAddress = hit.display_name || "";
+      if (fullAddress) {
+        updateField("address", fullAddress);
+      }
+      
+      // Display only city and country
+      setGeocodeLabel(cityLabel || `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
+    } catch (err) {
+      console.error("Geocode error", err);
+      setGeocodeError("Could not find this location. Please try again.");
+    } finally {
+      setGeocodeLoading(false);
+    }
   };
 
   const totalSteps = 5;
@@ -254,8 +452,8 @@ export default function AddWorkspacePage() {
   const isStepValid = (step: number): boolean => {
     switch (step) {
       case 1:
-        // Basic Information - name, type, and city are required
-        return !!(formData.name.trim() && formData.type && formData.city_id);
+        // Basic Information - name, type, and coordinates are required
+        return !!(formData.name.trim() && formData.type && formData.latitude !== null && formData.longitude !== null);
       case 2:
         // Productivity Features - all optional but if wifi is checked, speed should be selected
         if (formData.has_wifi && !formData.wifi_speed) return false;
@@ -326,6 +524,11 @@ export default function AddWorkspacePage() {
                   id="name"
                   value={formData.name}
                   onChange={(e) => updateField('name', e.target.value)}
+                  onBlur={() => {
+                    if (!formData.latitude && !formData.longitude && formData.name.trim()) {
+                      geocodeLocation(formData.name);
+                    }
+                  }}
                   placeholder="e.g., Café Malea"
                   required
                 />
@@ -349,19 +552,43 @@ export default function AddWorkspacePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="city">City *</Label>
-                <Select value={formData.city_id} onValueChange={(value) => updateField('city_id', value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a city" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cities.map((city) => (
-                      <SelectItem key={city.id} value={city.id}>
-                        {city.name}, {city.country}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="location-search">Location search (worldwide) *</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Input
+                    id="location-search"
+                    value={locationQuery}
+                    onChange={(e) => setLocationQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        geocodeLocation();
+                      }
+                    }}
+                    placeholder="City or full address (e.g., Lisbon, Portugal or 123 Main St, Paris)"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="sm:w-auto"
+                    onClick={() => geocodeLocation()}
+                    disabled={geocodeLoading}
+                  >
+                    {geocodeLoading ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Searching...
+                      </div>
+                    ) : (
+                      "Find location"
+                    )}
+                  </Button>
+                </div>
+                {geocodeError && <p className="text-sm text-destructive">{geocodeError}</p>}
+                {geocodeLabel && (
+                  <p className="text-sm text-muted-foreground">
+                    Found: {geocodeLabel} ({formData.latitude?.toFixed(4)}, {formData.longitude?.toFixed(4)})
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -370,7 +597,7 @@ export default function AddWorkspacePage() {
                   id="address"
                   value={formData.address}
                   onChange={(e) => updateField('address', e.target.value)}
-                  placeholder="Street address"
+                  placeholder="Street address (auto-filled from location search)"
                 />
               </div>
 
@@ -867,7 +1094,8 @@ export default function AddWorkspacePage() {
               disabled={
                 submitting ||
                 !formData.name ||
-                !formData.city_id ||
+                formData.latitude === null ||
+                formData.longitude === null ||
                 uploadedPhotos.length === 0
               }
               className="cursor-pointer"

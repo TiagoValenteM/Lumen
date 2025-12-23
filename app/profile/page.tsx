@@ -39,6 +39,12 @@ export default function ProfilePage() {
   const [nearbyLoading, setNearbyLoading] = useState(false);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
   const [placeLabel, setPlaceLabel] = useState<string | null>(null);
+  const [myWorkspaces, setMyWorkspaces] = useState<
+    { id: string; name: string; slug: string; city_slug: string | null; city_name: string | null }[]
+  >([]);
+  const [myWorkspacesCount, setMyWorkspacesCount] = useState(0);
+  const [myWorkspacesLoading, setMyWorkspacesLoading] = useState(false);
+  const [myWorkspacesError, setMyWorkspacesError] = useState<string | null>(null);
 
   const displayName = useMemo(() => {
     return getDisplayName(
@@ -199,6 +205,54 @@ export default function ProfilePage() {
     reverseGeocode();
   }, [reverseGeocode]);
 
+  useEffect(() => {
+    if (!user) return;
+    const loadMyWorkspaces = async () => {
+      setMyWorkspacesLoading(true);
+      setMyWorkspacesError(null);
+      try {
+        const { count } = await supabase
+          .from("workspaces")
+          .select("*", { head: true, count: "exact" })
+          .eq("submitted_by", user.id);
+        setMyWorkspacesCount(count || 0);
+
+        const { data, error } = await supabase
+          .from("workspaces")
+          .select(
+            `
+            id,
+            name,
+            slug,
+            created_at,
+            city:cities(slug, name)
+          `
+          )
+          .eq("submitted_by", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+        setMyWorkspaces(
+          (data || []).map((w) => ({
+            id: w.id as string,
+            name: w.name as string,
+            slug: w.slug as string,
+            city_slug: (w as any).city?.slug ?? null,
+            city_name: (w as any).city?.name ?? null,
+          }))
+        );
+      } catch (err) {
+        console.error("Failed to load user workspaces", err);
+        setMyWorkspacesError("Could not load your added places.");
+      } finally {
+        setMyWorkspacesLoading(false);
+      }
+    };
+
+    loadMyWorkspaces();
+  }, [user, supabase]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -220,11 +274,11 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-10">
+      <div className="max-w-5xl mx-auto px-4 py-10 space-y-6">
         {/* User Header */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+        <Card>
+          <CardContent className="py-6">
+            <div className="flex flex-col md:flex-row items-start md:items-center gap-5 md:gap-6">
               <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
                 <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
@@ -273,7 +327,7 @@ export default function ProfilePage() {
         </Card>
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Link href="/saved">
             <Card className="hover:border-primary transition-colors cursor-pointer h-full">
               <CardHeader>
@@ -381,8 +435,8 @@ export default function ProfilePage() {
                   className="border-muted hover:border-primary/70 transition-colors shadow-sm"
                 >
                   <CardContent className="py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-1">
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                             <MapPin className="h-4 w-4" />
@@ -394,23 +448,22 @@ export default function ProfilePage() {
                             >
                               {ws.name}
                             </Link>
-                            <p className="text-xs text-muted-foreground">
-                              {ws.city_name ?? "Unknown city"}
-                            </p>
+                            <span className="text-xs text-muted-foreground">
+                              {ws.city_name || "Unknown city"}
+                            </span>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {ws.distanceKm.toFixed(1)} km
+                        <Badge variant="secondary" className="text-[11px]">
+                          {ws.distanceKm.toFixed(1)} km away
                         </Badge>
-                        <Link
-                          href={`/cities/${ws.city_slug ?? ""}/${ws.slug}`}
-                          className="text-xs text-primary hover:underline font-medium"
-                        >
-                          View details
-                        </Link>
                       </div>
+                      <Link
+                        href={`/cities/${ws.city_slug ?? ""}/${ws.slug}`}
+                        className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
+                      >
+                        View details
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
                     </div>
                   </CardContent>
                 </Card>
@@ -418,6 +471,75 @@ export default function ProfilePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Your added places */}
+        <Card className="overflow-hidden">
+          <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b">
+            <div className="space-y-1">
+              <CardTitle>Your added places</CardTitle>
+              <CardDescription>
+                You&apos;ve added {myWorkspacesCount} {myWorkspacesCount === 1 ? "place" : "places"}. Keep them coming!
+              </CardDescription>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">
+                  {myWorkspacesCount >= 20
+                    ? "Explorer Lv3"
+                    : myWorkspacesCount >= 10
+                      ? "Explorer Lv2"
+                      : myWorkspacesCount >= 5
+                        ? "Explorer Lv1"
+                        : "Rising Contributor"}
+                </Badge>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/profile/my-workspaces">
+                View all
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {myWorkspacesLoading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Loading your places...</span>
+              </div>
+            )}
+            {myWorkspacesError && <p className="text-sm text-destructive">{myWorkspacesError}</p>}
+            {!myWorkspacesLoading && !myWorkspacesError && myWorkspaces.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                You haven&apos;t added any places yet. Share your favorites with the community!
+              </p>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {myWorkspaces.map((ws) => {
+                const citySlug = ws.city_slug || "global";
+                const cityName = ws.city_name || "Global";
+                return (
+                  <Card key={ws.id} className="border-muted hover:border-primary/70 transition-colors shadow-sm">
+                    <CardContent className="pt-3 pb-4 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="font-semibold text-base">{ws.name}</h4>
+                        <Badge variant="outline" className="text-[11px]">
+                          {cityName}
+                        </Badge>
+                      </div>
+                      <Link
+                        href={`/cities/${citySlug}/${ws.slug}`}
+                        className="inline-flex items-center text-sm text-primary hover:underline gap-1"
+                      >
+                        View workspace
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Link>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );

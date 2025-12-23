@@ -32,6 +32,8 @@ export default function CityPage() {
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
   const [savedWorkspaceIds, setSavedWorkspaceIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [showMap, setShowMap] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapInstance | null>(null);
   const supabase = createClient();
@@ -220,9 +222,17 @@ export default function CityPage() {
     loadSavedWorkspaces();
   }, [supabase, user]);
 
+  // Tear down map when hidden
+  useEffect(() => {
+    if (!showMap && mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+  }, [showMap]);
+
   // Map integration using MapLibre (free, no key) + OSM raster tiles
   useEffect(() => {
-    if (!city) return;
+    if (!city || !showMap) return;
 
     const workspaceWithCoords = workspaces.filter(
       (w) => typeof w.latitude === "number" && typeof w.longitude === "number"
@@ -429,13 +439,18 @@ export default function CityPage() {
           mapInstanceRef.current.setCenter(center);
           mapInstanceRef.current.setZoom(14);
         }
+
+        // Ensure map renders correctly after being toggled visible
+        if ((mapInstance as unknown as { resize?: () => void }).resize) {
+          (mapInstance as unknown as { resize: () => void }).resize();
+        }
       })
       .catch((err) => console.error("Failed to load map", err));
 
     return () => {
       isMounted = false;
     };
-  }, [workspaces]);
+  }, [workspaces, showMap, city]);
 
   if (loading) {
     return (
@@ -492,8 +507,32 @@ export default function CityPage() {
           )}
         </div>
 
+        {/* Toggles */}
+        <div className="flex flex-wrap gap-3 mb-6">
+          {workspaces.some((w) => w.latitude && w.longitude) && (
+            <Button
+              variant={showMap ? "default" : "outline"}
+              size="sm"
+              className="gap-2"
+              onClick={() => setShowMap((v) => !v)}
+            >
+              <MapIcon className="h-4 w-4" />
+              {showMap ? "Hide map" : "Show map"}
+            </Button>
+          )}
+          <Button
+            variant={showFilters ? "default" : "outline"}
+            size="sm"
+            className="gap-2"
+            onClick={() => setShowFilters((v) => !v)}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            {showFilters ? "Hide filters" : "Show filters"}
+          </Button>
+        </div>
+
         {/* Map View */}
-        {workspaces.some((w) => w.latitude && w.longitude) && (
+        {showMap && workspaces.some((w) => w.latitude && w.longitude) && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-3xl font-bold flex items-center gap-3">
@@ -518,61 +557,63 @@ export default function CityPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-card/60 p-4 mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <SlidersHorizontal className="h-4 w-4" />
-                Filters
-              </div>
-              {activeFilters.length > 0 && (
-                <Button variant="ghost" size="sm" onClick={() => setSelectedFilters(new Set())}>
-                  Clear
-                </Button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {FILTER_GROUPS.map((group) => (
-                <div key={group.label} className="space-y-2">
-                  <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
-                    {group.label}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {group.options.map((option) => {
-                      const isActive = selectedFilters.has(option);
-                      const Icon = FILTER_ICONS[option];
-                      return (
-                        <Button
-                          key={option}
-                          size="sm"
-                          variant={isActive ? "default" : "outline"}
-                          className="text-xs"
-                          onClick={() => toggleFilter(option)}
-                        >
-                          {Icon && <Icon className="h-3.5 w-3.5 mr-1.5" />}
-                          {option}
-                        </Button>
-                      );
-                    })}
-                  </div>
+          {showFilters && (
+            <div className="rounded-xl border border-border bg-card/60 p-4 mb-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Filters
                 </div>
-              ))}
-            </div>
-
-            {activeFilters.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-3">
-                {activeFilters.map((f) => (
-                  <Badge
-                    key={f}
-                    variant="secondary"
-                    className="cursor-pointer"
-                    onClick={() => toggleFilter(f)}
-                  >
-                    {f} ×
-                  </Badge>
+                {activeFilters.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedFilters(new Set())}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {FILTER_GROUPS.map((group) => (
+                  <div key={group.label} className="space-y-2">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">
+                      {group.label}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {group.options.map((option) => {
+                        const isActive = selectedFilters.has(option);
+                        const Icon = FILTER_ICONS[option];
+                        return (
+                          <Button
+                            key={option}
+                            size="sm"
+                            variant={isActive ? "default" : "outline"}
+                            className="text-xs"
+                            onClick={() => toggleFilter(option)}
+                          >
+                            {Icon && <Icon className="h-3.5 w-3.5 mr-1.5" />}
+                            {option}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-          </div>
+
+              {activeFilters.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {activeFilters.map((f) => (
+                    <Badge
+                      key={f}
+                      variant="secondary"
+                      className="cursor-pointer"
+                      onClick={() => toggleFilter(f)}
+                    >
+                      {f} ×
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {filteredWorkspaces.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

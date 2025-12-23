@@ -489,6 +489,21 @@ export default function WorkspacePage() {
                     <span className="text-sm">{workspace.phone}</span>
                   </a>
                 )}
+                {(workspace.address || (workspace.latitude && workspace.longitude)) && (
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      workspace.address
+                        ? `${workspace.name}, ${workspace.address}`
+                        : `${workspace.latitude},${workspace.longitude}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-primary hover:underline"
+                  >
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-sm">Get directions</span>
+                  </a>
+                )}
               </CardContent>
             </Card>
 
