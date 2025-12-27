@@ -127,6 +127,7 @@ export default function WorkspacePage() {
           .select('*')
           .eq('slug', workspaceSlug)
           .eq('city_id', (await supabase.from('cities').select('id').eq('slug', citySlug).single()).data?.id)
+          .eq('status', 'approved')
           .single();
 
         if (workspaceData) {

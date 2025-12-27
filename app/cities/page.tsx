@@ -54,16 +54,20 @@ export default function CitiesPage() {
   const groupedByCountry = useMemo(() => {
     const groups: Record<string, City[]> = {};
     cities.forEach((city) => {
-      if (!groups[city.country]) {
-        groups[city.country] = [];
+      // Only include cities with at least one approved workspace
+      const approvedCount = workspaceCounts[city.id] ?? 0;
+      if (approvedCount > 0) {
+        if (!groups[city.country]) {
+          groups[city.country] = [];
+        }
+        groups[city.country].push(city);
       }
-      groups[city.country].push(city);
     });
     return Object.entries(groups).map(([country, countryCities]) => ({
       name: country,
       cities: countryCities,
     }));
-  }, [cities]);
+  }, [cities, workspaceCounts]);
 
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return groupedByCountry;

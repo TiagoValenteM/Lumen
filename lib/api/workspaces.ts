@@ -55,6 +55,7 @@ export async function getWorkspaceDetail(
     .select('*')
     .eq('slug', workspaceSlug)
     .eq('city_id', cityData.id)
+    .eq('status', 'approved')
     .single();
 
   return {

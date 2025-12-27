@@ -26,6 +26,7 @@ import { useProfile } from "@/hooks/useProfile";
 export default function NavBar() {
   const { user, signOut } = useAuth();
   const { profile } = useProfile(user?.id);
+  const isAdmin = Boolean(profile?.is_admin);
 
   const displayName = getDisplayName(
     profile?.first_name,
@@ -92,13 +93,17 @@ export default function NavBar() {
                 </div>
               </div>
               <DropdownMenuSeparator />
+              {isAdmin && (
+                <DropdownMenuItem asChild>
+                  <Link href="/admin/workspaces">Admin</Link>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link href="/profile">Profile</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href="/saved">Saved</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" />

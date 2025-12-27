@@ -102,9 +102,10 @@ export interface Profile {
   tag: string | null;
   bio?: string | null;
   created_at?: string;
+  is_admin?: boolean;
 }
 
-export type ProfileSummary = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'avatar_url' | 'email' | 'tag'>;
+export type ProfileSummary = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'avatar_url' | 'email' | 'tag' | 'is_admin'>;
 
 export interface CountryGroup {
   name: string;

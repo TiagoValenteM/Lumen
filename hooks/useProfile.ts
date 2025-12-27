@@ -18,7 +18,7 @@ export function useProfile(userId: string | undefined) {
     setLoading(true);
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, avatar_url, email, tag")
+      .select("id, first_name, last_name, avatar_url, email, tag, is_admin")
       .eq("id", userId)
       .single();
 
