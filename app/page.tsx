@@ -76,7 +76,7 @@ export default function Home() {
             <div>
               <h3 className="text-2xl font-semibold mb-4">Find Local Work Hubs</h3>
               <p className="text-muted-foreground text-lg">
-                Quiet? Air conditioned? Well lit? Get stuff done in a fresh, new environment that's optimized for you!
+                Quiet? Air conditioned? Well lit? Get stuff done in a fresh, new environment that&apos;s optimized for you!
               </p>
             </div>
             <div>

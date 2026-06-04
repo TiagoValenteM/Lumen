@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
 import type { City, Workspace, WorkspaceDetail } from "@/lib/types";
 
+type WorkspaceListRow = Omit<Workspace, "primary_photo"> & {
+  workspace_photos?: { url: string }[] | null;
+};
+
 export async function getWorkspacesByCity(citySlug: string): Promise<Workspace[]> {
   const supabase = createClient();
   
@@ -27,7 +31,7 @@ export async function getWorkspacesByCity(citySlug: string): Promise<Workspace[]
   if (!workspacesData) return [];
 
   // Transform the data to match Workspace type
-  return workspacesData.map((workspace: any) => ({
+  return (workspacesData as WorkspaceListRow[]).map((workspace) => ({
     ...workspace,
     primary_photo: workspace.workspace_photos?.[0] || null,
     workspace_photos: undefined, // Remove the raw photos array

@@ -1,14 +1,16 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkspaceCard } from "@/components/features/workspace";
 import type { City, Workspace } from "@/lib/types";
+import { useLocation } from "@/contexts/LocationContext";
 import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } from "@/lib/constants/filters";
 import {
   ArrowLeft,
@@ -19,6 +21,8 @@ import {
   Map as MapIcon,
 } from "lucide-react";
 
+type SortMode = "best" | "reviewed" | "newest" | "quiet" | "long-stays" | "power" | "closest";
+
 type MapInstance = import("maplibre-gl").Map & {
   _markers?: import("maplibre-gl").Marker[];
 };
@@ -27,6 +31,7 @@ export default function CityPage() {
   const params = useParams();
   const slug = params.slug as string;
   const { user } = useAuth();
+  const { latitude: userLatitude, longitude: userLongitude } = useLocation();
   const [city, setCity] = useState<City | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
@@ -34,6 +39,7 @@ export default function CityPage() {
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("best");
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapInstance | null>(null);
   const supabase = createClient();
@@ -53,17 +59,39 @@ export default function CityPage() {
 
   const activeFilters = Array.from(selectedFilters);
 
+  const distanceKm = useCallback((workspace: Workspace) => {
+    if (
+      userLatitude === null ||
+      userLongitude === null ||
+      workspace.latitude === null ||
+      workspace.latitude === undefined ||
+      workspace.longitude === null ||
+      workspace.longitude === undefined
+    ) {
+      return Number.POSITIVE_INFINITY;
+    }
+    const deg2rad = (deg: number) => deg * (Math.PI / 180);
+    const radius = 6371;
+    const dLat = deg2rad(workspace.latitude - userLatitude);
+    const dLon = deg2rad(workspace.longitude - userLongitude);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(deg2rad(userLatitude)) *
+        Math.cos(deg2rad(workspace.latitude)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    return radius * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }, [userLatitude, userLongitude]);
+
   const filteredWorkspaces = useMemo(() => {
-    if (!activeFilters.length) return workspaces;
+    const base = !activeFilters.length ? workspaces : workspaces.filter((workspace) => {
+      const hasSavedFilter = activeFilters.includes("Saved");
+      const hasQuiet = activeFilters.includes("Quiet");
+      const hasLongStays = activeFilters.includes("Long stays");
+      const otherFilters = activeFilters.filter(
+        (f) => f !== "Saved" && f !== "Quiet" && f !== "Long stays"
+      );
 
-    const hasSavedFilter = activeFilters.includes("Saved");
-    const hasQuiet = activeFilters.includes("Quiet");
-    const hasLongStays = activeFilters.includes("Long stays");
-    const otherFilters = activeFilters.filter(
-      (f) => f !== "Saved" && f !== "Quiet" && f !== "Long stays"
-    );
-
-    return workspaces.filter((workspace) => {
       // Saved filter
       if (hasSavedFilter && !savedWorkspaceIds.has(workspace.id)) {
         return false;
@@ -93,7 +121,31 @@ export default function CityPage() {
         return value === true;
       });
     });
-  }, [activeFilters, workspaces, savedWorkspaceIds]);
+
+    return [...base].sort((a, b) => {
+      if (sortMode === "reviewed") return (b.total_reviews || 0) - (a.total_reviews || 0);
+      if (sortMode === "newest") {
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      if (sortMode === "quiet") {
+        const quietScore = (workspace: Workspace) =>
+          (workspace.noise_level === "quiet" ? 2 : 0) +
+          (typeof workspace.music_volume === "number" ? 5 - workspace.music_volume : 1);
+        return quietScore(b) - quietScore(a);
+      }
+      if (sortMode === "long-stays") {
+        const stayScore = (workspace: Workspace) =>
+          workspace.time_limit_hours === null || workspace.time_limit_hours === 0 ? 1 : 0;
+        return stayScore(b) - stayScore(a);
+      }
+      if (sortMode === "power") {
+        const powerScore = (workspace: Workspace) => (workspace.has_power_outlets ? 1 : 0);
+        return powerScore(b) - powerScore(a);
+      }
+      if (sortMode === "closest") return distanceKm(a) - distanceKm(b);
+      return (b.overall_rating || 0) - (a.overall_rating || 0);
+    });
+  }, [activeFilters, workspaces, savedWorkspaceIds, sortMode, distanceKm]);
 
   useEffect(() => {
     async function fetchCityAndWorkspaces() {
@@ -109,11 +161,12 @@ export default function CityPage() {
       if (cityData && !cityError) {
         setCity(cityData);
 
-        // Fetch workspaces for this city
+        // Fetch workspace card summaries and photos in one query.
         const { data: workspacesData, error: workspacesError } = await supabase
           .from('workspaces')
           .select(`
             id,
+            created_at,
             name,
             slug,
             type,
@@ -139,25 +192,18 @@ export default function CityPage() {
             music_volume,
             time_limit_hours,
             overall_rating,
-            total_reviews
+            total_reviews,
+            workspace_photos!workspace_id(url, is_primary, is_approved)
           `)
           .eq('city_id', cityData.id)
           .eq('status', 'approved')
           .order('overall_rating', { ascending: false });
 
         if (workspacesData && !workspacesError) {
-          // Fetch primary photos for each workspace
-          const workspacesWithPhotos = await Promise.all(
-            workspacesData.map(async (workspace) => {
-              const { data: photoData } = await supabase
-                .from('workspace_photos')
-                .select('url')
-                .eq('workspace_id', workspace.id)
-                .eq('is_primary', true)
-                .eq('is_approved', true)
-                .single();
-
-              return {
+          const workspacesWithPhotos = workspacesData.map((workspace) => {
+            const approvedPhotos = (workspace.workspace_photos || []).filter((photo) => photo.is_approved);
+            const primaryPhoto = approvedPhotos.find((photo) => photo.is_primary) || approvedPhotos[0] || null;
+            return {
                 ...workspace,
                 has_wifi: Boolean(workspace.has_wifi),
                 has_power_outlets: Boolean(workspace.has_power_outlets),
@@ -186,10 +232,10 @@ export default function CityPage() {
                     : workspace.time_limit_hours === null
                       ? null
                       : undefined,
-                primary_photo: photoData,
+                primary_photo: primaryPhoto ? { url: primaryPhoto.url } : null,
+                workspace_photos: undefined,
               };
-            })
-          );
+          });
 
           setWorkspaces(workspacesWithPhotos);
         }
@@ -243,15 +289,6 @@ export default function CityPage() {
 
     async function loadMapLibre(): Promise<typeof import("maplibre-gl") | null> {
       if (typeof window === "undefined") return null;
-      // Load CSS if not present
-      if (!document.querySelector('link[data-maplibre="css"]')) {
-        const link = document.createElement("link");
-        link.rel = "stylesheet";
-        link.href = "https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css";
-        link.dataset.maplibre = "css";
-        document.head.appendChild(link);
-      }
-
       // Attribution/readability styling (matches app palette)
       if (!document.querySelector('style[data-maplibre="theme"]')) {
         const style = document.createElement("style");
@@ -341,17 +378,7 @@ export default function CityPage() {
         document.head.appendChild(style);
       }
 
-      // Load JS if not present
-      if (!(window as unknown as { maplibregl?: typeof import("maplibre-gl") }).maplibregl) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement("script");
-          script.src = "https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js";
-          script.onload = () => resolve();
-          script.onerror = (err) => reject(err);
-          document.body.appendChild(script);
-        });
-      }
-      return (window as unknown as { maplibregl: typeof import("maplibre-gl") }).maplibregl || null;
+      return await import("maplibre-gl");
     }
 
     loadMapLibre()
@@ -555,6 +582,28 @@ export default function CityPage() {
             <div className="text-muted-foreground">
               {filteredWorkspaces.length} {filteredWorkspaces.length === 1 ? 'space' : 'spaces'} found
             </div>
+          </div>
+
+          <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              Sort places by what matters for the next work session.
+            </div>
+            <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+              <SelectTrigger className="w-full sm:w-[190px]">
+                <SelectValue placeholder="Sort" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="best">Best rated</SelectItem>
+                <SelectItem value="reviewed">Most reviewed</SelectItem>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="quiet">Quietest</SelectItem>
+                <SelectItem value="long-stays">Best for long stays</SelectItem>
+                <SelectItem value="power">Best power access</SelectItem>
+                <SelectItem value="closest" disabled={userLatitude === null || userLongitude === null}>
+                  Closest
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {showFilters && (

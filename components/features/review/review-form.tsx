@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Star } from "lucide-react";
 
 interface ReviewFormProps {
-  onSubmit: (rating: number, comment: string) => Promise<void>;
+  onSubmit: (rating: number, comment: string) => Promise<boolean>;
   onCancel: () => void;
   isSubmitting: boolean;
   maxCommentLength?: number;
@@ -22,7 +22,8 @@ export function ReviewForm({
   const remainingChars = maxCommentLength - comment.length;
 
   const handleSubmit = async () => {
-    await onSubmit(rating, comment);
+    const didSubmit = await onSubmit(rating, comment);
+    if (!didSubmit) return;
     // Reset form after successful submission
     setRating(0);
     setComment("");

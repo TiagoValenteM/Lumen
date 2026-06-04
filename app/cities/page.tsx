@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Search, Building2, Loader2 } from "lucide-react";
-import type { City, CountryGroup } from "@/lib/types";
+import type { City } from "@/lib/types";
 
 export default function CitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -172,7 +172,7 @@ export default function CitiesPage() {
         {filteredData.length === 0 && (
           <div className="text-center py-16">
             <p className="text-muted-foreground text-lg">
-              No cities found matching "{searchQuery}"
+              No cities found matching &quot;{searchQuery}&quot;
             </p>
           </div>
         )}

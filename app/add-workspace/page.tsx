@@ -1,76 +1,26 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ImageUpload } from "@/components/shared";
-import { Loader2, ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { deleteWorkspaceImage } from "@/lib/utils/image-upload";
+import { Loader2, ArrowLeft } from "lucide-react";
 import Link from "next/link";
-
-interface FormData {
-  // Basic Info
-  name: string;
-  type: string;
-  city_id: string | null;
-  city_name: string;
-  country: string;
-  address: string;
-  latitude: number | null;
-  longitude: number | null;
-  website: string;
-  phone: string;
-  description: string;
-  short_description: string;
-  
-  // Productivity
-  has_wifi: boolean;
-  wifi_speed: string;
-  has_power_outlets: boolean;
-  power_outlet_availability: number;
-  
-  // Seating
-  seating_capacity: number;
-  seating_comfort: string;
-  has_outdoor_seating: boolean;
-  has_standing_desks: boolean;
-  
-  // Ambiance
-  noise_level: string;
-  has_natural_light: boolean;
-  has_air_conditioning: boolean;
-  has_heating: boolean;
-  music_volume: number;
-  
-  // Amenities
-  has_restrooms: boolean;
-  has_parking: boolean;
-  has_bike_parking: boolean;
-  is_accessible: boolean;
-  allows_pets: boolean;
-  
-  // Food & Beverage
-  has_food: boolean;
-  has_veg: boolean;
-  has_coffee: boolean;
-  has_alcohol: boolean;
-  price_range: number;
-  
-  // Policies
-  laptop_friendly: boolean;
-  time_limit_hours: number;
-  minimum_purchase_required: boolean;
-  good_for_meetings: boolean;
-  good_for_calls: boolean;
-  good_for_groups: boolean;
-}
+import { AmbianceAmenitiesStep } from "./_components/ambiance-amenities-step";
+import { BasicInformationStep } from "./_components/basic-information-step";
+import { DuplicateCandidates } from "./_components/duplicate-candidates";
+import { FoodPoliciesStep } from "./_components/food-policies-step";
+import { FormNavigation } from "./_components/form-navigation";
+import { PhotosStep } from "./_components/photos-step";
+import { ProgressSteps } from "./_components/progress-steps";
+import { ProductivityStep } from "./_components/productivity-step";
+import { ValidationMessage } from "./_components/validation-message";
+import { defaultAddWorkspaceFormData } from "./_lib/defaults";
+import { findPotentialWorkspaceDuplicates } from "./_lib/duplicate-detection";
+import { submitWorkspace } from "./_lib/submit-workspace";
+import type { AddWorkspaceFormData, UpdateAddWorkspaceField, WorkspaceDuplicateCandidate } from "./_lib/types";
+import { getAddWorkspaceValidationMessage, isAddWorkspaceStepValid, totalAddWorkspaceSteps } from "./_lib/validation";
 
 export default function AddWorkspacePage() {
   const { user, loading: authLoading } = useAuth();
@@ -78,55 +28,12 @@ export default function AddWorkspacePage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [uploadedPhotos, setUploadedPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [locationQuery, setLocationQuery] = useState("");
-  const [geocodeLoading, setGeocodeLoading] = useState(false);
-  const [geocodeError, setGeocodeError] = useState<string | null>(null);
-  const [geocodeLabel, setGeocodeLabel] = useState<string | null>(null);
-  const supabase = createClient();
+  const [duplicateCandidates, setDuplicateCandidates] = useState<WorkspaceDuplicateCandidate[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const [duplicateCheckError, setDuplicateCheckError] = useState<string | null>(null);
+  const supabase = useMemo(() => createClient(), []);
 
-  const [formData, setFormData] = useState<FormData>({
-    name: "",
-    type: "cafe",
-    city_id: null,
-    city_name: "",
-    country: "",
-    address: "",
-    latitude: null,
-    longitude: null,
-    website: "",
-    phone: "",
-    description: "",
-    short_description: "",
-    has_wifi: true,
-    wifi_speed: "moderate",
-    has_power_outlets: true,
-    power_outlet_availability: 3,
-    seating_capacity: 20,
-    seating_comfort: "comfortable",
-    has_outdoor_seating: false,
-    has_standing_desks: false,
-    noise_level: "moderate",
-    has_natural_light: true,
-    has_air_conditioning: true,
-    has_heating: true,
-    music_volume: 3,
-    has_restrooms: true,
-    has_parking: false,
-    has_bike_parking: false,
-    is_accessible: true,
-    allows_pets: false,
-    has_food: true,
-    has_veg: false,
-    has_coffee: true,
-    has_alcohol: false,
-    price_range: 2,
-    laptop_friendly: true,
-    time_limit_hours: 0,
-    minimum_purchase_required: true,
-    good_for_meetings: true,
-    good_for_calls: false,
-    good_for_groups: false,
-  });
+  const [formData, setFormData] = useState<AddWorkspaceFormData>(defaultAddWorkspaceFormData);
 
 
   // Redirect to login if not authenticated
@@ -135,6 +42,36 @@ export default function AddWorkspacePage() {
       router.push('/login?redirect=/add-workspace');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    const hasSearchableLocation = formData.name.trim().length >= 3 && formData.latitude !== null && formData.longitude !== null;
+    if (!hasSearchableLocation) return;
+
+    let cancelled = false;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        if (cancelled) return;
+        setCheckingDuplicates(true);
+        setDuplicateCheckError(null);
+        const candidates = await findPotentialWorkspaceDuplicates(supabase, formData);
+        if (!cancelled) setDuplicateCandidates(candidates);
+      } catch (error) {
+        console.error("Failed to check duplicate workspaces:", error);
+        if (!cancelled) {
+          setDuplicateCandidates([]);
+          setDuplicateCheckError("Could not check for duplicate places right now.");
+        }
+      } finally {
+        if (!cancelled) setCheckingDuplicates(false);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [formData, supabase]);
 
 
   if (authLoading) {
@@ -163,193 +100,11 @@ export default function AddWorkspacePage() {
       return;
     }
 
-    const slug = formData.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-
-    const resolveCity = async (): Promise<{ cityId: string | null; citySlug: string }> => {
-      let cityId = formData.city_id;
-      let citySlug = formData.city_name
-        ? formData.city_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-        : "global";
-
-      if (!cityId && formData.city_name) {
-        const { data: existingCity } = await supabase
-          .from("cities")
-          .select("id, slug")
-          .ilike("name", formData.city_name)
-          .eq("country", formData.country || null)
-          .maybeSingle();
-
-        if (existingCity) {
-          cityId = existingCity.id;
-          citySlug = existingCity.slug;
-        } else {
-          const { data: newCity, error: cityInsertError } = await supabase
-            .from("cities")
-            .insert({
-              name: formData.city_name,
-              slug: citySlug,
-              country: formData.country || null,
-              latitude: formData.latitude,
-              longitude: formData.longitude,
-              workspace_count: 0,
-            })
-            .select("id, slug")
-            .single();
-          if (cityInsertError) throw cityInsertError;
-          if (newCity) {
-            cityId = newCity.id;
-            citySlug = newCity.slug;
-          }
-        }
-      }
-
-      return { cityId: cityId ?? null, citySlug };
-    };
-
-    const buildWorkspacePayload = (cityId: string | null) => {
-      const {
-        name,
-        type,
-        address,
-        latitude,
-        longitude,
-        website,
-        phone,
-        description,
-        short_description,
-        has_wifi,
-        wifi_speed,
-        has_power_outlets,
-        power_outlet_availability,
-        seating_capacity,
-        seating_comfort,
-        has_outdoor_seating,
-        has_standing_desks,
-        noise_level,
-        has_natural_light,
-        has_air_conditioning,
-        has_heating,
-        music_volume,
-        has_restrooms,
-        has_parking,
-        has_bike_parking,
-        is_accessible,
-        allows_pets,
-        has_food,
-        has_veg,
-        has_coffee,
-        has_alcohol,
-        price_range,
-        laptop_friendly,
-        time_limit_hours,
-        minimum_purchase_required,
-        good_for_meetings,
-        good_for_calls,
-        good_for_groups,
-      } = formData;
-
-      return {
-        name,
-        type,
-        city_id: cityId,
-        address,
-        latitude,
-        longitude,
-        website,
-        phone,
-        description,
-        short_description,
-        has_wifi,
-        wifi_speed,
-        has_power_outlets,
-        power_outlet_availability,
-        seating_capacity,
-        seating_comfort,
-        has_outdoor_seating,
-        has_standing_desks,
-        noise_level,
-        has_natural_light,
-        has_air_conditioning,
-        has_heating,
-        music_volume,
-        has_restrooms,
-        has_parking,
-        has_bike_parking,
-        is_accessible,
-        allows_pets,
-        has_food,
-        has_veg,
-        has_coffee,
-        has_alcohol,
-        price_range,
-        laptop_friendly,
-        time_limit_hours,
-        minimum_purchase_required,
-        good_for_meetings,
-        good_for_calls,
-        good_for_groups,
-        wifi_password_required: false,
-        slug,
-        submitted_by: user.id,
-        status: "approved",
-      };
-    };
-
-    const insertPhotos = async (workspaceId: string) => {
-      if (uploadedPhotos.length === 0) return;
-      const photoInserts = uploadedPhotos.map((url, index) => ({
-        workspace_id: workspaceId,
-        user_id: user.id,
-        url,
-        is_primary: index === 0,
-        is_approved: true,
-      }));
-      const { error: photosError } = await supabase.from("workspace_photos").insert(photoInserts).select();
-      if (photosError) {
-        console.error("Photo insert error:", photosError);
-        throw photosError;
-      }
-    };
-
-    const incrementCity = async (cityId: string | null) => {
-      if (!cityId) return;
-      const { error: countError } = await supabase.rpc("increment", {
-        table_name: "cities",
-        row_id: cityId,
-        column_name: "workspace_count",
-      });
-      if (countError) {
-        const { data: currentCity } = await supabase
-          .from("cities")
-          .select("workspace_count")
-          .eq("id", cityId)
-          .single();
-        if (currentCity) {
-          await supabase
-            .from("cities")
-            .update({ workspace_count: (currentCity.workspace_count || 0) + 1 })
-            .eq("id", cityId);
-        }
-      }
-    };
-
     setSubmitting(true);
     try {
-      const { cityId, citySlug } = await resolveCity();
-      const workspacePayload = buildWorkspacePayload(cityId);
-
-      const { data: workspace, error: workspaceError } = await supabase
-        .from("workspaces")
-        .insert(workspacePayload)
-        .select()
-        .single();
-      if (workspaceError) throw workspaceError;
-
-      await insertPhotos(workspace.id);
-      await incrementCity(cityId);
-
+      const { citySlug } = await submitWorkspace(supabase, formData, uploadedPhotos, user.id);
       await new Promise((resolve) => setTimeout(resolve, 500));
-      router.push(`/cities/${citySlug}/${slug}`);
+      router.push(`/profile/my-workspaces?submitted=1&city=${citySlug}`);
     } catch (error) {
       console.error("Error submitting workspace:", error);
       alert("Failed to submit workspace. Please try again.");
@@ -358,122 +113,28 @@ export default function AddWorkspacePage() {
     }
   };
 
-  const updateField = (field: keyof FormData, value: string | number | boolean | null) => {
+  const updateField: UpdateAddWorkspaceField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const geocodeLocation = async (query?: string) => {
-    const effectiveQuery = query ?? locationQuery;
-    if (!effectiveQuery.trim()) {
-      setGeocodeError("Please enter a city or address to search.");
-      return;
-    }
-    const extractPostcode = (text: string) => {
-      const match = text.match(/\d{4}[- ]?\d{3}/);
-      return match ? match[0].replace(" ", "-") : null;
-    };
-    const targetPostcode = extractPostcode(effectiveQuery);
+  const removeUploadedPhoto = async (index: number) => {
+    const photoUrl = uploadedPhotos[index];
+    if (!photoUrl || !user) return;
 
-    const pickBestResult = (results: any[]) => {
-      if (!Array.isArray(results) || results.length === 0) return null;
-      const postcodeMatch = results.find((r) => {
-        const rp = r.address?.postcode ? r.address.postcode.replace(" ", "-") : "";
-        return targetPostcode && rp === targetPostcode;
-      });
-      if (postcodeMatch) return postcodeMatch;
+    setUploadedPhotos((prev) => prev.filter((_, photoIndex) => photoIndex !== index));
+    const result = await deleteWorkspaceImage(photoUrl, user.id);
 
-      const cityMatch = results.find((r) => {
-        const rc =
-          r.address?.city ||
-          r.address?.town ||
-          r.address?.village ||
-          r.address?.hamlet ||
-          "";
-        return formData.city_name && rc && rc.toLowerCase() === formData.city_name.toLowerCase();
-      });
-      if (cityMatch) return cityMatch;
-
-      return results[0];
-    };
-
-    setGeocodeLoading(true);
-    setGeocodeError(null);
-    setGeocodeLabel(null);
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
-        effectiveQuery,
-      )}&format=jsonv2&limit=5&addressdetails=1`;
-      const res = await fetch(url, {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "LumenApp/1.0 (contact@example.com)",
-        },
-      });
-      if (!res.ok) throw new Error("Geocoding failed");
-      const results = await res.json();
-      const hit = pickBestResult(results);
-      if (!hit) {
-        setGeocodeError("No results found. Try a more specific address.");
-        return;
-      }
-      const lat = parseFloat(hit.lat);
-      const lon = parseFloat(hit.lon);
-      
-      // Extract city and country for display and grouping
-      const city = hit.address?.city || hit.address?.town || hit.address?.village || hit.address?.hamlet || "";
-      const country = hit.address?.country || "";
-      const cityLabel = [city, country].filter(Boolean).join(", ");
-      
-      updateField("latitude", lat);
-      updateField("longitude", lon);
-      updateField("city_name", city);
-      updateField("country", country);
-      
-      // Store full street address for Google Maps integration
-      // Use display_name which preserves all address details including apartment numbers
-      const fullAddress = hit.display_name || "";
-      if (fullAddress) {
-        updateField("address", fullAddress);
-      }
-      
-      // Display only city and country
-      setGeocodeLabel(cityLabel || `${lat.toFixed(4)}, ${lon.toFixed(4)}`);
-    } catch (err) {
-      console.error("Geocode error", err);
-      setGeocodeError("Could not find this location. Please try again.");
-    } finally {
-      setGeocodeLoading(false);
+    if (!result.success) {
+      console.error("Failed to delete removed upload:", result.error);
+      alert("The photo was removed from the form, but we could not delete the uploaded file. Please try again or contact support.");
     }
   };
 
-  const totalSteps = 5;
-
-  // Validation for each step
-  const isStepValid = (step: number): boolean => {
-    switch (step) {
-      case 1:
-        // Basic Information - name, type, and coordinates are required
-        return !!(formData.name.trim() && formData.type && formData.latitude !== null && formData.longitude !== null);
-      case 2:
-        // Productivity Features - all optional but if wifi is checked, speed should be selected
-        if (formData.has_wifi && !formData.wifi_speed) return false;
-        if (formData.has_power_outlets && !formData.power_outlet_availability) return false;
-        return true;
-      case 3:
-        // Ambiance & Amenities - all optional
-        return true;
-      case 4:
-        // Food & Policies - all optional
-        return true;
-      case 5:
-        // Photos - require at least one photo uploaded
-        return uploadedPhotos.length > 0;
-      default:
-        return true;
-    }
-  };
-
-  const canProceedToNext = isStepValid(currentStep);
+  const canProceedToNext = isAddWorkspaceStepValid(currentStep, formData, uploadedPhotos);
+  const canSubmit = Boolean(formData.name && formData.latitude !== null && formData.longitude !== null && uploadedPhotos.length > 0);
+  const validationMessage =
+    !canProceedToNext && currentStep < totalAddWorkspaceSteps ? getAddWorkspaceValidationMessage(currentStep, formData) : null;
+  const canCheckDuplicates = formData.name.trim().length >= 3 && formData.latitude !== null && formData.longitude !== null;
 
   return (
     <div className="min-h-full bg-background">
@@ -490,630 +151,56 @@ export default function AddWorkspacePage() {
           </p>
         </div>
 
-        {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-8">
-          {[1, 2, 3, 4, 5].map((step) => (
-            <div key={step} className="flex items-center flex-1">
-              <div className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                step < currentStep ? 'bg-primary border-primary text-primary-foreground' :
-                step === currentStep ? 'border-primary text-primary' :
-                'border-muted text-muted-foreground'
-              }`}>
-                {step < currentStep ? <Check className="h-5 w-5" /> : step}
-              </div>
-              {step < totalSteps && (
-                <div className={`flex-1 h-0.5 mx-2 ${
-                  step < currentStep ? 'bg-primary' : 'bg-muted'
-                }`} />
-              )}
-            </div>
-          ))}
-        </div>
+        <ProgressSteps currentStep={currentStep} totalSteps={totalAddWorkspaceSteps} />
 
         {/* Step 1: Basic Information */}
         {currentStep === 1 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Basic Information</CardTitle>
-              <CardDescription>Tell us about the workspace</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="name">Workspace Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => updateField('name', e.target.value)}
-                  onBlur={() => {
-                    if (!formData.latitude && !formData.longitude && formData.name.trim()) {
-                      geocodeLocation(formData.name);
-                    }
-                  }}
-                  placeholder="e.g., Café Malea"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="type">Type *</Label>
-                <Select value={formData.type} onValueChange={(value) => updateField('type', value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cafe">Café</SelectItem>
-                    <SelectItem value="coworking">Coworking Space</SelectItem>
-                    <SelectItem value="hotel_lobby">Hotel Lobby</SelectItem>
-                    <SelectItem value="library">Library</SelectItem>
-                    <SelectItem value="restaurant">Restaurant</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="location-search">Location search (worldwide) *</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    id="location-search"
-                    value={locationQuery}
-                    onChange={(e) => setLocationQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        geocodeLocation();
-                      }
-                    }}
-                    placeholder="City or full address (e.g., Lisbon, Portugal or 123 Main St, Paris)"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="sm:w-auto"
-                    onClick={() => geocodeLocation()}
-                    disabled={geocodeLoading}
-                  >
-                    {geocodeLoading ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Searching...
-                      </div>
-                    ) : (
-                      "Find location"
-                    )}
-                  </Button>
-                </div>
-                {geocodeError && <p className="text-sm text-destructive">{geocodeError}</p>}
-                {geocodeLabel && (
-                  <p className="text-sm text-muted-foreground">
-                    Found: {geocodeLabel} ({formData.latitude?.toFixed(4)}, {formData.longitude?.toFixed(4)})
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={formData.address}
-                  onChange={(e) => updateField('address', e.target.value)}
-                  placeholder="Street address (auto-filled from location search)"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="short_description">Short Description</Label>
-                <Input
-                  id="short_description"
-                  value={formData.short_description}
-                  onChange={(e) => updateField('short_description', e.target.value)}
-                  placeholder="One-line summary (max 500 characters)"
-                  maxLength={500}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Full Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => updateField('description', e.target.value)}
-                  placeholder="Describe the workspace, atmosphere, and what makes it special..."
-                  rows={5}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  <Input
-                    id="website"
-                    type="url"
-                    value={formData.website}
-                    onChange={(e) => updateField('website', e.target.value)}
-                    placeholder="https://..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => updateField('phone', e.target.value)}
-                    placeholder="+351 123 456 789"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <BasicInformationStep formData={formData} setFormData={setFormData} updateField={updateField} />
+            <DuplicateCandidates
+              candidates={canCheckDuplicates ? duplicateCandidates : []}
+              loading={canCheckDuplicates && checkingDuplicates}
+              error={canCheckDuplicates ? duplicateCheckError : null}
+            />
+          </div>
         )}
 
         {/* Step 2: Productivity Features */}
         {currentStep === 2 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Productivity Features</CardTitle>
-              <CardDescription>What makes this a good place to work?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_wifi"
-                    checked={formData.has_wifi}
-                    onCheckedChange={(checked) => updateField('has_wifi', checked)}
-                  />
-                  <Label htmlFor="has_wifi" className="font-normal">Has WiFi</Label>
-                </div>
-
-                {formData.has_wifi && (
-                  <div className="space-y-2">
-                    <Label htmlFor="wifi_speed">WiFi Speed</Label>
-                    <Select value={formData.wifi_speed} onValueChange={(value) => updateField('wifi_speed', value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="slow">Slow</SelectItem>
-                        <SelectItem value="moderate">Moderate</SelectItem>
-                        <SelectItem value="fast">Fast</SelectItem>
-                        <SelectItem value="very_fast">Very Fast</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_power_outlets"
-                    checked={formData.has_power_outlets}
-                    onCheckedChange={(checked) => updateField('has_power_outlets', checked)}
-                  />
-                  <Label htmlFor="has_power_outlets" className="font-normal">Has Power Outlets</Label>
-                </div>
-
-                {formData.has_power_outlets && (
-                  <div className="space-y-2">
-                    <Label htmlFor="power_outlet_availability">Power Outlet Availability (1-5)</Label>
-                    <Select 
-                      value={formData.power_outlet_availability.toString()} 
-                      onValueChange={(value) => updateField('power_outlet_availability', parseInt(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 - Very Limited</SelectItem>
-                        <SelectItem value="2">2 - Limited</SelectItem>
-                        <SelectItem value="3">3 - Moderate</SelectItem>
-                        <SelectItem value="4">4 - Good</SelectItem>
-                        <SelectItem value="5">5 - Excellent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="seating_capacity">Seating Capacity (approximate)</Label>
-                <Input
-                  id="seating_capacity"
-                  type="number"
-                  value={formData.seating_capacity}
-                  onChange={(e) => updateField('seating_capacity', parseInt(e.target.value) || 0)}
-                  min="0"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="seating_comfort">Seating Comfort</Label>
-                <Select value={formData.seating_comfort} onValueChange={(value) => updateField('seating_comfort', value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="uncomfortable">Uncomfortable</SelectItem>
-                    <SelectItem value="adequate">Adequate</SelectItem>
-                    <SelectItem value="comfortable">Comfortable</SelectItem>
-                    <SelectItem value="very_comfortable">Very Comfortable</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="has_outdoor_seating"
-                  checked={formData.has_outdoor_seating}
-                  onCheckedChange={(checked) => updateField('has_outdoor_seating', checked)}
-                />
-                <Label htmlFor="has_outdoor_seating" className="font-normal">Has Outdoor Seating</Label>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="has_standing_desks"
-                  checked={formData.has_standing_desks}
-                  onCheckedChange={(checked) => updateField('has_standing_desks', checked)}
-                />
-                <Label htmlFor="has_standing_desks" className="font-normal">Has Standing Desks</Label>
-              </div>
-            </CardContent>
-          </Card>
+          <ProductivityStep formData={formData} updateField={updateField} />
         )}
 
         {/* Step 3: Ambiance & Amenities */}
         {currentStep === 3 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Ambiance & Amenities</CardTitle>
-              <CardDescription>What's the atmosphere like?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="noise_level">Noise Level</Label>
-                <Select value={formData.noise_level} onValueChange={(value) => updateField('noise_level', value)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="quiet">Quiet</SelectItem>
-                    <SelectItem value="moderate">Moderate</SelectItem>
-                    <SelectItem value="loud">Loud</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="music_volume">Music Volume (1-5)</Label>
-                <Select 
-                  value={formData.music_volume.toString()} 
-                  onValueChange={(value) => updateField('music_volume', parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 - Silent</SelectItem>
-                    <SelectItem value="2">2 - Quiet</SelectItem>
-                    <SelectItem value="3">3 - Moderate</SelectItem>
-                    <SelectItem value="4">4 - Loud</SelectItem>
-                    <SelectItem value="5">5 - Very Loud</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_natural_light"
-                    checked={formData.has_natural_light}
-                    onCheckedChange={(checked) => updateField('has_natural_light', checked)}
-                  />
-                  <Label htmlFor="has_natural_light" className="font-normal">Natural Light</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_air_conditioning"
-                    checked={formData.has_air_conditioning}
-                    onCheckedChange={(checked) => updateField('has_air_conditioning', checked)}
-                  />
-                  <Label htmlFor="has_air_conditioning" className="font-normal">Air Conditioning</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_heating"
-                    checked={formData.has_heating}
-                    onCheckedChange={(checked) => updateField('has_heating', checked)}
-                  />
-                  <Label htmlFor="has_heating" className="font-normal">Heating</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_restrooms"
-                    checked={formData.has_restrooms}
-                    onCheckedChange={(checked) => updateField('has_restrooms', checked)}
-                  />
-                  <Label htmlFor="has_restrooms" className="font-normal">Restrooms</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_parking"
-                    checked={formData.has_parking}
-                    onCheckedChange={(checked) => updateField('has_parking', checked)}
-                  />
-                  <Label htmlFor="has_parking" className="font-normal">Parking</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_bike_parking"
-                    checked={formData.has_bike_parking}
-                    onCheckedChange={(checked) => updateField('has_bike_parking', checked)}
-                  />
-                  <Label htmlFor="has_bike_parking" className="font-normal">Bike Parking</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="is_accessible"
-                    checked={formData.is_accessible}
-                    onCheckedChange={(checked) => updateField('is_accessible', checked)}
-                  />
-                  <Label htmlFor="is_accessible" className="font-normal">Wheelchair Accessible</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="allows_pets"
-                    checked={formData.allows_pets}
-                    onCheckedChange={(checked) => updateField('allows_pets', checked)}
-                  />
-                  <Label htmlFor="allows_pets" className="font-normal">Pet Friendly</Label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <AmbianceAmenitiesStep formData={formData} updateField={updateField} />
         )}
 
         {/* Step 4: Food, Beverage & Policies */}
         {currentStep === 4 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Food, Beverage & Policies</CardTitle>
-              <CardDescription>What's available and what are the rules?</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_food"
-                    checked={formData.has_food}
-                    onCheckedChange={(checked) => updateField('has_food', checked)}
-                  />
-                  <Label htmlFor="has_food" className="font-normal">Serves Food</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_veg"
-                    checked={formData.has_veg}
-                    onCheckedChange={(checked) => updateField('has_veg', checked)}
-                    disabled={!formData.has_food}
-                  />
-                  <Label htmlFor="has_veg" className="font-normal">Vegetarian/Vegan options</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_coffee"
-                    checked={formData.has_coffee}
-                    onCheckedChange={(checked) => updateField('has_coffee', checked)}
-                  />
-                  <Label htmlFor="has_coffee" className="font-normal">Serves Coffee</Label>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="has_alcohol"
-                    checked={formData.has_alcohol}
-                    onCheckedChange={(checked) => updateField('has_alcohol', checked)}
-                  />
-                  <Label htmlFor="has_alcohol" className="font-normal">Serves Alcohol</Label>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="price_range">Price Range</Label>
-                <Select 
-                  value={formData.price_range.toString()} 
-                  onValueChange={(value) => updateField('price_range', parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">$ - Budget</SelectItem>
-                    <SelectItem value="2">$$ - Moderate</SelectItem>
-                    <SelectItem value="3">$$$ - Expensive</SelectItem>
-                    <SelectItem value="4">$$$$ - Very Expensive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="border-t pt-6">
-                <h3 className="font-semibold mb-4">Policies</h3>
-                
-                <div className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="laptop_friendly"
-                      checked={formData.laptop_friendly}
-                      onCheckedChange={(checked) => updateField('laptop_friendly', checked)}
-                    />
-                    <Label htmlFor="laptop_friendly" className="font-normal">Laptop Friendly</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="minimum_purchase_required"
-                      checked={formData.minimum_purchase_required}
-                      onCheckedChange={(checked) => updateField('minimum_purchase_required', checked)}
-                    />
-                    <Label htmlFor="minimum_purchase_required" className="font-normal">Minimum Purchase Required</Label>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="time_limit_hours">Time Limit (hours, 0 for none)</Label>
-                    <Input
-                      id="time_limit_hours"
-                      type="number"
-                      value={formData.time_limit_hours}
-                      onChange={(e) => updateField('time_limit_hours', parseInt(e.target.value) || 0)}
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="good_for_meetings"
-                      checked={formData.good_for_meetings}
-                      onCheckedChange={(checked) => updateField('good_for_meetings', checked)}
-                    />
-                    <Label htmlFor="good_for_meetings" className="font-normal">Good for Meetings</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="good_for_calls"
-                      checked={formData.good_for_calls}
-                      onCheckedChange={(checked) => updateField('good_for_calls', checked)}
-                    />
-                    <Label htmlFor="good_for_calls" className="font-normal">Good for Phone Calls</Label>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="good_for_groups"
-                      checked={formData.good_for_groups}
-                      onCheckedChange={(checked) => updateField('good_for_groups', checked)}
-                    />
-                    <Label htmlFor="good_for_groups" className="font-normal">Good for Groups</Label>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <FoodPoliciesStep formData={formData} updateField={updateField} />
         )}
 
         {/* Step 5: Photos */}
         {currentStep === 5 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Photos</CardTitle>
-              <CardDescription>Add at least one photo of the workspace (max 2MB each)</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ImageUpload
-                workspaceId="temp"
-                onUploadComplete={(url) => setUploadedPhotos(prev => [...prev, url])}
-                onUploadError={(error) => console.error(error)}
-              />
-
-              {uploadedPhotos.length > 0 && (
-                <div className="grid grid-cols-3 gap-4 mt-6">
-                  {uploadedPhotos.map((url, index) => (
-                    <div key={index} className="relative aspect-video rounded-lg overflow-hidden border">
-                      <img src={url} alt={`Upload ${index + 1}`} className="w-full h-full object-cover" />
-                      {index === 0 && (
-                        <div className="absolute top-2 left-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded">
-                          Primary
-                        </div>
-                      )}
-                      <button
-                        onClick={() => setUploadedPhotos(prev => prev.filter((_, i) => i !== index))}
-                        className="absolute top-2 right-2 bg-destructive text-destructive-foreground p-1 rounded-full hover:bg-destructive/90 cursor-pointer"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {uploadedPhotos.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No photos uploaded yet. At least one photo is recommended.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <PhotosStep
+            uploadedPhotos={uploadedPhotos}
+            onPhotoUploaded={(url) => setUploadedPhotos((prev) => [...prev, url])}
+            onPhotoRemoved={removeUploadedPhoto}
+          />
         )}
 
-        {/* Validation Message */}
-        {!canProceedToNext && currentStep < totalSteps && (
-          <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-            <p className="text-sm text-destructive">
-              {currentStep === 1 && "Please fill in all required fields: Workspace Name, Type, and City"}
-              {currentStep === 2 && formData.has_wifi && !formData.wifi_speed && "Please select WiFi speed"}
-              {currentStep === 2 && formData.has_power_outlets && !formData.power_outlet_availability && "Please select power outlet availability"}
-            </p>
-          </div>
-        )}
+        <ValidationMessage message={validationMessage} />
 
-        {/* Navigation Buttons */}
-        <div className="flex items-center justify-between mt-8">
-          <Button
-            variant="outline"
-            onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))}
-            disabled={currentStep === 1 || submitting}
-            className="cursor-pointer"
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Previous
-          </Button>
-
-          {currentStep < totalSteps ? (
-            <Button
-              onClick={() => setCurrentStep(prev => Math.min(totalSteps, prev + 1))}
-              disabled={submitting || !canProceedToNext}
-              className="cursor-pointer"
-            >
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              onClick={handleSubmit}
-              disabled={
-                submitting ||
-                !formData.name ||
-                formData.latitude === null ||
-                formData.longitude === null ||
-                uploadedPhotos.length === 0
-              }
-              className="cursor-pointer"
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Submit Workspace
-                </>
-              )}
-            </Button>
-          )}
-        </div>
+        <FormNavigation
+          currentStep={currentStep}
+          totalSteps={totalAddWorkspaceSteps}
+          submitting={submitting}
+          canProceedToNext={canProceedToNext}
+          canSubmit={canSubmit}
+          onPrevious={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
+          onNext={() => setCurrentStep((prev) => Math.min(totalAddWorkspaceSteps, prev + 1))}
+          onSubmit={handleSubmit}
+        />
       </div>
     </div>
   );

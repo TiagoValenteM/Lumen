@@ -12,10 +12,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Pencil, Filter, Shield, ArrowLeft, MapPin, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Building2, Loader2, Pencil, Filter, Shield, ArrowLeft, MapPin, CheckCircle, XCircle, Clock, Wrench } from "lucide-react";
 
 type WorkspaceRow = {
   id: string;
@@ -29,8 +28,20 @@ type WorkspaceRow = {
   short_description?: string | null;
 };
 
+type WorkspaceQueryRow = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string | null;
+  created_at: string | null;
+  submitted_by: string | null;
+  short_description: string | null;
+  city: { slug: string | null; name: string | null } | { slug: string | null; name: string | null }[] | null;
+};
+
 const STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
+  { value: "under_review", label: "Needs fixes" },
   { value: "approved", label: "Approved" },
   { value: "rejected", label: "Rejected" },
   { value: "all", label: "All" },
@@ -38,14 +49,14 @@ const STATUS_OPTIONS = [
 
 export default function AdminWorkspacesPage() {
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -63,7 +74,10 @@ export default function AdminWorkspacesPage() {
   }, [workspaces, search, statusFilter]);
 
   const loadProfile = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoadingProfile(false);
+      return;
+    }
     setLoadingProfile(true);
     const { data, error: profileError } = await supabase
       .from("profiles")
@@ -108,7 +122,7 @@ export default function AdminWorkspacesPage() {
       if (fetchError) throw fetchError;
 
       const mapped: WorkspaceRow[] =
-        data?.map((w: any) => {
+        (data as WorkspaceQueryRow[] | null)?.map((w) => {
           const cityField = Array.isArray(w.city) ? w.city[0] ?? null : w.city;
           return {
             id: w.id,
@@ -133,17 +147,25 @@ export default function AdminWorkspacesPage() {
   }, [user, supabase, isAdmin, statusFilter]);
 
   useEffect(() => {
+    // Admin profile is loaded from Supabase when the authenticated user changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfile();
   }, [loadProfile]);
 
   useEffect(() => {
     if (isAdmin) {
+      // Workspace rows are loaded from Supabase after admin access is confirmed.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadWorkspaces();
     }
   }, [isAdmin, loadWorkspaces]);
 
-  const updateStatus = async (id: string, status: "approved" | "rejected" | "pending") => {
+  const updateStatus = async (id: string, status: "approved" | "rejected" | "pending" | "under_review") => {
     if (!user || !isAdmin) return;
+    if (status === "rejected" || status === "under_review") {
+      setError("Open the workspace detail page to add a submitter-facing reason before changing to that status.");
+      return;
+    }
     setSavingId(id);
     try {
       const { error: updateError } = await supabase
@@ -151,6 +173,15 @@ export default function AdminWorkspacesPage() {
         .update({ status })
         .eq("id", id);
       if (updateError) throw updateError;
+      if (status === "approved") {
+        const { error: photoError } = await supabase
+          .from("workspace_photos")
+          .update({ is_approved: true })
+          .eq("workspace_id", id);
+        if (photoError) {
+          console.warn("Workspace status saved, but photos could not be auto-approved", photoError);
+        }
+      }
       setWorkspaces((prev) =>
         prev.map((w) => (w.id === id ? { ...w, status } : w))
       );
@@ -230,6 +261,12 @@ export default function AdminWorkspacesPage() {
               <Filter className="h-4 w-4" />
               Refresh
             </Button>
+            <Button asChild variant="outline" className="inline-flex items-center gap-2">
+              <Link href="/admin/cities">
+                <Building2 className="h-4 w-4" />
+                Cities
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -255,11 +292,6 @@ export default function AdminWorkspacesPage() {
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {filtered.map((ws) => {
-                const statusColor = 
-                  ws.status === "approved" ? "text-green-600 bg-green-50 border-green-200" : 
-                  ws.status === "rejected" ? "text-red-600 bg-red-50 border-red-200" : 
-                  "text-yellow-600 bg-yellow-50 border-yellow-200";
-                
                 return (
                   <Card key={ws.id} className="border-muted hover:border-primary/50 transition-colors">
                     <CardContent className="pt-4 pb-4">
@@ -277,13 +309,15 @@ export default function AdminWorkspacesPage() {
                               <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                             ) : ws.status === "rejected" ? (
                               <XCircle className="h-3.5 w-3.5 text-red-600" />
+                            ) : ws.status === "under_review" ? (
+                              <Wrench className="h-3.5 w-3.5 text-blue-600" />
                             ) : (
                               <Clock className="h-3.5 w-3.5 text-yellow-600" />
                             )}
                           </div>
                           <Select
                             value={ws.status || "pending"}
-                            onValueChange={(val) => updateStatus(ws.id, val as "approved" | "rejected" | "pending")}
+                            onValueChange={(val) => updateStatus(ws.id, val as "approved" | "rejected" | "pending" | "under_review")}
                             disabled={savingId === ws.id}
                           >
                             <SelectTrigger className="h-8 w-[110px] text-xs">
@@ -291,6 +325,7 @@ export default function AdminWorkspacesPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="pending">Pending</SelectItem>
+                              <SelectItem value="under_review">Needs fixes</SelectItem>
                               <SelectItem value="approved">Approved</SelectItem>
                               <SelectItem value="rejected">Rejected</SelectItem>
                             </SelectContent>

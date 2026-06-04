@@ -11,6 +11,7 @@ export interface City {
 
 export interface Workspace {
   id: string;
+  created_at?: string;
   name: string;
   slug: string;
   type: string;
@@ -39,6 +40,10 @@ export interface Workspace {
   time_limit_hours?: number | null;
   overall_rating: number | null;
   total_reviews: number;
+  last_verified_at?: string | null;
+  reported_change_count?: number | null;
+  rejection_reason?: string | null;
+  admin_notes?: string | null;
   primary_photo?: {
     url: string;
   } | null;

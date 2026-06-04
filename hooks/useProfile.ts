@@ -38,6 +38,8 @@ export function useProfile(userId: string | undefined) {
   }, [userId, supabase]);
 
   useEffect(() => {
+    // Profile data is fetched from Supabase when the subscribed user id changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProfile();
 
     // Listen for profile updates

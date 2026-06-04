@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Loader2, MapPin, Plus } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2, MapPin, Plus, Wrench, XCircle, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,6 +22,59 @@ export default function MyWorkspacesPage() {
   const [error, setError] = useState<string | null>(null);
   const level = getLevel(items.length);
 
+  const statusCounts = useMemo(
+    () =>
+      items.reduce(
+        (acc, item) => {
+          const status = item.status || "pending";
+          acc[status] = (acc[status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    [items],
+  );
+
+  const statusMeta = (status: string | null) => {
+    switch (status) {
+      case "approved":
+        return {
+          label: "Live",
+          description: "Approved and visible in Lumen.",
+          icon: CheckCircle2,
+          className: "border-green-200 bg-green-50 text-green-700",
+        };
+      case "rejected":
+        return {
+          label: "Rejected",
+          description: "Not published. Review the reason and submit a corrected place.",
+          icon: XCircle,
+          className: "border-red-200 bg-red-50 text-red-700",
+        };
+      case "under_review":
+        return {
+          label: "Needs fixes",
+          description: "An admin requested changes before approval.",
+          icon: Wrench,
+          className: "border-blue-200 bg-blue-50 text-blue-700",
+        };
+      default:
+        return {
+          label: "Pending",
+          description: "Queued for admin review.",
+          icon: Clock,
+          className: "border-yellow-200 bg-yellow-50 text-yellow-700",
+        };
+    }
+  };
+
+  const statusSummary: Array<[string, number, LucideIcon]> = [
+    ["Pending", statusCounts.pending || 0, Clock],
+    ["Needs fixes", statusCounts.under_review || 0, Wrench],
+    ["Live", statusCounts.approved || 0, CheckCircle2],
+    ["Rejected", statusCounts.rejected || 0, XCircle],
+  ];
+
   useEffect(() => {
     const load = async () => {
       if (!user) return;
@@ -35,6 +89,12 @@ export default function MyWorkspacesPage() {
             name,
             slug,
             status,
+            created_at,
+            updated_at,
+            rejection_reason,
+            short_description,
+            latitude,
+            longitude,
             city:cities(slug, name)
           `
           )
@@ -53,6 +113,12 @@ export default function MyWorkspacesPage() {
               city_slug: cityField?.slug ?? null,
               city_name: cityField?.name ?? null,
               status: w.status ?? null,
+              created_at: w.created_at ?? null,
+              updated_at: w.updated_at ?? null,
+              rejection_reason: w.rejection_reason ?? null,
+              short_description: w.short_description ?? null,
+              latitude: w.latitude ?? null,
+              longitude: w.longitude ?? null,
             };
           }) || [];
 
@@ -91,7 +157,7 @@ export default function MyWorkspacesPage() {
             <div className="space-y-3">
               <div className="flex items-center gap-5">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <img src={MEDAL_ICON_URL} alt="Medal icon" className="h-6 w-6" />
+                  <Image src={MEDAL_ICON_URL} alt="Medal icon" width={24} height={24} className="h-6 w-6" />
                 </div>
                 <div>
                   <CardTitle>Level & progress</CardTitle>
@@ -100,9 +166,11 @@ export default function MyWorkspacesPage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <Badge variant="secondary" className="inline-flex items-center gap-2">
-                    <img
+                    <Image
                       src={LEVEL_ICONS[level.levelNumber - 1] ?? MEDAL_ICON_URL}
                       alt={level.title}
+                      width={16}
+                      height={16}
                       className="h-4 w-4"
                     />
                     <span>Lv {level.levelNumber} · {level.title}</span>
@@ -121,9 +189,11 @@ export default function MyWorkspacesPage() {
                       variant="outline"
                       className="text-[11px] inline-flex items-center gap-2"
                     >
-                      <img
+                      <Image
                         src={LEVEL_ICONS[idx] ?? MEDAL_ICON_URL}
                         alt={lvl.title}
+                        width={16}
+                        height={16}
                         className="h-4 w-4"
                       />
                       <span>
@@ -136,6 +206,20 @@ export default function MyWorkspacesPage() {
             </div>
           </CardHeader>
         </Card>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {statusSummary.map(([label, count, Icon]) => (
+            <Card key={String(label)}>
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">{String(label)}</p>
+                  <p className="text-2xl font-semibold">{Number(count)}</p>
+                </div>
+                <Icon className="h-5 w-5 text-muted-foreground" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
 
         <Card>
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -182,9 +266,12 @@ export default function MyWorkspacesPage() {
               {items.map((ws) => {
                 const citySlug = ws.city_slug || "global";
                 const cityName = ws.city_name || "Global";
+                const meta = statusMeta(ws.status);
+                const StatusIcon = meta.icon;
+                const canViewPublic = ws.status === "approved";
                 return (
                   <Card key={ws.id} className="border-muted hover:border-primary/70 transition-colors shadow-sm">
-                    <CardContent className="pt-5 pb-5 space-y-3">
+                    <CardContent className="pt-5 pb-5 space-y-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-2">
                           <div className="flex items-center gap-3">
@@ -197,19 +284,33 @@ export default function MyWorkspacesPage() {
                             </div>
                           </div>
                         </div>
-                        {ws.status && (
-                          <Badge variant="outline" className="text-[11px] capitalize">
-                            {ws.status}
-                          </Badge>
-                        )}
+                        <Badge variant="outline" className={`text-[11px] ${meta.className}`}>
+                          <StatusIcon className="mr-1 h-3 w-3" />
+                          {meta.label}
+                        </Badge>
                       </div>
-                      <Link
-                        href={`/cities/${citySlug}/${ws.slug}`}
-                        className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
-                      >
-                        View details
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Link>
+                      {ws.short_description && <p className="text-sm text-muted-foreground line-clamp-2">{ws.short_description}</p>}
+                      <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                          <div className="space-y-1">
+                            <p className="font-medium text-foreground">{meta.description}</p>
+                            {ws.rejection_reason && <p>{ws.rejection_reason}</p>}
+                            {ws.latitude === null || ws.longitude === null ? <p>Location pin is missing.</p> : null}
+                          </div>
+                        </div>
+                      </div>
+                      {canViewPublic ? (
+                        <Link
+                          href={`/cities/${citySlug}/${ws.slug}`}
+                          className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
+                        >
+                          View live page
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Public page appears after approval.</span>
+                      )}
                     </CardContent>
                   </Card>
                 );

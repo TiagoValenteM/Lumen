@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,10 +16,9 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Bookmark, MapPinCheck, ArrowRight, Settings, Mail, AtSign, Calendar, MapPin, Navigation } from "lucide-react";
 import Link from "next/link";
-import { getInitials, getDisplayName } from "@/lib/utils";
+import { getErrorMessage, getInitials, getDisplayName } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
 import { useLocation } from "@/contexts/LocationContext";
-import { useCallback } from "react";
 import { LEVEL_ICONS, VISITED_LEVEL_ICONS, getLevel, getVisitedLevel } from "@/lib/constants/profileLevels";
 import {
   Tooltip,
@@ -39,9 +38,29 @@ type NearbyWorkspace = {
   distanceKm: number;
 };
 
+type WorkspaceWithCity = {
+  id: string;
+  name: string;
+  slug: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  city: { slug: string | null; name: string | null } | { slug: string | null; name: string | null }[] | null;
+};
+
+type MyWorkspaceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  city: { slug: string | null; name: string | null } | { slug: string | null; name: string | null }[] | null;
+};
+
+const getCityField = (
+  city: WorkspaceWithCity["city"],
+) => Array.isArray(city) ? city[0] ?? null : city;
+
 export default function ProfilePage() {
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { latitude, longitude, loading: geoLoading, error: geoError, requestLocation } = useLocation();
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -195,27 +214,34 @@ export default function ProfilePage() {
           return R * c;
         };
 
+        const workspaceRows = (data as WorkspaceWithCity[] | null) || [];
         const filtered =
-          data
-            ?.filter((w) => w.latitude !== null && w.longitude !== null && !visitedIds.has(w.id))
+          workspaceRows
+            ?.filter((w): w is WorkspaceWithCity & { latitude: number; longitude: number } =>
+              w.latitude !== null &&
+              w.latitude !== undefined &&
+              w.longitude !== null &&
+              w.longitude !== undefined &&
+              !visitedIds.has(w.id)
+            )
             .map((w) => ({
               id: w.id,
               name: w.name,
               slug: w.slug,
-              city_slug: (w as any).city?.slug ?? null,
-              city_name: (w as any).city?.name ?? null,
+              city_slug: getCityField(w.city)?.slug ?? null,
+              city_name: getCityField(w.city)?.name ?? null,
               latitude: w.latitude,
               longitude: w.longitude,
-              distanceKm: haversine(w.latitude as number, w.longitude as number),
+              distanceKm: haversine(w.latitude, w.longitude),
             }))
             .filter((w) => w.distanceKm <= radiusKm)
             .sort((a, b) => a.distanceKm - b.distanceKm)
             .slice(0, 4) || [];
 
         setNearby(filtered);
-      } catch (err: any) {
+      } catch (err) {
         console.error("Failed to load nearby workspaces", err);
-        setNearbyError("Could not load nearby workspaces. Please try again.");
+        setNearbyError(getErrorMessage(err, "Could not load nearby workspaces. Please try again."));
       } finally {
         setNearbyLoading(false);
       }
@@ -250,6 +276,8 @@ export default function ProfilePage() {
   }, [latitude, longitude]);
 
   useEffect(() => {
+    // Reverse geocoding synchronizes the current browser location with a place label.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     reverseGeocode();
   }, [reverseGeocode]);
 
@@ -282,12 +310,12 @@ export default function ProfilePage() {
 
         if (error) throw error;
         setMyWorkspaces(
-          (data || []).map((w) => ({
+          ((data as MyWorkspaceRow[] | null) || []).map((w) => ({
             id: w.id as string,
             name: w.name as string,
             slug: w.slug as string,
-            city_slug: (w as any).city?.slug ?? null,
-            city_name: (w as any).city?.name ?? null,
+            city_slug: getCityField(w.city)?.slug ?? null,
+            city_name: getCityField(w.city)?.name ?? null,
           }))
         );
       } catch (err) {

@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useRef, ChangeEvent } from "react";
+import Image from "next/image";
 import { Upload, X, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   validateImage,
   uploadWorkspaceImage,
-  formatFileSize,
   MAX_IMAGE_SIZE,
   ALLOWED_IMAGE_TYPES,
 } from "@/lib/utils/image-upload";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils";
 
 interface ImageUploadProps {
   workspaceId: string;
@@ -72,8 +73,8 @@ export function ImageUpload({
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    } catch (err: any) {
-      const errorMessage = err.message || "Failed to upload image";
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to upload image");
       setError(errorMessage);
       if (onUploadError) onUploadError(errorMessage);
     } finally {
@@ -90,10 +91,8 @@ export function ImageUpload({
   };
 
   const maxSizeMB = MAX_IMAGE_SIZE / (1024 * 1024);
-  const acceptedTypes = ALLOWED_IMAGE_TYPES.join(", ");
-
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`space-y-4 ${className}`} data-max-files={maxFiles}>
       <div>
         <Label htmlFor="image-upload" className="text-sm font-medium">
           Upload Photo
@@ -116,10 +115,12 @@ export function ImageUpload({
 
         {preview ? (
           <div className="relative w-32 h-32 rounded-lg overflow-hidden border">
-            <img
+            <Image
               src={preview}
               alt="Preview"
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="8rem"
             />
             {!uploading && (
               <button

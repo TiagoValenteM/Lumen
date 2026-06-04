@@ -17,6 +17,7 @@ interface WorkspaceCardProps {
     has_coffee: boolean;
     overall_rating: number | null;
     total_reviews: number;
+    last_verified_at?: string | null;
     primary_photo?: {
       url: string;
     } | null;
@@ -88,6 +89,15 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
                 ({workspace.total_reviews} {workspace.total_reviews === 1 ? 'review' : 'reviews'})
               </span>
             </div>
+          )}
+
+          {workspace.last_verified_at && (
+            <p className="border-t pt-2 text-xs text-muted-foreground">
+              Verified {new Date(workspace.last_verified_at).toLocaleDateString("en-US", {
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
           )}
         </CardContent>
       </Card>

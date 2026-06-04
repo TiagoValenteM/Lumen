@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Star } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import type { Review, ProfileSummary } from "@/lib/types";
@@ -29,9 +30,11 @@ export function ReviewsList({ reviews, profilesById }: ReviewsListProps) {
               {/* User Avatar */}
               <div className="flex-shrink-0">
                 {avatarUrl ? (
-                  <img
+                  <Image
                     src={avatarUrl}
                     alt={tag}
+                    width={44}
+                    height={44}
                     className="h-11 w-11 rounded-full object-cover ring-2 ring-border"
                   />
                 ) : (

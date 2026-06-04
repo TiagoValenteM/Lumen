@@ -6,7 +6,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { WorkspaceCard } from "@/components/features/workspace";
 import { Loader2, Bookmark, ArrowLeft } from "lucide-react";
 import type { Workspace } from "@/lib/types";

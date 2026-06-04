@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
@@ -155,7 +156,7 @@ export default function VisitedWorkspacesPage() {
             <div className="space-y-3">
               <div className="flex items-center gap-5">
                 <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <img src={MEDAL_ICON_URL} alt="Medal icon" className="h-6 w-6" />
+                  <Image src={MEDAL_ICON_URL} alt="Medal icon" width={24} height={24} className="h-6 w-6" />
                 </div>
                 <div>
                   <CardTitle>Visited level & progress</CardTitle>
@@ -164,9 +165,11 @@ export default function VisitedWorkspacesPage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <Badge variant="secondary" className="inline-flex items-center gap-2">
-                    <img
+                    <Image
                       src={VISITED_LEVEL_ICONS[visitedLevel.levelNumber - 1] ?? MEDAL_ICON_URL}
                       alt={visitedLevel.title}
+                      width={16}
+                      height={16}
                       className="h-4 w-4"
                     />
                     <span>Lv {visitedLevel.levelNumber} · {visitedLevel.title}</span>
@@ -185,9 +188,11 @@ export default function VisitedWorkspacesPage() {
                       variant="outline"
                       className="text-[11px] inline-flex items-center gap-2"
                     >
-                      <img
+                      <Image
                         src={VISITED_LEVEL_ICONS[idx] ?? MEDAL_ICON_URL}
                         alt={lvl.title}
+                        width={16}
+                        height={16}
                         className="h-4 w-4"
                       />
                       <span>

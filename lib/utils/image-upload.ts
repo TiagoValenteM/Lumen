@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { getErrorMessage } from "@/lib/utils/error";
 
 export const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 2MB in bytes
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -67,7 +68,7 @@ export async function uploadWorkspaceImage(
 
   try {
     // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('workspace-photos')
       .upload(fileName, file, {
         cacheControl: '3600',
@@ -91,10 +92,10 @@ export async function uploadWorkspaceImage(
       success: true,
       url: urlData.publicUrl,
     };
-  } catch (error: any) {
+  } catch (error) {
     return {
       success: false,
-      error: error.message || 'Failed to upload image',
+      error: getErrorMessage(error, 'Failed to upload image'),
     };
   }
 }
@@ -125,10 +126,10 @@ export async function deleteWorkspaceImage(
     }
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
     return {
       success: false,
-      error: error.message || 'Failed to delete image',
+      error: getErrorMessage(error, 'Failed to delete image'),
     };
   }
 }
