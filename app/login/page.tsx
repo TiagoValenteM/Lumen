@@ -61,7 +61,7 @@ export default function LoginPage() {
     checkingSession ? null : (
     <div className="relative flex min-h-full items-center justify-center py-12 px-4">
       <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
-      <Card className="relative mx-auto w-full max-w-md z-10 shadow-lg">
+      <Card className="relative z-10 mx-auto w-full max-w-md shadow-lg shadow-black/10 dark:shadow-black/30">
         <CardHeader className="space-y-0.5 text-center pb-4">
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription className="text-sm text-muted-foreground">

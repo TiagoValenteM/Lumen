@@ -114,6 +114,29 @@ Move mutation/data orchestration into `_lib` or `lib/features` when it has:
 - fallback behavior for old migrations
 - city/workspace/photo/suggestion business rules
 
+## UI Design Rules
+
+Lumen should follow modern website principles without becoming a heavy custom visual system.
+
+Use the existing UI primitives first:
+
+- `components/ui/card.tsx` for framed content.
+- `components/ui/button.tsx` for actions.
+- `components/ui/badge.tsx` for compact metadata.
+- `components/ui/input.tsx`, `textarea.tsx`, and `select.tsx` for forms.
+
+Keep the design direction restrained:
+
+- Prefer open hero layouts over boxed hero banners.
+- Prefer `rounded-xl`, subtle shadows, and low-contrast borders for content cards.
+- Use translucent `bg-background/70`, `bg-card/90`, or `bg-muted/20` sparingly for softer surfaces.
+- Keep borders when they improve scanability, but use `border-border/60` instead of strong outlines.
+- Hover states should feel responsive but quiet: small lift, soft shadow, or a background change.
+- Avoid decorative gradients, oversized glass panels, strong glow effects, and page-wide visual treatments.
+- Do not restyle every route locally if the same result belongs in `components/ui`.
+
+When improving UI, make the smallest shared primitive change that improves multiple screens, then only add route-level styling where the content genuinely needs it.
+
 ## Supabase Rules
 
 - Keep RLS and database state transitions as the source of truth.

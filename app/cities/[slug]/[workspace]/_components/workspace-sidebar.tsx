@@ -54,78 +54,83 @@ export function WorkspaceSidebar({
   onSubmitSuggestion,
 }: WorkspaceSidebarProps) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 lg:sticky lg:top-20">
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan your visit</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-3">
+            <Button variant={hasVisited ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleVisited}>
+              <MapPinCheck className="h-5 w-5" />
+              {hasVisited ? "Been Here" : "Mark as Visited"}
+            </Button>
+            <Button variant={isSaved ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleSaved}>
+              {isSaved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
+              {isSaved ? "Saved" : "Save Place"}
+            </Button>
+          </div>
+          <Button variant="outline" size="lg" className="w-full gap-2" onClick={onWriteReview}>
+            <MessageSquare className="h-5 w-5" />
+            Write Review
+          </Button>
+
+          <Dialog open={suggestionOpen} onOpenChange={onSuggestionOpenChange}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="lg" className="w-full gap-2">
+                <MapPin className="h-5 w-5" />
+                Suggest an Edit
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Suggest an edit</DialogTitle>
+                <DialogDescription>Send a correction for this place. Admins review suggestions before changing public data.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>What should we check?</Label>
+                  <Select value={suggestionKind} onValueChange={(value) => onSuggestionKindChange(value as WorkspaceSuggestionKind)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="wrong_location">Wrong location</SelectItem>
+                      <SelectItem value="closed_place">Closed place</SelectItem>
+                      <SelectItem value="incorrect_amenities">Incorrect amenities</SelectItem>
+                      <SelectItem value="bad_photo">Bad photo</SelectItem>
+                      <SelectItem value="duplicate">Duplicate place</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Details</Label>
+                  <Textarea
+                    value={suggestionMessage}
+                    onChange={(event) => onSuggestionMessageChange(event.target.value)}
+                    placeholder="Tell us what looks wrong and what the correct information should be."
+                    rows={5}
+                    maxLength={800}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => onSuggestionOpenChange(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={onSubmitSuggestion} disabled={submittingSuggestion || !userSignedIn}>
+                  {submittingSuggestion ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Send suggestion
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </CardContent>
+      </Card>
+
       <ContactCard workspace={workspace} />
       <PoliciesCard workspace={workspace} />
-
-      <div className="space-y-3">
-        <div className="flex gap-3">
-          <Button variant={hasVisited ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleVisited}>
-            <MapPinCheck className="h-5 w-5" />
-            {hasVisited ? "Been Here" : "Mark as Visited"}
-          </Button>
-          <Button variant={isSaved ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleSaved}>
-            {isSaved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
-            {isSaved ? "Saved" : "Save Place"}
-          </Button>
-        </div>
-        <Button variant="outline" size="lg" className="w-full gap-2" onClick={onWriteReview}>
-          <MessageSquare className="h-5 w-5" />
-          Write Review
-        </Button>
-
-        <Dialog open={suggestionOpen} onOpenChange={onSuggestionOpenChange}>
-          <DialogTrigger asChild>
-            <Button variant="outline" size="lg" className="w-full gap-2">
-              <MapPin className="h-5 w-5" />
-              Suggest an Edit
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Suggest an edit</DialogTitle>
-              <DialogDescription>Send a correction for this place. Admins review suggestions before changing public data.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>What should we check?</Label>
-                <Select value={suggestionKind} onValueChange={(value) => onSuggestionKindChange(value as WorkspaceSuggestionKind)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="wrong_location">Wrong location</SelectItem>
-                    <SelectItem value="closed_place">Closed place</SelectItem>
-                    <SelectItem value="incorrect_amenities">Incorrect amenities</SelectItem>
-                    <SelectItem value="bad_photo">Bad photo</SelectItem>
-                    <SelectItem value="duplicate">Duplicate place</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Details</Label>
-                <Textarea
-                  value={suggestionMessage}
-                  onChange={(event) => onSuggestionMessageChange(event.target.value)}
-                  placeholder="Tell us what looks wrong and what the correct information should be."
-                  rows={5}
-                  maxLength={800}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onSuggestionOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button onClick={onSubmitSuggestion} disabled={submittingSuggestion || !userSignedIn}>
-                {submittingSuggestion ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Send suggestion
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
     </div>
   );
 }

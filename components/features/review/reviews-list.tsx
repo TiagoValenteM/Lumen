@@ -24,7 +24,7 @@ export function ReviewsList({ reviews, profilesById }: ReviewsListProps) {
         return (
           <div
             key={review.id}
-            className="rounded-xl border border-border/60 bg-card/50 p-5 shadow-sm"
+            className="rounded-xl border border-border/35 bg-card/50 p-5 shadow-sm shadow-black/5 dark:shadow-black/20"
           >
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
               {/* User Avatar */}

@@ -42,7 +42,7 @@ export default function NavBar() {
   const initials = !avatarUrl ? getInitials(displayName) : undefined;
 
   return (
-    <nav className="sticky top-0 z-50 flex items-center justify-between px-6 h-14 border-b bg-background">
+    <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border/25 bg-background/85 px-6 shadow-sm shadow-black/5 backdrop-blur-xl dark:shadow-black/20">
       <Link href="/" className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity">
         <CoffeeLogo className="h-6 w-6" />
         <span>Lumen</span>

@@ -36,7 +36,7 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
 
   return (
     <>
-      <Card className="rounded-lg">
+      <Card className="rounded-xl">
         <CardHeader>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
@@ -90,7 +90,7 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
       </Card>
 
       {workspace.description && (
-        <Card className="rounded-lg">
+        <Card className="rounded-xl">
           <CardHeader>
             <CardTitle>About</CardTitle>
           </CardHeader>
@@ -100,7 +100,7 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
         </Card>
       )}
 
-      <Card className="rounded-lg">
+      <Card className="rounded-xl">
         <CardHeader>
           <CardTitle>Productivity</CardTitle>
         </CardHeader>
@@ -162,7 +162,7 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
         </CardContent>
       </Card>
 
-      <Card className="rounded-lg">
+      <Card className="rounded-xl">
         <CardHeader>
           <CardTitle>Amenities</CardTitle>
         </CardHeader>
@@ -195,7 +195,7 @@ function AmenityItem({ icon, label }: { icon: ReactNode; label: string }) {
 
 function ScoreBlock({ icon, label, score }: { icon: ReactNode; label: string; score: number }) {
   return (
-    <div className="rounded-md border bg-muted/25 p-4">
+    <div className="rounded-xl border border-border/35 bg-muted/20 p-4 shadow-sm shadow-black/5 dark:shadow-black/20">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-medium">
           <span className="text-primary">{icon}</span>

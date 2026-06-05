@@ -10,12 +10,12 @@ const featuredUseCases = ["Quiet work", "Calls", "Long stays", "Power access"];
 export function PublicHome() {
   return (
     <div className="min-h-full bg-background">
-      <section className="border-b bg-muted/20 px-6 py-14 md:py-20">
+      <section className="px-6 py-14 md:py-20">
         <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:items-center">
           <div className="space-y-7">
             <div className="flex flex-wrap gap-2">
               {featuredUseCases.map((label) => (
-                <Badge key={label} variant="outline" className="bg-background">
+                <Badge key={label} variant="outline">
                   {label}
                 </Badge>
               ))}
@@ -44,7 +44,7 @@ export function PublicHome() {
             </div>
           </div>
 
-          <div className="rounded-lg border bg-card p-5 shadow-sm">
+          <div className="rounded-xl border border-border/30 bg-card/90 p-5 shadow-md shadow-black/5 dark:shadow-black/20">
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Workspace assessment</p>
@@ -117,7 +117,7 @@ export function PublicHome() {
 
 function SignalRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-md border bg-background p-3">
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-border/30 bg-background/70 p-3 shadow-sm shadow-black/5 dark:shadow-black/20">
       <div className="flex items-center gap-3">
         <span className="text-primary">{icon}</span>
         <span className="font-medium">{label}</span>
@@ -129,7 +129,7 @@ function SignalRow({ icon, label, value }: { icon: ReactNode; label: string; val
 
 function ValueCard({ body, icon, title }: { body: string; icon: ReactNode; title: string }) {
   return (
-    <Card className="rounded-lg">
+    <Card className="rounded-xl transition-colors hover:bg-card">
       <CardHeader>
         <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
           {icon}

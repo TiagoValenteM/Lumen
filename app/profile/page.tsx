@@ -413,7 +413,7 @@ function ProfilePageContent() {
         <Card>
           <CardContent className="py-6">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-5 md:gap-6">
-              <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
+              <Avatar className="h-24 w-24 border-4 border-background shadow-lg shadow-black/10 dark:shadow-black/30">
                 <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
@@ -595,7 +595,7 @@ function ProfilePageContent() {
                 size="sm"
                 onClick={requestLocation}
                 disabled={geoLoading}
-                className="inline-flex items-center gap-2 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-md"
+                className="inline-flex items-center gap-2 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-md hover:shadow-black/10 dark:hover:shadow-black/30"
               >
                 {geoLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -633,7 +633,7 @@ function ProfilePageContent() {
               {nearby.map((ws) => (
                 <Card
                   key={ws.id}
-                  className="border-muted hover:border-primary/70 transition-colors shadow-sm"
+                  className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20"
                 >
                   <CardContent className="py-4">
                     <div className="space-y-2">
@@ -712,7 +712,7 @@ function ProfilePageContent() {
                 const citySlug = ws.city_slug || "global";
                 const cityName = ws.city_name || "Global";
                 return (
-                  <Card key={ws.id} className="border-muted hover:border-primary/70 transition-colors shadow-sm">
+                  <Card key={ws.id} className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20">
                     <CardContent className="pt-3 pb-4 space-y-1.5">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">

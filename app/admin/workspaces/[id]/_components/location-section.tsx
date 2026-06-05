@@ -16,7 +16,6 @@ export function LocationSection({ form, onChange }: LocationSectionProps) {
       <div className="space-y-2">
         <Label>Location</Label>
         <LocationPicker
-          workspaceName={form.name}
           value={{
             latitude: form.latitude,
             longitude: form.longitude,

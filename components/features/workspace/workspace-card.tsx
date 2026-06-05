@@ -39,7 +39,7 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
 
   return (
     <Link href={`/cities/${citySlug}/${workspace.slug}`} className="block h-full">
-      <Card className="group flex h-full flex-col gap-0 overflow-hidden rounded-lg border-border/70 p-0 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md">
+      <Card className="group flex h-full flex-col gap-0 overflow-hidden rounded-xl border-border/30 p-0 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30">
         <div className="relative aspect-video w-full overflow-hidden">
           <WorkspaceImage
             src={workspace.primary_photo?.url}
@@ -48,9 +48,14 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
           <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
-            <Badge className="capitalize shadow-sm">{workspace.type.replace("_", " ")}</Badge>
+            <Badge
+              variant="outline"
+              className="border-border/30 bg-background/90 capitalize text-foreground shadow-sm shadow-black/10 backdrop-blur-sm dark:bg-background/80 dark:shadow-black/30"
+            >
+              {workspace.type.replace("_", " ")}
+            </Badge>
             {workspace.last_verified_at && (
-              <Badge variant="secondary" className="gap-1 border border-white/40 bg-background/90 text-foreground shadow-sm backdrop-blur">
+              <Badge variant="secondary" className="gap-1 border border-white/40 bg-background/90 text-foreground shadow-sm shadow-black/10 backdrop-blur-sm dark:shadow-black/30">
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" />
                 Verified
               </Badge>
@@ -72,7 +77,11 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
           <div className="flex min-h-6 flex-nowrap gap-1.5 overflow-hidden">
             {vibeLabels.length > 0 ? (
               vibeLabels.map((label) => (
-                <Badge key={label} variant="outline" className="shrink-0 border-primary/20 bg-primary/5 text-[11px] text-foreground">
+                <Badge
+                  key={label}
+                  variant="outline"
+                  className="shrink-0 border-primary/20 bg-background/70 text-[11px] text-foreground shadow-none dark:border-primary/30 dark:bg-muted/50"
+                >
                   {label}
                 </Badge>
               ))
@@ -93,7 +102,7 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
 
           <div className="min-h-[42px]">
             {features.length > 0 && (
-              <div className="flex flex-wrap gap-2 rounded-md border bg-muted/25 p-2 text-muted-foreground">
+              <div className="flex flex-wrap gap-2 rounded-lg border border-border/25 bg-muted/20 p-2 text-muted-foreground">
                 {features.map((feature) => (
                   <FeatureIcon key={feature.label} label={feature.label} icon={feature.icon} />
                 ))}

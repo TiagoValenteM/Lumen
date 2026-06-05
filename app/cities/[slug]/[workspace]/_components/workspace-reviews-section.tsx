@@ -16,7 +16,7 @@ type WorkspaceReviewsSectionProps = {
   maxCommentLength: number;
   onSubmitReview: (rating: number, comment: string) => Promise<boolean>;
   onCancelReview: () => void;
-  onWriteFirstReview: () => void;
+  onWriteReview: () => void;
 };
 
 export function WorkspaceReviewsSection({
@@ -29,15 +29,20 @@ export function WorkspaceReviewsSection({
   maxCommentLength,
   onSubmitReview,
   onCancelReview,
-  onWriteFirstReview,
+  onWriteReview,
 }: WorkspaceReviewsSectionProps) {
   return (
-    <Card className="mt-8">
-      <CardHeader>
+    <Card>
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5" />
           Reviews ({reviews.length})
         </CardTitle>
+        {!showReviewForm && (
+          <Button variant="outline" size="sm" onClick={onWriteReview}>
+            Write review
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {showReviewForm && userSignedIn && (
@@ -54,7 +59,7 @@ export function WorkspaceReviewsSection({
             <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
             <p className="text-muted-foreground mb-6">Be the first to share your experience at {workspaceName}</p>
-            <Button onClick={onWriteFirstReview}>Write the First Review</Button>
+            <Button onClick={onWriteReview}>Write the First Review</Button>
           </div>
         ) : (
           <ReviewsList reviews={reviews} profilesById={profilesById} />

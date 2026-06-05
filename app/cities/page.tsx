@@ -179,7 +179,7 @@ export default function CitiesPage() {
           {filteredData.map((country) => (
             <div
               key={country.name}
-              className="bg-card border border-border rounded-lg p-6 hover:shadow-md transition-shadow"
+              className="rounded-xl border border-border/35 bg-card p-6 shadow-md shadow-black/5 transition-shadow hover:shadow-black/10 dark:shadow-black/20 dark:hover:shadow-black/30"
             >
               <h2 className="text-xl font-semibold mb-4 text-foreground">
                 {country.name}

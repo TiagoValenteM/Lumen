@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -38,6 +38,7 @@ export default function WorkspacePage() {
   const [suggestionKind, setSuggestionKind] = useState<WorkspaceSuggestionKind>("wrong_location");
   const [suggestionMessage, setSuggestionMessage] = useState("");
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
+  const reviewsSectionRef = useRef<HTMLDivElement>(null);
   const { toast, showSuccess, showError } = useToast();
   const { isSaved, toggleSave } = useSavedWorkspace(user?.id, workspace?.id || "");
   const { hasVisited, toggleVisited } = useVisitedWorkspace(user?.id, workspace?.id || "");
@@ -215,6 +216,23 @@ export default function WorkspacePage() {
     }
   };
 
+  const scrollToReviews = useCallback(() => {
+    requestAnimationFrame(() => {
+      reviewsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      reviewsSectionRef.current?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const openReviewForm = useCallback(() => {
+    if (!user) {
+      showError("Please sign in to write a review");
+      return;
+    }
+
+    setShowReviewForm(true);
+    scrollToReviews();
+  }, [scrollToReviews, showError, user]);
+
   if (loading) {
     return (
       <div className="min-h-full bg-background flex items-center justify-center">
@@ -248,12 +266,39 @@ export default function WorkspacePage() {
   return (
     <div className="min-h-full bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <WorkspaceHeader city={city} workspace={workspace} />
+        <WorkspaceHeader city={city} workspace={workspace} onReviewsClick={scrollToReviews} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <WorkspaceGallery photos={photos} workspaceName={workspace.name} />
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="space-y-8">
             <WorkspaceMainDetails workspace={workspace} />
+            {photos.length > 0 && (
+              <section className="space-y-4" aria-labelledby="workspace-photos">
+                <div>
+                  <h2 id="workspace-photos" className="text-2xl font-semibold">
+                    Photos
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    A quick look at the space before you decide to work there.
+                  </p>
+                </div>
+                <WorkspaceGallery photos={photos} workspaceName={workspace.name} />
+              </section>
+            )}
+
+            <div ref={reviewsSectionRef} id="reviews" tabIndex={-1} className="scroll-mt-24 outline-none">
+              <WorkspaceReviewsSection
+                workspaceName={workspace.name}
+                reviews={reviews}
+                profilesById={profilesById}
+                showReviewForm={showReviewForm}
+                userSignedIn={Boolean(user)}
+                submittingReview={submittingReview}
+                maxCommentLength={MAX_COMMENT_LENGTH}
+                onSubmitReview={handleSubmitReview}
+                onCancelReview={() => setShowReviewForm(false)}
+                onWriteReview={openReviewForm}
+              />
+            </div>
           </div>
 
           <WorkspaceSidebar
@@ -289,38 +334,13 @@ export default function WorkspacePage() {
                 showError("Failed to save workspace");
               }
             }}
-            onWriteReview={() => {
-              if (!user) {
-                showError("Please sign in to write a review");
-                return;
-              }
-              setShowReviewForm(!showReviewForm);
-            }}
+            onWriteReview={openReviewForm}
             onSuggestionOpenChange={setSuggestionOpen}
             onSuggestionKindChange={setSuggestionKind}
             onSuggestionMessageChange={setSuggestionMessage}
             onSubmitSuggestion={submitSuggestion}
           />
         </div>
-
-        <WorkspaceReviewsSection
-          workspaceName={workspace.name}
-          reviews={reviews}
-          profilesById={profilesById}
-          showReviewForm={showReviewForm}
-          userSignedIn={Boolean(user)}
-          submittingReview={submittingReview}
-          maxCommentLength={MAX_COMMENT_LENGTH}
-          onSubmitReview={handleSubmitReview}
-          onCancelReview={() => setShowReviewForm(false)}
-          onWriteFirstReview={() => {
-            if (!user) {
-              showError("Please sign in to write a review");
-              return;
-            }
-            setShowReviewForm(true);
-          }}
-        />
       </div>
 
       {toast && <Toast message={toast.message} type={toast.type} />}

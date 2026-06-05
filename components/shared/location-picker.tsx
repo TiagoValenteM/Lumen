@@ -36,7 +36,6 @@ type GeocodeCandidate = {
 type LocationPickerProps = {
   value: LocationValue;
   onChange: (value: LocationValue) => void;
-  workspaceName?: string;
 };
 
 const mapStyle = {
@@ -63,7 +62,7 @@ const mapStyle = {
   ],
 } as const;
 
-export function LocationPicker({ value, onChange, workspaceName }: LocationPickerProps) {
+export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const markerRef = useRef<Marker | null>(null);
@@ -238,7 +237,7 @@ export function LocationPicker({ value, onChange, workspaceName }: LocationPicke
                 searchLocations();
               }
             }}
-            placeholder={workspaceName ? `${workspaceName}, city or address` : "Search city or full address"}
+            placeholder="Search city or full address"
             className="pl-9"
           />
         </div>

@@ -312,7 +312,7 @@ export default function MyWorkspacesPage() {
                 const StatusIcon = meta.icon;
                 const canViewPublic = ws.status === "approved";
                 return (
-                  <Card key={ws.id} className="border-muted hover:border-primary/70 transition-colors shadow-sm">
+                  <Card key={ws.id} className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20">
                     <CardContent className="pt-5 pb-5 space-y-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-2">

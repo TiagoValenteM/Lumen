@@ -293,7 +293,7 @@ export default function AdminWorkspacesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {filtered.map((ws) => {
                 return (
-                  <Card key={ws.id} className="border-muted hover:border-primary/50 transition-colors">
+                  <Card key={ws.id} className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20">
                     <CardContent className="pt-4 pb-4">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -304,7 +304,7 @@ export default function AdminWorkspacesPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <div className="h-8 w-8 rounded-md border border-input bg-background flex items-center justify-center">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-input/35 bg-background/70 shadow-sm shadow-black/5 dark:shadow-black/20">
                             {ws.status === "approved" ? (
                               <CheckCircle className="h-3.5 w-3.5 text-green-600" />
                             ) : ws.status === "rejected" ? (

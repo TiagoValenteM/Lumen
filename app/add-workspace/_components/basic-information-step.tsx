@@ -54,7 +54,6 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
         <div className="space-y-2">
           <Label>Location *</Label>
           <LocationPicker
-            workspaceName={formData.name}
             value={{
               latitude: formData.latitude,
               longitude: formData.longitude,
