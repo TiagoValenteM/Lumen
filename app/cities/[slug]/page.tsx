@@ -9,19 +9,27 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WorkspaceCard } from "@/components/features/workspace";
+import { CityCollectionStrip } from "./_components/city-collection-strip";
+import { CityDiscoveryControls } from "./_components/city-discovery-controls";
+import { CityMapSection } from "./_components/city-map-section";
 import type { City, Workspace } from "@/lib/types";
 import { useLocation } from "@/contexts/LocationContext";
 import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } from "@/lib/constants/filters";
+import { mapCityWorkspaceRow } from "@/lib/features/cities/city-workspace-mapper";
+import {
+  filterAndSortCityWorkspaces,
+  getCityWorkspaceCollections,
+  getWorkspaceDistanceKm,
+  hasWorkspaceCoordinates,
+  type CityWorkspaceSortMode,
+} from "@/lib/features/cities/workspace-discovery";
 import {
   ArrowLeft,
   MapPin,
   Loader2,
   Building2,
   SlidersHorizontal,
-  Map as MapIcon,
 } from "lucide-react";
-
-type SortMode = "best" | "reviewed" | "newest" | "quiet" | "long-stays" | "power" | "closest";
 
 type MapInstance = import("maplibre-gl").Map & {
   _markers?: import("maplibre-gl").Marker[];
@@ -39,10 +47,10 @@ export default function CityPage() {
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>("best");
+  const [sortMode, setSortMode] = useState<CityWorkspaceSortMode>("best");
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<MapInstance | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const toggleFilter = (option: string) => {
     setSelectedFilters((prev) => {
@@ -60,92 +68,39 @@ export default function CityPage() {
   const activeFilters = Array.from(selectedFilters);
 
   const distanceKm = useCallback((workspace: Workspace) => {
-    if (
-      userLatitude === null ||
-      userLongitude === null ||
-      workspace.latitude === null ||
-      workspace.latitude === undefined ||
-      workspace.longitude === null ||
-      workspace.longitude === undefined
-    ) {
-      return Number.POSITIVE_INFINITY;
-    }
-    const deg2rad = (deg: number) => deg * (Math.PI / 180);
-    const radius = 6371;
-    const dLat = deg2rad(workspace.latitude - userLatitude);
-    const dLon = deg2rad(workspace.longitude - userLongitude);
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(deg2rad(userLatitude)) *
-        Math.cos(deg2rad(workspace.latitude)) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    return radius * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    return getWorkspaceDistanceKm({ userLatitude, userLongitude, workspace });
   }, [userLatitude, userLongitude]);
 
   const filteredWorkspaces = useMemo(() => {
-    const base = !activeFilters.length ? workspaces : workspaces.filter((workspace) => {
-      const hasSavedFilter = activeFilters.includes("Saved");
-      const hasQuiet = activeFilters.includes("Quiet");
-      const hasLongStays = activeFilters.includes("Long stays");
-      const otherFilters = activeFilters.filter(
-        (f) => f !== "Saved" && f !== "Quiet" && f !== "Long stays"
-      );
-
-      // Saved filter
-      if (hasSavedFilter && !savedWorkspaceIds.has(workspace.id)) {
-        return false;
-      }
-
-      // Quiet: noise level quiet or music volume <=2
-      if (hasQuiet) {
-        const noiseOk = workspace.noise_level === "quiet";
-        const musicOk =
-          typeof workspace.music_volume === "number"
-            ? workspace.music_volume <= 2
-            : workspace.music_volume === null;
-        if (!noiseOk && !musicOk) return false;
-      }
-
-      // Long stays: time_limit_hours is 0 or null
-      if (hasLongStays) {
-        const tl = workspace.time_limit_hours;
-        if (!(tl === null || tl === 0)) return false;
-      }
-
-      // Other supported filters
-      return otherFilters.every((filter) => {
-        const key = SUPPORTED_FILTERS[filter];
-        if (!key) return true; // filters we don't have data for are ignored
-        const value = workspace[key];
-        return value === true;
-      });
-    });
-
-    return [...base].sort((a, b) => {
-      if (sortMode === "reviewed") return (b.total_reviews || 0) - (a.total_reviews || 0);
-      if (sortMode === "newest") {
-        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
-      }
-      if (sortMode === "quiet") {
-        const quietScore = (workspace: Workspace) =>
-          (workspace.noise_level === "quiet" ? 2 : 0) +
-          (typeof workspace.music_volume === "number" ? 5 - workspace.music_volume : 1);
-        return quietScore(b) - quietScore(a);
-      }
-      if (sortMode === "long-stays") {
-        const stayScore = (workspace: Workspace) =>
-          workspace.time_limit_hours === null || workspace.time_limit_hours === 0 ? 1 : 0;
-        return stayScore(b) - stayScore(a);
-      }
-      if (sortMode === "power") {
-        const powerScore = (workspace: Workspace) => (workspace.has_power_outlets ? 1 : 0);
-        return powerScore(b) - powerScore(a);
-      }
-      if (sortMode === "closest") return distanceKm(a) - distanceKm(b);
-      return (b.overall_rating || 0) - (a.overall_rating || 0);
+    return filterAndSortCityWorkspaces({
+      activeFilters,
+      distanceKm,
+      savedWorkspaceIds,
+      sortMode,
+      supportedFilters: SUPPORTED_FILTERS,
+      workspaces,
     });
   }, [activeFilters, workspaces, savedWorkspaceIds, sortMode, distanceKm]);
+
+  const cityCollections = useMemo(() => {
+    return getCityWorkspaceCollections(filteredWorkspaces);
+  }, [filteredWorkspaces]);
+
+  const placesWithCoordinates = useMemo(() => {
+    return workspaces.filter((workspace) => hasWorkspaceCoordinates(workspace)).length;
+  }, [workspaces]);
+  const hasMappablePlaces = placesWithCoordinates > 0;
+  const canUseLocationSort = userLatitude !== null && userLongitude !== null;
+
+  const handleCollectionSelect = useCallback((collection: (typeof cityCollections)[number]) => {
+    if (collection.action === "sort") {
+      setSortMode(collection.value);
+      return;
+    }
+
+    setSelectedFilters(new Set([collection.value]));
+    setShowFilters(true);
+  }, []);
 
   useEffect(() => {
     async function fetchCityAndWorkspaces() {
@@ -187,6 +142,8 @@ export default function CityPage() {
             has_natural_light,
             is_accessible,
             allows_pets,
+            good_for_calls,
+            good_for_meetings,
             good_for_groups,
             noise_level,
             music_volume,
@@ -200,44 +157,10 @@ export default function CityPage() {
           .order('overall_rating', { ascending: false });
 
         if (workspacesData && !workspacesError) {
-          const workspacesWithPhotos = workspacesData.map((workspace) => {
-            const approvedPhotos = (workspace.workspace_photos || []).filter((photo) => photo.is_approved);
-            const primaryPhoto = approvedPhotos.find((photo) => photo.is_primary) || approvedPhotos[0] || null;
-            return {
-                ...workspace,
-                has_wifi: Boolean(workspace.has_wifi),
-                has_power_outlets: Boolean(workspace.has_power_outlets),
-                has_coffee: Boolean(workspace.has_coffee),
-                has_food: Boolean(workspace.has_food),
-                has_veg: Boolean(workspace.has_veg),
-                has_alcohol: Boolean(workspace.has_alcohol),
-                has_outdoor_seating: Boolean(workspace.has_outdoor_seating),
-                has_restrooms: Boolean(workspace.has_restrooms),
-                has_bike_parking: Boolean(workspace.has_bike_parking),
-                has_parking: Boolean(workspace.has_parking),
-                has_natural_light: Boolean(workspace.has_natural_light),
-                is_accessible: Boolean(workspace.is_accessible),
-                allows_pets: Boolean(workspace.allows_pets),
-                good_for_groups: Boolean(workspace.good_for_groups),
-                noise_level: workspace.noise_level,
-                music_volume:
-                  typeof workspace.music_volume === "number"
-                    ? workspace.music_volume
-                    : workspace.music_volume === null
-                      ? null
-                      : undefined,
-                time_limit_hours:
-                  typeof workspace.time_limit_hours === "number"
-                    ? workspace.time_limit_hours
-                    : workspace.time_limit_hours === null
-                      ? null
-                      : undefined,
-                primary_photo: primaryPhoto ? { url: primaryPhoto.url } : null,
-                workspace_photos: undefined,
-              };
-          });
-
-          setWorkspaces(workspacesWithPhotos);
+          setWorkspaces(workspacesData.map(mapCityWorkspaceRow));
+        } else if (workspacesError) {
+          console.error("Failed to load city workspaces", workspacesError);
+          setWorkspaces([]);
         }
       }
 
@@ -280,9 +203,7 @@ export default function CityPage() {
   useEffect(() => {
     if (!city || !showMap) return;
 
-    const workspaceWithCoords = workspaces.filter(
-      (w) => typeof w.latitude === "number" && typeof w.longitude === "number"
-    );
+    const workspaceWithCoords = workspaces.filter(hasWorkspaceCoordinates);
     if (!workspaceWithCoords.length) return;
 
     let isMounted = true;
@@ -534,43 +455,22 @@ export default function CityPage() {
           )}
         </div>
 
-        {/* Toggles */}
-        <div className="flex flex-wrap gap-3 mb-6">
-          {workspaces.some((w) => w.latitude && w.longitude) && (
-            <Button
-              variant={showMap ? "default" : "outline"}
-              size="sm"
-              className="gap-2"
-              onClick={() => setShowMap((v) => !v)}
-            >
-              <MapIcon className="h-4 w-4" />
-              {showMap ? "Hide map" : "Show map"}
-            </Button>
-          )}
-          <Button
-            variant={showFilters ? "default" : "outline"}
-            size="sm"
-            className="gap-2"
-            onClick={() => setShowFilters((v) => !v)}
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            {showFilters ? "Hide filters" : "Show filters"}
-          </Button>
-        </div>
+        <CityCollectionStrip collections={cityCollections} onSelect={handleCollectionSelect} />
+
+        <CityDiscoveryControls
+          canUseLocationSort={canUseLocationSort}
+          hasMappablePlaces={hasMappablePlaces}
+          isClosestSort={sortMode === "closest"}
+          showFilters={showFilters}
+          showMap={showMap}
+          onToggleFilters={() => setShowFilters((value) => !value)}
+          onToggleMap={() => setShowMap((value) => !value)}
+          onUseNearMe={() => setSortMode("closest")}
+        />
 
         {/* Map View */}
-        {showMap && workspaces.some((w) => w.latitude && w.longitude) && (
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-3xl font-bold flex items-center gap-3">
-                <MapIcon className="h-8 w-8" />
-                Map
-              </h2>
-            </div>
-            <div className="rounded-xl border border-border bg-card overflow-hidden h-[420px]">
-              <div ref={mapContainerRef} className="w-full h-full" />
-            </div>
-          </div>
+        {showMap && hasMappablePlaces && (
+          <CityMapSection mapContainerRef={mapContainerRef} placesWithCoordinates={placesWithCoordinates} />
         )}
 
         <div className="mb-8">
@@ -588,7 +488,7 @@ export default function CityPage() {
             <div className="text-sm text-muted-foreground">
               Sort places by what matters for the next work session.
             </div>
-            <Select value={sortMode} onValueChange={(value) => setSortMode(value as SortMode)}>
+            <Select value={sortMode} onValueChange={(value) => setSortMode(value as CityWorkspaceSortMode)}>
               <SelectTrigger className="w-full sm:w-[190px]">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
@@ -607,7 +507,7 @@ export default function CityPage() {
           </div>
 
           {showFilters && (
-            <div className="rounded-xl border border-border bg-card/60 p-4 mb-6">
+            <div className="rounded-lg border border-border bg-card/60 p-4 mb-6">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                   <SlidersHorizontal className="h-4 w-4" />

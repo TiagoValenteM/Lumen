@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Building2, Loader2, Merge, Shield, Star, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { mergeCityBySlug } from "@/lib/features/admin-cities/actions";
+import { deleteCityIfEmpty, mergeCityBySlug } from "@/lib/features/admin-cities/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,16 +106,16 @@ export default function AdminCitiesPage() {
     setSavingId(cityId);
     setError(null);
     try {
-      const { data, error: deleteError } = await supabase.rpc("delete_city_if_empty", { city_uuid: cityId });
-      if (deleteError) throw deleteError;
-      if (!data) {
+      const deleted = await deleteCityIfEmpty(supabase, cityId);
+      if (!deleted) {
         setError("City was not deleted because it is featured or still has places.");
         return;
       }
       setCities((prev) => prev.filter((city) => city.id !== cityId));
     } catch (err) {
-      console.error("Failed to delete city", err);
-      setError("Could not delete city.");
+      const message = err instanceof Error ? err.message : "Could not delete city.";
+      console.error("Failed to delete city", message);
+      setError(message);
     } finally {
       setSavingId(null);
     }

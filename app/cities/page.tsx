@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Search, Building2, Loader2 } from "lucide-react";
+import { Search, Building2, Loader2, MapPin, Sparkles } from "lucide-react";
 import type { City } from "@/lib/types";
 
 export default function CitiesPage() {
@@ -13,7 +14,7 @@ export default function CitiesPage() {
     {}
   );
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function fetchCities() {
@@ -104,6 +105,17 @@ export default function CitiesPage() {
     return filteredData.reduce((acc, country) => acc + country.cities.length, 0);
   }, [filteredData]);
 
+  const featuredCities = useMemo(() => {
+    return cities
+      .filter((city) => (workspaceCounts[city.id] ?? city.workspace_count ?? 0) > 0)
+      .sort((a, b) => {
+        const aCount = workspaceCounts[a.id] ?? a.workspace_count ?? 0;
+        const bCount = workspaceCounts[b.id] ?? b.workspace_count ?? 0;
+        return bCount - aCount;
+      })
+      .slice(0, 4);
+  }, [cities, workspaceCounts]);
+
   if (loading) {
     return (
       <div className="min-h-full bg-background flex items-center justify-center">
@@ -128,6 +140,30 @@ export default function CitiesPage() {
           </p>
         </div>
 
+        {featuredCities.length > 0 && (
+          <div className="mb-8 grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            {featuredCities.map((city, index) => (
+              <Link
+                key={city.id}
+                href={`/cities/${city.slug}`}
+                className="rounded-lg border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-muted/40"
+              >
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    {index === 0 ? <Sparkles className="h-3.5 w-3.5" /> : <MapPin className="h-3.5 w-3.5" />}
+                    Featured
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {workspaceCounts[city.id] ?? city.workspace_count ?? 0} places
+                  </span>
+                </div>
+                <h2 className="text-lg font-semibold">{city.name}</h2>
+                <p className="text-sm text-muted-foreground">{city.country}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+
         <div className="mb-8 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input
@@ -151,7 +187,7 @@ export default function CitiesPage() {
               <ul className="space-y-2">
                 {country.cities.map((city) => (
                   <li key={city.slug}>
-                    <a
+                    <Link
                       href={`/cities/${city.slug}`}
                       className="text-muted-foreground hover:text-primary transition-colors inline-flex items-center justify-between group w-full"
                     >
@@ -161,7 +197,7 @@ export default function CitiesPage() {
                           {workspaceCounts[city.id] ?? city.workspace_count ?? 0}
                         </span>
                       )}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

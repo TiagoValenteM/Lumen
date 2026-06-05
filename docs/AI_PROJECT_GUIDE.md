@@ -40,6 +40,56 @@ hooks/
 
 Do not put route-specific business logic in `lib/utils`.
 
+## Feature Module Plan
+
+Move shared business behavior toward domain folders. File names should describe the job they do, not the CRUD pattern they happen to use.
+
+```txt
+lib/features/
+  cities/
+    city-repository.ts
+    city-lifecycle.ts
+    city-normalization.ts
+  locations/
+    geocoding.ts
+    reverse-geocoding.ts
+    location-normalization.ts
+  moderation/
+    workspace-review-actions.ts
+    photo-review-actions.ts
+    suggestion-review-actions.ts
+  workspace-submissions/
+    submission-actions.ts
+    submission-repository.ts
+    duplicate-detection.ts
+    submission-validation.ts
+  workspaces/
+    workspace-queries.ts
+    workspace-mappers.ts
+    workability-report.ts
+```
+
+Use this split as the target shape:
+
+- `*-repository.ts`: isolated Supabase reads/writes and migration compatibility fallbacks.
+- `*-actions.ts`: server actions or route-callable workflows that compose repositories and validation.
+- `*-validation.ts`: schemas, input guards, and user-facing validation errors.
+- `*-mappers.ts`: database rows to UI/domain models.
+- `*-normalization.ts`: slug, address, city, and coordinate cleanup helpers.
+- `*-lifecycle.ts`: cross-record rules such as creating the new city and pruning an empty old city.
+
+Route-local `_lib` is still fine when a behavior is only used by one route. Promote it into `lib/features/<domain>` when a second route needs it or when tests would be easier around a pure domain helper.
+
+## Slow Extraction Order
+
+Follow this order to keep behavior stable:
+
+1. Move pure helpers first, such as scoring, city normalization, and duplicate fingerprints.
+2. Move read mappers next, keeping page queries unchanged.
+3. Move write orchestration into named actions after the types are stable.
+4. Add tests around moved helpers before changing related UI.
+5. Extract UI sections after data contracts stop moving.
+
 ## Component Boundaries
 
 Keep `page.tsx` focused on:
@@ -116,4 +166,3 @@ Current priority:
 - `app/add-workspace/page.tsx`: split by form step and submit helpers.
 - `app/cities/[slug]/[workspace]/page.tsx`: split action sidebar, suggest-edit dialog, reviews, and detail sections.
 - `app/profile/my-workspaces/page.tsx`: split status summary and submission card if it grows further.
-
