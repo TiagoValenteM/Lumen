@@ -37,9 +37,32 @@ export async function createCityForWorkspace(supabase: SupabaseClient, formData:
 }
 
 export async function createPendingWorkspace(supabase: SupabaseClient, payload: Record<string, unknown>) {
-  const { data, error } = await supabase.from("workspaces").insert(payload).select("id").single();
-  if (error) throw error;
-  return data;
+  const result = await supabase.from("workspaces").insert(payload).select("id").single();
+  if (!result.error) return result.data;
+  if (!isMissingLocationMetadataColumnError(result.error)) throw result.error;
+
+  const fallbackPayload = { ...payload };
+  delete fallbackPayload.location_source;
+  delete fallbackPayload.location_provider;
+  delete fallbackPayload.location_provider_id;
+  delete fallbackPayload.location_confidence;
+  delete fallbackPayload.location_raw;
+
+  const fallback = await supabase.from("workspaces").insert(fallbackPayload).select("id").single();
+  if (fallback.error) throw result.error;
+  return fallback.data;
+}
+
+function isMissingLocationMetadataColumnError(error: { code?: string; message?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+  return (
+    error.code === "42703" ||
+    error.code === "PGRST204" ||
+    message.includes("location_source") ||
+    message.includes("location_provider") ||
+    message.includes("location_confidence") ||
+    message.includes("location_raw")
+  );
 }
 
 export async function createPendingWorkspacePhotos(

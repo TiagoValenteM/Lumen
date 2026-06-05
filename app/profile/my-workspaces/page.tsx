@@ -13,9 +13,23 @@ import type { UserWorkspaceSummary } from "@/lib/types/profile";
 import { LEVELS, LEVEL_ICONS, MEDAL_ICON_URL, getLevel } from "@/lib/constants/profileLevels";
 import { Progress } from "@/components/ui/progress";
 
+type MyWorkspaceRow = {
+  id: string;
+  name: string;
+  slug: string;
+  status: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  rejection_reason?: string | null;
+  short_description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  city: { slug: string | null; name: string | null } | { slug: string | null; name: string | null }[] | null;
+};
+
 export default function MyWorkspacesPage() {
   const { user } = useAuth();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [items, setItems] = useState<UserWorkspaceSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -81,7 +95,8 @@ export default function MyWorkspacesPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data, error: fetchError } = await supabase
+        let includeModerationReason = true;
+        const result = await supabase
           .from("workspaces")
           .select(
             `
@@ -100,6 +115,33 @@ export default function MyWorkspacesPage() {
           )
           .eq("submitted_by", user.id)
           .order("created_at", { ascending: false });
+        let data = result.data as MyWorkspaceRow[] | null;
+        let fetchError = result.error;
+
+        if (fetchError && isMissingModerationColumnError(fetchError)) {
+          includeModerationReason = false;
+          const fallback = await supabase
+            .from("workspaces")
+            .select(
+              `
+              id,
+              name,
+              slug,
+              status,
+              created_at,
+              updated_at,
+              short_description,
+              latitude,
+              longitude,
+              city:cities(slug, name)
+            `
+            )
+            .eq("submitted_by", user.id)
+            .order("created_at", { ascending: false });
+
+          data = fallback.data as MyWorkspaceRow[] | null;
+          fetchError = fallback.error;
+        }
 
         if (fetchError) throw fetchError;
 
@@ -115,7 +157,7 @@ export default function MyWorkspacesPage() {
               status: w.status ?? null,
               created_at: w.created_at ?? null,
               updated_at: w.updated_at ?? null,
-              rejection_reason: w.rejection_reason ?? null,
+              rejection_reason: includeModerationReason ? w.rejection_reason ?? null : null,
               short_description: w.short_description ?? null,
               latitude: w.latitude ?? null,
               longitude: w.longitude ?? null,
@@ -321,4 +363,9 @@ export default function MyWorkspacesPage() {
       </div>
     </div>
   );
+}
+
+function isMissingModerationColumnError(error: { code?: string; message?: string }) {
+  const message = error.message?.toLowerCase() ?? "";
+  return error.code === "42703" || error.code === "PGRST204" || message.includes("rejection_reason");
 }
