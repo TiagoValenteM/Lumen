@@ -30,6 +30,7 @@ export function mapCityWorkspaceRow(row: CityWorkspaceRow): Workspace {
     has_natural_light: Boolean(row.has_natural_light),
     is_accessible: Boolean(row.is_accessible),
     allows_pets: Boolean(row.allows_pets),
+    laptop_friendly: Boolean(row.laptop_friendly),
     good_for_calls: Boolean(row.good_for_calls),
     good_for_meetings: Boolean(row.good_for_meetings),
     good_for_groups: Boolean(row.good_for_groups),

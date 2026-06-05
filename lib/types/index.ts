@@ -32,6 +32,7 @@ export interface Workspace {
   has_natural_light?: boolean;
   is_accessible?: boolean;
   allows_pets?: boolean;
+  laptop_friendly?: boolean;
   good_for_meetings?: boolean;
   good_for_calls?: boolean;
   good_for_groups?: boolean;
@@ -76,6 +77,7 @@ export interface WorkspaceDetail extends Workspace {
   allows_pets: boolean;
   website: string | null;
   phone: string | null;
+  laptop_friendly: boolean;
   time_limit_hours: number | null;
   minimum_purchase_required: boolean;
   good_for_meetings: boolean;

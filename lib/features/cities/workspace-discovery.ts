@@ -52,8 +52,9 @@ export function filterAndSortCityWorkspaces({
         const hasSavedFilter = activeFilters.includes("Saved");
         const hasQuiet = activeFilters.includes("Quiet");
         const hasLongStays = activeFilters.includes("Long stays");
+        const hasLaptopReady = activeFilters.includes("Laptop-ready");
         const otherFilters = activeFilters.filter(
-          (filter) => filter !== "Saved" && filter !== "Quiet" && filter !== "Long stays"
+          (filter) => filter !== "Saved" && filter !== "Quiet" && filter !== "Long stays" && filter !== "Laptop-ready"
         );
 
         if (hasSavedFilter && !savedWorkspaceIds.has(workspace.id)) return false;
@@ -61,6 +62,8 @@ export function filterAndSortCityWorkspaces({
         if (hasQuiet && !isQuietWorkspace(workspace)) return false;
 
         if (hasLongStays && !isLongStayWorkspace(workspace)) return false;
+
+        if (hasLaptopReady && !isLaptopReadyWorkspace(workspace)) return false;
 
         return otherFilters.every((filter) => {
           const key = supportedFilters[filter];
@@ -74,13 +77,13 @@ export function filterAndSortCityWorkspaces({
 
 export function getCityWorkspaceCollections(workspaces: Workspace[]): CityWorkspaceCollection[] {
   const quiet = workspaces.filter(isQuietWorkspace);
-  const laptopReady = workspaces.filter((workspace) => workspace.has_wifi && workspace.has_power_outlets);
+  const laptopReady = workspaces.filter(isLaptopReadyWorkspace);
   const longStay = workspaces.filter(isLongStayWorkspace);
   const recentlyAdded = [...workspaces].sort((a, b) => getCreatedAt(b) - getCreatedAt(a));
 
   const collections: CityWorkspaceCollection[] = [
     { label: "Quiet picks", count: quiet.length, action: "filter", value: "Quiet" },
-    { label: "Laptop-ready", count: laptopReady.length, action: "sort", value: "power" },
+    { label: "Laptop-ready", count: laptopReady.length, action: "filter", value: "Laptop-ready" },
     { label: "Long-stay friendly", count: longStay.length, action: "filter", value: "Long stays" },
     { label: "Recently added", count: recentlyAdded.length, action: "sort", value: "newest" },
   ];
@@ -128,7 +131,7 @@ function compareWorkspaces(
   if (sortMode === "newest") return getCreatedAt(b) - getCreatedAt(a);
   if (sortMode === "quiet") return getQuietScore(b) - getQuietScore(a);
   if (sortMode === "long-stays") return Number(isLongStayWorkspace(b)) - Number(isLongStayWorkspace(a));
-  if (sortMode === "power") return Number(b.has_power_outlets) - Number(a.has_power_outlets);
+  if (sortMode === "power") return getLaptopReadyScore(b) - getLaptopReadyScore(a);
   if (sortMode === "closest") return distanceKm(a) - distanceKm(b);
 
   return (b.overall_rating || 0) - (a.overall_rating || 0);
@@ -150,4 +153,15 @@ function isQuietWorkspace(workspace: Workspace) {
 
 function isLongStayWorkspace(workspace: Workspace) {
   return workspace.time_limit_hours === null || workspace.time_limit_hours === 0;
+}
+
+function isLaptopReadyWorkspace(workspace: Workspace) {
+  return workspace.laptop_friendly === true ||
+    (workspace.has_wifi === true && workspace.has_power_outlets === true);
+}
+
+function getLaptopReadyScore(workspace: Workspace) {
+  return Number(isLaptopReadyWorkspace(workspace)) +
+    Number(workspace.has_power_outlets) +
+    Number(workspace.has_wifi);
 }

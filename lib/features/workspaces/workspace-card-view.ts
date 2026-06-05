@@ -5,6 +5,7 @@ type WorkspaceCardData = Pick<
   | "has_coffee"
   | "has_power_outlets"
   | "has_wifi"
+  | "laptop_friendly"
   | "music_volume"
   | "noise_level"
   | "time_limit_hours"
@@ -21,7 +22,9 @@ export function getWorkspaceCardVibes(workspace: WorkspaceCardData) {
   if (workspace.good_for_meetings || workspace.good_for_groups) vibes.push("Social");
   if (isLongStayWorkspace(workspace)) vibes.push("Long stay");
 
-  if (vibes.length === 0 && workspace.has_wifi && workspace.has_power_outlets) vibes.push("Laptop-ready");
+  if (vibes.length === 0 && (workspace.laptop_friendly || (workspace.has_wifi && workspace.has_power_outlets))) {
+    vibes.push("Laptop-ready");
+  }
 
   return vibes.slice(0, 3);
 }

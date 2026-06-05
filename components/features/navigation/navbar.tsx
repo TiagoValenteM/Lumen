@@ -21,11 +21,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { CoffeeLogo } from "@/components/shared";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDisplayName, getInitials } from "@/lib/utils";
-import { useProfile } from "@/hooks/useProfile";
 
 export default function NavBar() {
-  const { user, signOut } = useAuth();
-  const { profile } = useProfile(user?.id);
+  const { user, profile, signOut } = useAuth();
   const isAdmin = Boolean(profile?.is_admin);
 
   const displayName = getDisplayName(

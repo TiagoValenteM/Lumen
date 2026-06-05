@@ -18,7 +18,7 @@ import { Loader2, Bookmark, MapPinCheck, ArrowRight, Settings, Mail, AtSign, Cal
 import Link from "next/link";
 import { getErrorMessage, getInitials, getDisplayName } from "@/lib/utils";
 import type { Profile } from "@/lib/types";
-import { useLocation } from "@/contexts/LocationContext";
+import { LocationProvider, useLocation } from "@/contexts/LocationContext";
 import { LEVEL_ICONS, VISITED_LEVEL_ICONS, getLevel, getVisitedLevel } from "@/lib/constants/profileLevels";
 import {
   Tooltip,
@@ -59,6 +59,14 @@ const getCityField = (
 ) => Array.isArray(city) ? city[0] ?? null : city;
 
 export default function ProfilePage() {
+  return (
+    <LocationProvider>
+      <ProfilePageContent />
+    </LocationProvider>
+  );
+}
+
+function ProfilePageContent() {
   const { user } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const { latitude, longitude, loading: geoLoading, error: geoError, requestLocation } = useLocation();

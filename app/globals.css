@@ -48,6 +48,8 @@
 
 :root {
   --radius: 0.625rem;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
   /* Palette D — Olive & Terracotta */
   --background: oklch(0.95 0.015 100); /* Bone */
   --foreground: oklch(0.30 0.05 60); /* Umber */

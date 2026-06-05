@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState } from "react";
 
 interface GeolocationState {
   latitude: number | null;
@@ -19,7 +19,7 @@ export function useGeolocation() {
     permissionStatus: null,
   });
 
-  const requestLocation = () => {
+  const requestLocation = useCallback(() => {
     if (!navigator.geolocation) {
       setLocation((prev) => ({
         ...prev,
@@ -29,6 +29,23 @@ export function useGeolocation() {
     }
 
     setLocation((prev) => ({ ...prev, loading: true, error: null }));
+
+    if (navigator.permissions) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then((permissionStatus) => {
+          setLocation((prev) => ({
+            ...prev,
+            permissionStatus: permissionStatus.state as "granted" | "denied" | "prompt",
+          }));
+        })
+        .catch(() => {
+          setLocation((prev) => ({
+            ...prev,
+            permissionStatus: "prompt",
+          }));
+        });
+    }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -83,32 +100,6 @@ export function useGeolocation() {
         maximumAge: 0,
       }
     );
-  };
-
-  useEffect(() => {
-    if (navigator.permissions) {
-      navigator.permissions
-        .query({ name: "geolocation" })
-        .then((permissionStatus) => {
-          setLocation((prev) => ({
-            ...prev,
-            permissionStatus: permissionStatus.state as "granted" | "denied" | "prompt",
-          }));
-
-          permissionStatus.onchange = () => {
-            setLocation((prev) => ({
-              ...prev,
-              permissionStatus: permissionStatus.state as "granted" | "denied" | "prompt",
-            }));
-          };
-        })
-        .catch(() => {
-          setLocation((prev) => ({
-            ...prev,
-            permissionStatus: "prompt",
-          }));
-        });
-    }
   }, []);
 
   return {

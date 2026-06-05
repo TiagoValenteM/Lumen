@@ -13,7 +13,7 @@ import { CityCollectionStrip } from "./_components/city-collection-strip";
 import { CityDiscoveryControls } from "./_components/city-discovery-controls";
 import { CityMapSection } from "./_components/city-map-section";
 import type { City, Workspace } from "@/lib/types";
-import { useLocation } from "@/contexts/LocationContext";
+import { LocationProvider, useLocation } from "@/contexts/LocationContext";
 import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } from "@/lib/constants/filters";
 import { mapCityWorkspaceRow } from "@/lib/features/cities/city-workspace-mapper";
 import {
@@ -36,6 +36,14 @@ type MapInstance = import("maplibre-gl").Map & {
 };
 
 export default function CityPage() {
+  return (
+    <LocationProvider>
+      <CityPageContent />
+    </LocationProvider>
+  );
+}
+
+function CityPageContent() {
   const params = useParams();
   const slug = params.slug as string;
   const { user } = useAuth();
@@ -142,6 +150,7 @@ export default function CityPage() {
             has_natural_light,
             is_accessible,
             allows_pets,
+            laptop_friendly,
             good_for_calls,
             good_for_meetings,
             good_for_groups,

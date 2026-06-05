@@ -1,20 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "@/components/features/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
-import { LocationProvider } from "@/contexts/LocationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-
-const geist = Geist({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Lumen | Productive Workspaces",
@@ -28,9 +16,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geist.variable} ${geistMono.variable} antialiased`}
-      >
+      <body>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -38,12 +24,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            <LocationProvider>
-              <NavBar />
-              <div id="root-content">
-                {children}
-              </div>
-            </LocationProvider>
+            <NavBar />
+            <div id="root-content">
+              {children}
+            </div>
           </AuthProvider>
         </ThemeProvider>
       </body>
