@@ -31,15 +31,29 @@ export async function submitWorkspaceSuggestion(
     error.code === "PGRST202" ||
     error.message?.toLowerCase().includes("could not find the function");
 
-  if (!missingRpc) throw error;
+  const rpcCanFallback =
+    missingRpc ||
+    error.code === "42703" ||
+    error.message?.toLowerCase().includes("reported_change_count") ||
+    error.message?.toLowerCase().includes("workspace_edit_suggestions");
+
+  if (!rpcCanFallback) throw error;
 
   const { error: insertError } = await supabase.from("workspace_edit_suggestions").insert({
     workspace_id: input.workspaceId,
     user_id: input.userId,
     kind: input.kind,
+    field: input.kind,
+    current_value: "",
+    proposed_value: input.message,
     message: input.message,
+    status: "open",
   });
-  if (insertError) throw insertError;
+  if (insertError) throw new Error(formatSuggestionError(insertError));
 
   return null;
+}
+
+function formatSuggestionError(error: { code?: string; message?: string; details?: string; hint?: string }) {
+  return [error.code, error.message, error.details, error.hint].filter(Boolean).join(" | ") || "Could not submit suggestion.";
 }

@@ -26,6 +26,7 @@ type WorkspaceSidebarProps = {
   suggestionOpen: boolean;
   suggestionKind: WorkspaceSuggestionKind;
   suggestionMessage: string;
+  suggestionError: string | null;
   submittingSuggestion: boolean;
   onToggleVisited: () => void;
   onToggleSaved: () => void;
@@ -44,6 +45,7 @@ export function WorkspaceSidebar({
   suggestionOpen,
   suggestionKind,
   suggestionMessage,
+  suggestionError,
   submittingSuggestion,
   onToggleVisited,
   onToggleSaved,
@@ -82,12 +84,12 @@ export function WorkspaceSidebar({
                 Suggest an Edit
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Suggest an edit</DialogTitle>
-                <DialogDescription>Send a correction for this place. Admins review suggestions before changing public data.</DialogDescription>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
+              <DialogHeader className="min-w-0">
+                <DialogTitle className="break-words">Suggest an edit</DialogTitle>
+                <DialogDescription className="break-words">Send a correction for this place. Admins review suggestions before changing public data.</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
+              <div className="min-w-0 space-y-4">
                 <div className="space-y-2">
                   <Label>What should we check?</Label>
                   <Select value={suggestionKind} onValueChange={(value) => onSuggestionKindChange(value as WorkspaceSuggestionKind)}>
@@ -110,12 +112,22 @@ export function WorkspaceSidebar({
                     value={suggestionMessage}
                     onChange={(event) => onSuggestionMessageChange(event.target.value)}
                     placeholder="Tell us what looks wrong and what the correct information should be."
+                    className="break-words [overflow-wrap:anywhere]"
+                    aria-invalid={Boolean(suggestionError)}
                     rows={5}
                     maxLength={800}
                   />
+                  <div className="flex items-start justify-between gap-3 text-xs">
+                    <p className="min-h-4 min-w-0 break-words text-destructive [overflow-wrap:anywhere]">
+                      {suggestionError}
+                    </p>
+                    <span className="shrink-0 text-muted-foreground">
+                      {suggestionMessage.trim().length}/800
+                    </span>
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={() => onSuggestionOpenChange(false)}>
                   Cancel
                 </Button>

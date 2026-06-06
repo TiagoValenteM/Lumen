@@ -186,6 +186,44 @@ export async function updateWorkspacePhoto(
   if (error) throw error;
 }
 
+export async function deleteWorkspacePhoto(
+  supabase: SupabaseClient,
+  photoId: string,
+) {
+  const { data, error } = await supabase.rpc("delete_workspace_photo", { photo_uuid: photoId });
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function deleteWorkspace(
+  supabase: SupabaseClient,
+  workspaceId: string,
+) {
+  const { data, error } = await supabase.rpc("delete_workspace", { workspace_uuid: workspaceId });
+  if (error) throw error;
+  return Boolean(data);
+}
+
+export async function deleteWorkspacePhotoStorageObject(supabase: SupabaseClient, imageUrl: string) {
+  const storagePath = getWorkspacePhotoStoragePath(imageUrl);
+  if (!storagePath) return;
+
+  const { error } = await supabase.storage.from("workspace-photos").remove([storagePath]);
+  if (error) throw error;
+}
+
+function getWorkspacePhotoStoragePath(imageUrl: string) {
+  try {
+    const url = new URL(imageUrl);
+    const marker = "/storage/v1/object/public/workspace-photos/";
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex === -1) return null;
+    return decodeURIComponent(url.pathname.slice(markerIndex + marker.length));
+  } catch {
+    return null;
+  }
+}
+
 export async function setWorkspacePrimaryPhoto(
   supabase: SupabaseClient,
   workspaceId: string,

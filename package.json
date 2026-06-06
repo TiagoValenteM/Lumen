@@ -6,7 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "locations:leads": "node scripts/osm-location-leads.mjs",
+    "locations:leads:laptopfriendly": "node scripts/laptopfriendly-location-leads.mjs",
+    "locations:import:from-leads": "node scripts/build-workspace-import-from-leads.mjs",
+    "locations:import:enrich": "node scripts/enrich-workspace-import-locations.mjs",
+    "locations:import:photos": "node scripts/build-workspace-photo-import.mjs",
+    "locations:import:push": "node scripts/push-workspace-import-to-supabase.mjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",

@@ -9,6 +9,7 @@ import { resolveAvatarUrl } from "@/lib/utils";
 import { useToast } from "@/hooks/useToast";
 import { useSavedWorkspace } from "@/hooks/useSavedWorkspace";
 import { useVisitedWorkspace } from "@/hooks/useVisitedWorkspace";
+import { getErrorMessage } from "@/lib/utils/error";
 import { submitWorkspaceSuggestion, type WorkspaceSuggestionKind } from "@/lib/features/workspace-suggestions/actions";
 import type { City, WorkspaceDetail, Photo, Review, ProfileSummary } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export default function WorkspacePage() {
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [suggestionKind, setSuggestionKind] = useState<WorkspaceSuggestionKind>("wrong_location");
   const [suggestionMessage, setSuggestionMessage] = useState("");
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [submittingSuggestion, setSubmittingSuggestion] = useState(false);
   const reviewsSectionRef = useRef<HTMLDivElement>(null);
   const { toast, showSuccess, showError } = useToast();
@@ -185,15 +187,16 @@ export default function WorkspacePage() {
 
   const submitSuggestion = async () => {
     if (!user || !workspace) {
-      showError("Please sign in to suggest an edit");
+      setSuggestionError("Please sign in to suggest an edit.");
       return;
     }
     if (suggestionMessage.trim().length < 10) {
-      showError("Please add a little more detail.");
+      setSuggestionError("Please add at least 10 characters so admins have enough context.");
       return;
     }
 
     setSubmittingSuggestion(true);
+    setSuggestionError(null);
     try {
       const result = await submitWorkspaceSuggestion(supabase, {
         workspaceId: workspace.id,
@@ -205,12 +208,15 @@ export default function WorkspacePage() {
       const nextCount = result?.reported_change_count ?? Number(workspace.reported_change_count || 0) + 1;
       setWorkspace({ ...workspace, reported_change_count: nextCount });
       setSuggestionMessage("");
+      setSuggestionError(null);
       setSuggestionKind("wrong_location");
       setSuggestionOpen(false);
       showSuccess("Thanks. Your suggestion was sent for review.");
     } catch (error) {
-      console.error("Failed to submit edit suggestion", error);
-      showError("Could not submit the suggestion. Please try again.");
+      const errorMessage = getErrorMessage(error, "Could not submit the suggestion. Please try again.");
+      console.error("Failed to submit edit suggestion", errorMessage, error);
+      setSuggestionError(errorMessage);
+      showError(errorMessage);
     } finally {
       setSubmittingSuggestion(false);
     }
@@ -309,6 +315,7 @@ export default function WorkspacePage() {
             suggestionOpen={suggestionOpen}
             suggestionKind={suggestionKind}
             suggestionMessage={suggestionMessage}
+            suggestionError={suggestionError}
             submittingSuggestion={submittingSuggestion}
             onToggleVisited={async () => {
               if (!user) {
@@ -335,9 +342,15 @@ export default function WorkspacePage() {
               }
             }}
             onWriteReview={openReviewForm}
-            onSuggestionOpenChange={setSuggestionOpen}
+            onSuggestionOpenChange={(open) => {
+              setSuggestionOpen(open);
+              if (!open) setSuggestionError(null);
+            }}
             onSuggestionKindChange={setSuggestionKind}
-            onSuggestionMessageChange={setSuggestionMessage}
+            onSuggestionMessageChange={(message) => {
+              setSuggestionMessage(message);
+              if (suggestionError && message.trim().length >= 10) setSuggestionError(null);
+            }}
             onSubmitSuggestion={submitSuggestion}
           />
         </div>

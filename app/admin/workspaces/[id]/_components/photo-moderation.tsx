@@ -1,8 +1,18 @@
 "use client";
 
-import { CheckCircle2, Star, XCircle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Loader2, Star, Trash2, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { WorkspacePhotoRow } from "../_lib/types";
 
@@ -12,6 +22,7 @@ type PhotoModerationProps = {
   savingPhotoId: string | null;
   onUpdatePhoto: (photoId: string, next: Partial<WorkspacePhotoRow>) => void;
   onSetPrimaryPhoto: (photoId: string) => void;
+  onDeletePhoto: (photo: WorkspacePhotoRow) => void;
 };
 
 export function PhotoModeration({
@@ -20,7 +31,10 @@ export function PhotoModeration({
   savingPhotoId,
   onUpdatePhoto,
   onSetPrimaryPhoto,
+  onDeletePhoto,
 }: PhotoModerationProps) {
+  const [photoToDelete, setPhotoToDelete] = useState<WorkspacePhotoRow | null>(null);
+
   if (photos.length === 0) return null;
 
   return (
@@ -83,11 +97,61 @@ export function PhotoModeration({
                   <Star className="mr-2 h-4 w-4" />
                   Set primary
                 </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  disabled={savingPhotoId === photo.id}
+                  onClick={() => setPhotoToDelete(photo)}
+                >
+                  {savingPhotoId === photo.id ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Delete
+                </Button>
               </div>
             </div>
           </div>
         ))}
       </div>
+      <Dialog open={Boolean(photoToDelete)} onOpenChange={(open) => !open && setPhotoToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete this photo?</DialogTitle>
+            <DialogDescription>
+              This removes the photo from the workspace moderation queue. It cannot be restored from Lumen.
+            </DialogDescription>
+          </DialogHeader>
+          {photoToDelete && (
+            <div className="overflow-hidden rounded-md border bg-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoToDelete.url} alt={photoToDelete.caption || workspaceName} className="max-h-56 w-full object-cover" />
+            </div>
+          )}
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={Boolean(photoToDelete && savingPhotoId === photoToDelete.id)}>
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={Boolean(photoToDelete && savingPhotoId === photoToDelete.id)}
+              onClick={() => {
+                if (!photoToDelete) return;
+                onDeletePhoto(photoToDelete);
+                setPhotoToDelete(null);
+              }}
+            >
+              {photoToDelete && savingPhotoId === photoToDelete.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+              Delete photo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -28,9 +28,9 @@ export function SuggestionsPanel({ suggestions, savingSuggestionId, onUpdateStat
       ) : (
         <div className="space-y-3">
           {suggestions.map((suggestion) => (
-            <div key={suggestion.id} className="rounded-md border p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
+            <div key={suggestion.id} className="min-w-0 rounded-md border p-3">
+              <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Badge variant="outline" className="capitalize">
                     {suggestion.kind.replaceAll("_", " ")}
                   </Badge>
@@ -54,7 +54,7 @@ export function SuggestionsPanel({ suggestions, savingSuggestionId, onUpdateStat
                   </SelectContent>
                 </Select>
               </div>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{suggestion.message}</p>
+              <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{suggestion.message}</p>
             </div>
           ))}
         </div>

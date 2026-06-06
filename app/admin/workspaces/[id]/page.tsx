@@ -16,6 +16,15 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,13 +32,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Eye, Loader2, Shield, ArrowLeft, Save } from "lucide-react";
+import { Eye, Loader2, Shield, ArrowLeft, Save, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LocationSection } from "./_components/location-section";
 import { PhotoModeration } from "./_components/photo-moderation";
 import { SuggestionsPanel } from "./_components/suggestions-panel";
 import {
   buildWorkspaceUpdatePayload,
+  deleteWorkspace,
+  deleteWorkspacePhoto,
+  deleteWorkspacePhotoStorageObject,
   isMissingColumnError,
   resolveWorkspaceCity,
   setWorkspacePrimaryPhoto,
@@ -58,6 +70,7 @@ export default function AdminWorkspaceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [hasLocationMetadataColumns, setHasLocationMetadataColumns] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceDetailMinimal | null>(null);
   const [photos, setPhotos] = useState<WorkspacePhotoRow[]>([]);
@@ -82,8 +95,11 @@ export default function AdminWorkspaceDetailPage() {
   const [suggestions, setSuggestions] = useState<EditSuggestionRow[]>([]);
   const [savingPhotoId, setSavingPhotoId] = useState<string | null>(null);
   const [savingSuggestionId, setSavingSuggestionId] = useState<string | null>(null);
+  const [deleteWorkspaceDialogOpen, setDeleteWorkspaceDialogOpen] = useState(false);
+  const [deletingWorkspace, setDeletingWorkspace] = useState(false);
 
   const statusBadge = useMemo(() => workspace?.status || "pending", [workspace]);
+  const approvalNeedsLocation = form.status === "approved" && (form.latitude === null || form.longitude === null);
 
   const loadProfile = useCallback(async () => {
     if (!user) {
@@ -220,11 +236,14 @@ export default function AdminWorkspaceDetailPage() {
     if (!user || !isAdmin || !workspace) return;
     setSaving(true);
     setError(null);
-    try {
-      if (form.status === "approved" && (form.latitude === null || form.longitude === null)) {
-        throw new Error("Approved workspaces need a verified map location.");
-      }
+    setValidationError(null);
+    if (approvalNeedsLocation) {
+      setSaving(false);
+      setValidationError("Approved workspaces need a verified map location. Search for the place or drop a pin before saving as approved.");
+      return;
+    }
 
+    try {
       const previousCityId = workspace.city_id;
       const { cityId, citySlug } = await resolveWorkspaceCity(supabase, form, workspace.city_slug);
       const updatePayload = buildWorkspaceUpdatePayload(form, cityId, user.id, hasLocationMetadataColumns);
@@ -313,6 +332,43 @@ export default function AdminWorkspaceDetailPage() {
       setError("Could not set primary photo. Please try again.");
     } finally {
       setSavingPhotoId(null);
+    }
+  };
+
+  const removePhoto = async (photo: WorkspacePhotoRow) => {
+    if (!user || !isAdmin) return;
+    setSavingPhotoId(photo.id);
+    setError(null);
+    try {
+      await deleteWorkspacePhoto(supabase, photo.id);
+      setPhotos((prev) => prev.filter((existingPhoto) => existingPhoto.id !== photo.id));
+      try {
+        await deleteWorkspacePhotoStorageObject(supabase, photo.url);
+      } catch (storageError) {
+        console.warn("Photo row deleted, but storage cleanup failed", storageError);
+      }
+    } catch (err) {
+      console.error("Failed to delete photo", err);
+      setError(err instanceof Error ? err.message : "Could not delete photo. Please try again.");
+    } finally {
+      setSavingPhotoId(null);
+    }
+  };
+
+  const removeWorkspace = async () => {
+    if (!workspace || !user || !isAdmin) return;
+    setDeletingWorkspace(true);
+    setError(null);
+    try {
+      await deleteWorkspace(supabase, workspace.id);
+      await Promise.allSettled(photos.map((photo) => deleteWorkspacePhotoStorageObject(supabase, photo.url)));
+      router.push("/admin/workspaces");
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to delete workspace", err);
+      setError(err instanceof Error ? err.message : "Could not delete workspace. Please try again.");
+      setDeletingWorkspace(false);
+      setDeleteWorkspaceDialogOpen(false);
     }
   };
 
@@ -423,7 +479,11 @@ export default function AdminWorkspaceDetailPage() {
           </Button>
         </div>
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && (
+          <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
 
         <Card>
           <CardHeader className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
@@ -453,7 +513,10 @@ export default function AdminWorkspaceDetailPage() {
                 <label className="text-sm font-medium">Status</label>
                 <Select
                   value={form.status}
-                  onValueChange={(val) => setForm((prev) => ({ ...prev, status: val }))}
+                  onValueChange={(val) => {
+                    setForm((prev) => ({ ...prev, status: val }));
+                    if (val !== "approved") setValidationError(null);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
@@ -497,13 +560,29 @@ export default function AdminWorkspaceDetailPage() {
                 />
               </div>
             </div>
-            <LocationSection form={form} onChange={setForm} />
+            {validationError && (
+              <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {validationError}
+              </p>
+            )}
+            <LocationSection
+              form={form}
+              onChange={(updater) => {
+                setForm((prev) => {
+                  const next = updater(prev);
+                  if (next.latitude !== null && next.longitude !== null) setValidationError(null);
+                  return next;
+                });
+              }}
+              error={approvalNeedsLocation ? validationError : null}
+            />
             <PhotoModeration
               photos={photos}
               workspaceName={workspace.name}
               savingPhotoId={savingPhotoId}
               onUpdatePhoto={updatePhoto}
               onSetPrimaryPhoto={setPrimaryPhoto}
+              onDeletePhoto={removePhoto}
             />
             <SuggestionsPanel
               suggestions={suggestions}
@@ -530,9 +609,43 @@ export default function AdminWorkspaceDetailPage() {
                   Public view
                 </Link>
               </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="ml-auto"
+                onClick={() => setDeleteWorkspaceDialogOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete place
+              </Button>
             </div>
           </CardContent>
         </Card>
+        <Dialog open={deleteWorkspaceDialogOpen} onOpenChange={setDeleteWorkspaceDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete this place?</DialogTitle>
+              <DialogDescription>
+                This permanently removes {workspace.name} and its related photos, suggestions, saves, visits, and reviews from Lumen.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">{workspace.name}</p>
+              <p>{workspace.address || "No address"}</p>
+            </div>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="outline" disabled={deletingWorkspace}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="button" variant="destructive" disabled={deletingWorkspace} onClick={removeWorkspace}>
+                {deletingWorkspace ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Delete place
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -8,13 +8,21 @@ import type { AdminWorkspaceFormState } from "../_lib/types";
 type LocationSectionProps = {
   form: AdminWorkspaceFormState;
   onChange: (updater: (prev: AdminWorkspaceFormState) => AdminWorkspaceFormState) => void;
+  error?: string | null;
 };
 
-export function LocationSection({ form, onChange }: LocationSectionProps) {
+export function LocationSection({ form, onChange, error }: LocationSectionProps) {
   return (
     <>
       <div className="space-y-2">
-        <Label>Location</Label>
+        <div className="flex items-center justify-between gap-3">
+          <Label>Location</Label>
+          {form.latitude !== null && form.longitude !== null && (
+            <span className="text-xs text-muted-foreground">
+              {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
+            </span>
+          )}
+        </div>
         <LocationPicker
           value={{
             latitude: form.latitude,
@@ -44,6 +52,11 @@ export function LocationSection({ form, onChange }: LocationSectionProps) {
             }));
           }}
         />
+        {error && (
+          <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
       </div>
       <div className="space-y-2">
         <Label>Address</Label>
