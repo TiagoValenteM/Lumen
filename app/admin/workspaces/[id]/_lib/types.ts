@@ -4,9 +4,12 @@ export type LocationSource = "search" | "pin" | "manual";
 
 export type WorkspaceDetailMinimal = {
   id: string;
+  created_at?: string | null;
   name: string;
   slug: string;
+  type?: string | null;
   status: string | null;
+  description?: string | null;
   short_description: string | null;
   address: string | null;
   city_id: string | null;
@@ -23,6 +26,46 @@ export type WorkspaceDetailMinimal = {
   rejection_reason: string | null;
   admin_notes: string | null;
   submitted_by: string | null;
+  has_wifi?: boolean | null;
+  wifi_speed?: string | null;
+  has_power_outlets?: boolean | null;
+  power_outlet_availability?: number | null;
+  seating_capacity?: number | null;
+  seating_comfort?: string | null;
+  has_outdoor_seating?: boolean | null;
+  has_standing_desks?: boolean | null;
+  noise_level?: string | null;
+  music_volume?: number | null;
+  has_natural_light?: boolean | null;
+  has_air_conditioning?: boolean | null;
+  has_heating?: boolean | null;
+  has_restrooms?: boolean | null;
+  has_parking?: boolean | null;
+  has_bike_parking?: boolean | null;
+  is_accessible?: boolean | null;
+  allows_pets?: boolean | null;
+  has_food?: boolean | null;
+  has_veg?: boolean | null;
+  has_coffee?: boolean | null;
+  has_alcohol?: boolean | null;
+  price_range?: string | number | null;
+  laptop_friendly?: boolean | null;
+  time_limit_hours?: number | null;
+  minimum_purchase_required?: boolean | null;
+  good_for_meetings?: boolean | null;
+  good_for_calls?: boolean | null;
+  good_for_groups?: boolean | null;
+  overall_rating?: number | null;
+  productivity_rating?: number | null;
+  comfort_rating?: number | null;
+  service_rating?: number | null;
+  atmosphere_rating?: number | null;
+  total_reviews?: number | null;
+  last_verified_at?: string | null;
+  reported_change_count?: number | null;
+  best_time_to_visit?: string | null;
+  website?: string | null;
+  phone?: string | null;
 };
 
 export type WorkspacePhotoRow = {
@@ -35,9 +78,12 @@ export type WorkspacePhotoRow = {
 
 export type WorkspaceQueryRow = {
   id: string;
+  created_at?: string | null;
   name: string;
   slug: string;
+  type?: string | null;
   status: string | null;
+  description?: string | null;
   short_description: string | null;
   address: string | null;
   city_id: string | null;
@@ -51,6 +97,46 @@ export type WorkspaceQueryRow = {
   rejection_reason: string | null;
   admin_notes: string | null;
   submitted_by: string | null;
+  has_wifi?: boolean | null;
+  wifi_speed?: string | null;
+  has_power_outlets?: boolean | null;
+  power_outlet_availability?: number | null;
+  seating_capacity?: number | null;
+  seating_comfort?: string | null;
+  has_outdoor_seating?: boolean | null;
+  has_standing_desks?: boolean | null;
+  noise_level?: string | null;
+  music_volume?: number | null;
+  has_natural_light?: boolean | null;
+  has_air_conditioning?: boolean | null;
+  has_heating?: boolean | null;
+  has_restrooms?: boolean | null;
+  has_parking?: boolean | null;
+  has_bike_parking?: boolean | null;
+  is_accessible?: boolean | null;
+  allows_pets?: boolean | null;
+  has_food?: boolean | null;
+  has_veg?: boolean | null;
+  has_coffee?: boolean | null;
+  has_alcohol?: boolean | null;
+  price_range?: string | number | null;
+  laptop_friendly?: boolean | null;
+  time_limit_hours?: number | null;
+  minimum_purchase_required?: boolean | null;
+  good_for_meetings?: boolean | null;
+  good_for_calls?: boolean | null;
+  good_for_groups?: boolean | null;
+  overall_rating?: number | null;
+  productivity_rating?: number | null;
+  comfort_rating?: number | null;
+  service_rating?: number | null;
+  atmosphere_rating?: number | null;
+  total_reviews?: number | null;
+  last_verified_at?: string | null;
+  reported_change_count?: number | null;
+  best_time_to_visit?: string | null;
+  website?: string | null;
+  phone?: string | null;
   city:
     | { slug: string | null; name: string | null; country: string | null }
     | { slug: string | null; name: string | null; country: string | null }[]

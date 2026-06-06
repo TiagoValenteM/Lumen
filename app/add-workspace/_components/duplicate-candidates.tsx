@@ -15,7 +15,7 @@ type DuplicateCandidatesProps = {
 export function DuplicateCandidates({ candidates, loading, error }: DuplicateCandidatesProps) {
   if (loading) {
     return (
-      <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+      <div className="rounded-xl border border-border/30 bg-muted/20 p-4 text-sm text-muted-foreground shadow-sm shadow-black/5">
         <div className="flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           Checking for existing places nearby...
@@ -26,7 +26,7 @@ export function DuplicateCandidates({ candidates, loading, error }: DuplicateCan
 
   if (error) {
     return (
-      <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive">
+      <div className="rounded-xl border border-destructive/15 bg-destructive/10 p-4 text-sm text-destructive">
         <div className="flex items-start gap-2">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>{error}</p>
@@ -38,10 +38,10 @@ export function DuplicateCandidates({ candidates, loading, error }: DuplicateCan
   if (candidates.length === 0) return null;
 
   return (
-    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+    <div className="rounded-xl border border-primary/20 bg-primary/10 p-4 shadow-sm shadow-black/5">
       <div className="flex items-start gap-2">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-        <div className="space-y-3">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1 space-y-3">
           <div>
             <p className="font-medium">This place might already exist</p>
             <p className="text-sm text-muted-foreground">Check these nearby matches before continuing with a new submission.</p>
@@ -49,11 +49,11 @@ export function DuplicateCandidates({ candidates, loading, error }: DuplicateCan
 
           <div className="space-y-2">
             {candidates.map((candidate) => (
-              <div key={candidate.id} className="rounded-md border bg-background p-3">
+              <div key={candidate.id} className="rounded-xl border border-border/30 bg-background/80 p-3 shadow-sm shadow-black/5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="space-y-1">
+                  <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{candidate.name}</p>
+                      <p className="font-medium leading-snug">{candidate.name}</p>
                       <Badge variant="outline" className="capitalize">
                         {candidate.status.replace("_", " ")}
                       </Badge>

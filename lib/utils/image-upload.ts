@@ -46,6 +46,70 @@ export function validateImage(file: File): ImageValidationResult {
   };
 }
 
+export async function prepareWorkspaceImageForUpload(file: File): Promise<File> {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type) || file.size <= MAX_IMAGE_SIZE) {
+    return file;
+  }
+
+  const image = await loadImage(file);
+  const maxDimension = 1800;
+  const scale = Math.min(1, maxDimension / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+
+  const context = canvas.getContext("2d");
+  if (!context) return file;
+
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  for (const quality of [0.86, 0.76, 0.66, 0.56]) {
+    const blob = await canvasToBlob(canvas, "image/jpeg", quality);
+    if (blob.size <= MAX_IMAGE_SIZE) {
+      return new File([blob], replaceFileExtension(file.name, "jpg"), {
+        lastModified: Date.now(),
+        type: "image/jpeg",
+      });
+    }
+  }
+
+  return file;
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Could not read this image."));
+    };
+    image.src = url;
+  });
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (blob) resolve(blob);
+        else reject(new Error("Could not prepare this image."));
+      },
+      type,
+      quality,
+    );
+  });
+}
+
+function replaceFileExtension(fileName: string, extension: string) {
+  return fileName.replace(/\.[^.]+$/, "") + `.${extension}`;
+}
+
 export async function uploadWorkspaceImage(
   file: File,
   workspaceId: string,

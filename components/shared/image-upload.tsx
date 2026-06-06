@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import { Upload, X, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import {
   uploadWorkspaceImage,
   MAX_IMAGE_SIZE,
   ALLOWED_IMAGE_TYPES,
+  prepareWorkspaceImageForUpload,
 } from "@/lib/utils/image-upload";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils";
@@ -19,6 +20,7 @@ interface ImageUploadProps {
   onUploadComplete: (url: string) => void;
   onUploadError?: (error: string) => void;
   maxFiles?: number;
+  currentFileCount?: number;
   className?: string;
 }
 
@@ -27,13 +29,16 @@ export function ImageUpload({
   onUploadComplete,
   onUploadError,
   maxFiles = 5,
+  currentFileCount = 0,
   className = "",
 }: ImageUploadProps) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
+  const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const limitReached = currentFileCount >= maxFiles;
 
   const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -42,25 +47,43 @@ export function ImageUpload({
     setError(null);
     setPreview(null);
 
-    // Validate image
-    const validation = validateImage(file);
-    if (!validation.isValid) {
-      setError(validation.error);
-      if (onUploadError) onUploadError(validation.error);
+    if (limitReached) {
+      const limitError = `You can upload up to ${maxFiles} photos.`;
+      setError(limitError);
+      if (onUploadError) onUploadError(limitError);
       return;
     }
 
-    // Show preview
+    setPreparing(true);
+    let uploadFile = file;
+    try {
+      uploadFile = await prepareWorkspaceImageForUpload(file);
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to prepare image");
+      setError(errorMessage);
+      if (onUploadError) onUploadError(errorMessage);
+      setPreparing(false);
+      return;
+    }
+
+    const validation = validateImage(uploadFile);
+    if (!validation.isValid) {
+      setError(validation.error);
+      if (onUploadError) onUploadError(validation.error);
+      setPreparing(false);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result as string);
     };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(uploadFile);
+    setPreparing(false);
 
-    // Upload image
     setUploading(true);
     try {
-      const result = await uploadWorkspaceImage(file, workspaceId, user.id);
+      const result = await uploadWorkspaceImage(uploadFile, workspaceId, user.id);
 
       if (!result.success || !result.url) {
         throw new Error(result.error || "Upload failed");
@@ -68,8 +91,7 @@ export function ImageUpload({
 
       onUploadComplete(result.url);
       setPreview(null);
-      
-      // Reset input
+
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -98,23 +120,23 @@ export function ImageUpload({
           Upload Photo
         </Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Maximum file size: {maxSizeMB}MB. Accepted formats: JPEG, PNG, WebP
+          {currentFileCount}/{maxFiles} uploaded. Maximum file size: {maxSizeMB}MB. JPEG, PNG, or WebP.
         </p>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <input
           ref={fileInputRef}
           id="image-upload"
           type="file"
           accept={ALLOWED_IMAGE_TYPES.join(",")}
           onChange={handleFileSelect}
-          disabled={uploading}
+          disabled={uploading || preparing || limitReached}
           className="hidden"
         />
 
         {preview ? (
-          <div className="relative w-32 h-32 rounded-lg overflow-hidden border">
+          <div className="relative h-40 w-full overflow-hidden rounded-xl border border-border/35 sm:h-32 sm:w-32">
             <Image
               src={preview}
               alt="Preview"
@@ -125,12 +147,14 @@ export function ImageUpload({
             {!uploading && (
               <button
                 onClick={clearPreview}
-                className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full hover:bg-destructive/90"
+                type="button"
+                className="absolute top-2 right-2 rounded-full bg-destructive p-1 text-destructive-foreground hover:bg-destructive/90"
+                aria-label="Remove selected upload"
               >
                 <X className="h-4 w-4" />
               </button>
             )}
-            {uploading && (
+            {(uploading || preparing) && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
@@ -141,15 +165,21 @@ export function ImageUpload({
             type="button"
             variant="outline"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-32 h-32 flex flex-col items-center justify-center gap-2"
+            disabled={uploading || preparing || limitReached}
+            className="h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-border/35 bg-muted/15 text-muted-foreground hover:bg-muted/25 sm:h-32 sm:w-32"
           >
             <Upload className="h-6 w-6" />
-            <span className="text-xs">Choose Photo</span>
+            <span className="text-xs">{limitReached ? "Limit reached" : "Choose Photo"}</span>
           </Button>
         )}
 
-        <div className="flex-1">
+        <div className="min-h-5 flex-1">
+          {preparing && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Preparing image...
+            </div>
+          )}
           {uploading && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -160,7 +190,7 @@ export function ImageUpload({
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+        <div className="flex items-start gap-2 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <p>{error}</p>
         </div>

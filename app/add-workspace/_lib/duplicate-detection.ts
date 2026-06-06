@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AddWorkspaceFormData, WorkspaceDuplicateCandidate } from "./types";
 
+type WorkspaceDuplicateSearchInput = Pick<AddWorkspaceFormData, "latitude" | "longitude" | "name">;
+
 type WorkspaceRow = {
   id: string;
   name: string;
@@ -23,7 +25,7 @@ const EARTH_RADIUS_METERS = 6371000;
 
 export async function findPotentialWorkspaceDuplicates(
   supabase: SupabaseClient,
-  formData: AddWorkspaceFormData,
+  formData: WorkspaceDuplicateSearchInput,
 ): Promise<WorkspaceDuplicateCandidate[]> {
   if (!formData.name.trim() || formData.latitude === null || formData.longitude === null) return [];
 
@@ -63,7 +65,7 @@ async function loadCitiesById(supabase: SupabaseClient, cityIds: string[]) {
 function toDuplicateCandidate(
   workspace: WorkspaceRow,
   citiesById: Map<string, CityRow>,
-  formData: AddWorkspaceFormData,
+  formData: WorkspaceDuplicateSearchInput,
 ): WorkspaceDuplicateCandidate {
   const distanceMeters =
     workspace.latitude !== null && workspace.longitude !== null

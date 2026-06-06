@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Map, Marker } from "maplibre-gl";
-import { Loader2, MapPin, Search } from "lucide-react";
+import { CheckCircle2, Loader2, MapPin, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -72,6 +72,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [reverseSearching, setReverseSearching] = useState(false);
 
   useEffect(() => {
     valueRef.current = value;
@@ -96,6 +97,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     });
 
     try {
+      setReverseSearching(true);
       const response = await fetch(`/api/geocode/reverse?lat=${latitude}&lng=${longitude}`);
       const data = await response.json();
       updateLocation({
@@ -112,6 +114,8 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       });
     } catch {
       // Manual pin placement still gives reliable coordinates.
+    } finally {
+      setReverseSearching(false);
     }
   };
 
@@ -268,7 +272,30 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         </div>
       )}
 
-      <div className="relative h-72 overflow-hidden rounded-lg border bg-muted">
+      <div className="rounded-xl border border-border/30 bg-muted/15 p-3 text-sm">
+        {value.latitude !== null && value.longitude !== null ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 font-medium text-foreground">
+              <CheckCircle2 className="h-4 w-4 text-primary" />
+              {value.source === "search" ? "Search result selected" : "Pin selected"}
+            </div>
+            <p className="text-muted-foreground">
+              {reverseSearching
+                ? "Finding the address..."
+                : value.address
+                  ? "Address found. Move the pin if needed."
+                  : "Coordinates saved. Add or adjust the address below."}
+            </p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <MapPin className="h-4 w-4" />
+            Search an address or tap the map to place the pin.
+          </div>
+        )}
+      </div>
+
+      <div className="relative h-64 overflow-hidden rounded-xl border border-border/35 bg-muted sm:h-72">
         <div ref={mapContainerRef} className="h-full w-full" />
         {!mapReady && (
           <div className="absolute inset-0 flex items-center justify-center bg-background/70">
@@ -284,7 +311,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
             ? `${value.latitude.toFixed(6)}, ${value.longitude.toFixed(6)}`
             : "Click the map or choose a result to set the pin"}
         </div>
-        <div>
+        <div className="min-w-0 truncate">
           {value.address || [value.city, value.country].filter(Boolean).join(", ") || "Address can be edited below"}
         </div>
       </div>

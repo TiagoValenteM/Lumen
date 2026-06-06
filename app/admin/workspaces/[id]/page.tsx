@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Loader2, Shield, ArrowLeft, Save } from "lucide-react";
+import { Eye, Loader2, Shield, ArrowLeft, Save } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LocationSection } from "./_components/location-section";
 import { PhotoModeration } from "./_components/photo-moderation";
@@ -135,6 +135,7 @@ export default function AdminWorkspaceDetailPage() {
       const row = data as unknown as WorkspaceQueryRow;
       const cityField = Array.isArray(row.city) ? row.city[0] ?? null : row.city;
       const mapped: WorkspaceDetailMinimal = {
+        ...row,
         id: row.id,
         name: row.name,
         slug: row.slug,
@@ -517,6 +518,12 @@ export default function AdminWorkspaceDetailPage() {
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save changes
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={`/admin/workspaces/${workspace.id}/preview`} target="_blank">
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview page
+                </Link>
               </Button>
               <Button variant="outline" asChild>
                 <Link href={`/cities/${workspace.city_slug ?? ""}/${workspace.slug}`} target="_blank">
