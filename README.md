@@ -50,7 +50,6 @@ GEOAPIFY_API_KEY=optional-geocoding-key
 LOCATIONIQ_API_KEY=optional-fallback-geocoding-key
 OPENROUTER_API_KEY=optional-server-side-ai-enrichment-key
 OPENROUTER_PLACE_ENRICHMENT_MODEL=openai/gpt-oss-20b:free
-OPENROUTER_PLACE_ENRICHMENT_WEB_SEARCH=false
 ```
 `.env.local` is gitignored—never commit secrets.
 
@@ -58,7 +57,7 @@ For another machine or deployment, copy the variable names from `.env.example` a
 
 Location search uses `GEOAPIFY_API_KEY` first, then `LOCATIONIQ_API_KEY`. If neither is configured, users can still place a pin manually on the map. Pin clicks and drags also try a cached OpenStreetMap Nominatim reverse lookup so the address, city, and country can be filled without an autocomplete key.
 
-AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs. `OPENROUTER_PLACE_ENRICHMENT_WEB_SEARCH=true` enables OpenRouter web search, but OpenRouter can charge extra for web search even when the model itself is free.
+AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs and gives the model access to OpenRouter web search when public verification is useful. OpenRouter can charge extra for web search even when the model itself is free.
 
 ## Setup
 ```bash

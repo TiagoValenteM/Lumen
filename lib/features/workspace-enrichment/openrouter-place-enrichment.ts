@@ -69,10 +69,6 @@ const FREE_STRUCTURED_PLACE_ENRICHMENT_MODELS = [
   "qwen/qwen3-next-80b-a3b-instruct:free",
 ];
 
-function isOpenRouterWebSearchEnabled() {
-  return process.env.OPENROUTER_PLACE_ENRICHMENT_WEB_SEARCH === "true";
-}
-
 export function getPlaceEnrichmentModel() {
   return process.env.OPENROUTER_PLACE_ENRICHMENT_MODEL || DEFAULT_PLACE_ENRICHMENT_MODEL;
 }
@@ -225,9 +221,7 @@ async function requestOpenRouterEnrichment(
   workspace: WorkspaceEnrichmentInput,
   mode: OpenRouterRequestMode,
 ) {
-  const webSearchEnabled = isOpenRouterWebSearchEnabled();
   const plugins = [
-    ...(webSearchEnabled ? [{ id: "web", max_results: 3 }] : []),
     ...(mode === "schema" ? [{ id: "response-healing" }] : []),
   ];
 
@@ -246,16 +240,10 @@ async function requestOpenRouterEnrichment(
           role: "system",
           content: [
             "You enrich pending Lumen workspace submissions for a human reviewer.",
-            webSearchEnabled
-              ? "Use web search to verify public facts before suggesting changes."
-              : "Web search is disabled. Use only submitted data and generally known public facts you are highly confident about.",
+            "Use web search when public verification would improve the suggestion, especially for address, website, opening hours, amenities, remote-work suitability, and review patterns.",
             "Prefer official websites, official social profiles, reputable directories, map/business profiles, and source pages that clearly refer to the exact place.",
-            webSearchEnabled
-              ? "Never infer amenities from generic cafe/coworking expectations. If the source does not explicitly support a detail, return null for that detail."
-              : "Never infer amenities from generic cafe/coworking expectations. If submitted data or confident public knowledge does not support a detail, return null for that detail.",
-            webSearchEnabled
-              ? "You may use public review snippets, source-provided review summaries, and reputable review pages to infer patterns, but do not copy individual review text verbatim."
-              : "Do not fabricate review insights. Leave review_insights null unless the submitted data already contains review-like evidence.",
+            "Never infer amenities from generic cafe/coworking expectations. If the submitted data or public sources do not explicitly support a detail, return null for that detail.",
+            "You may use public review snippets, source-provided review summaries, and reputable review pages to infer patterns, but do not copy individual review text verbatim.",
             "Do not scrape or reproduce Google Maps reviews. If Google review data is only visible as protected Maps content, summarize only high-level, source-attributed patterns or leave review_insights null.",
             "Do not suggest images or image URLs.",
             "Keep copy neutral, concise, and useful for remote workers. Mention uncertainty in reviewer_notes.",
@@ -264,41 +252,28 @@ async function requestOpenRouterEnrichment(
         {
           role: "user",
           content: JSON.stringify({
-            task: webSearchEnabled
-              ? "Find public information for this place and suggest missing or improved fields."
-              : "Use the submitted place data to suggest safe cleanup, concise descriptions, and clearly marked uncertain fields.",
+            task: "Find public information for this place when useful and suggest missing or improved fields.",
             workspace: buildWorkspaceEnrichmentSnapshot(workspace),
             output_rules: [
               "short_description should be one sentence under 160 characters.",
               "description should be 2-4 sentences and useful for deciding whether to work there.",
-              webSearchEnabled
-                ? "core_details should include corrected canonical name, workspace type, full address, city, country, and coordinates when source-backed for this exact place."
-                : "core_details should include submitted or high-confidence corrected name, workspace type, full address, city, country, and coordinates only when already provided.",
+              "core_details should include corrected canonical name, workspace type, full address, city, country, and coordinates when source-backed for this exact place.",
               "For core_details.type, use only cafe, coworking, hotel_lobby, library, restaurant, or other.",
-              webSearchEnabled
-                ? "For core_details.latitude and longitude, only include coordinates when the source clearly points to the exact same place."
-                : "For core_details.latitude and longitude, only repeat coordinates from the submitted workspace data.",
-              webSearchEnabled
-                ? "work_notes should include only source-backed details relevant to laptop work, calls, meetings, seating, noise, outlets, WiFi, food, or stay duration."
-                : "work_notes should include only details present in the submitted data or obviously implied by the provided description.",
-              webSearchEnabled
-                ? "review_insights should summarize review patterns across public sources: positives, cautions, and any remote-work signal. Do not quote private/protected reviews."
-                : "review_insights should be null unless the submitted data contains review-like evidence.",
-              webSearchEnabled
-                ? "work_details should cover every known source-backed amenity/workability value: WiFi, outlets, seating, comfort, outdoor seating, standing desks, noise, music volume, natural light, climate, restrooms, parking, bike parking, accessibility, pets, food, vegetarian options, coffee, alcohol, price, laptop friendliness, time limits, minimum purchase, meetings, calls, and groups."
-                : "work_details should cover only submitted or clearly stated amenity/workability values: WiFi, outlets, seating, comfort, outdoor seating, standing desks, noise, music volume, natural light, climate, restrooms, parking, bike parking, accessibility, pets, food, vegetarian options, coffee, alcohol, price, laptop friendliness, time limits, minimum purchase, meetings, calls, and groups.",
+              "For core_details.latitude and longitude, only include coordinates when the source clearly points to the exact same place.",
+              "work_notes should include only source-backed details relevant to laptop work, calls, meetings, seating, noise, outlets, WiFi, food, or stay duration.",
+              "review_insights should summarize review patterns across public sources: positives, cautions, and any remote-work signal. Do not quote private/protected reviews.",
+              "work_details should cover every known source-backed amenity/workability value: WiFi, outlets, seating, comfort, outdoor seating, standing desks, noise, music volume, natural light, climate, restrooms, parking, bike parking, accessibility, pets, food, vegetarian options, coffee, alcohol, price, laptop friendliness, time limits, minimum purchase, meetings, calls, and groups.",
               "Use null for any work_details field that is not clearly supported.",
               "For boolean work_details, true requires explicit support. false requires explicit contradiction. Otherwise use null.",
               "For numeric scales, only use a number when the source clearly supports it; otherwise null.",
               "Do not include images or image_candidates.",
-              webSearchEnabled
-                ? "field_sources values must list URLs used for each suggested field."
-                : "field_sources values should use submitted_data for submitted facts and model_knowledge for high-confidence general knowledge.",
+              "field_sources values must list URLs used for each suggested field, or submitted_data when the value came only from the user's submission.",
               "Return JSON only. If the exact nested schema is hard, return root-level core_details, short_description, description, website, phone, work_notes, review_insights, and work_details.",
             ],
           }),
         },
       ],
+      tools: [{ type: "openrouter:web_search" }],
       ...(plugins.length > 0 ? { plugins } : {}),
       provider: {
         require_parameters: true,
