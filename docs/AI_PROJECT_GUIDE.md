@@ -12,6 +12,12 @@ Lumen is a Next.js App Router app for discovering and moderating work-friendly p
 - Public users suggest corrections from workspace detail pages.
 - Admins manage city data in `/admin/cities`.
 
+## Environment And Secrets
+
+Use `.env.example` as the committed contract for required environment variable names. Keep real values in `.env.local`, the hosting provider environment settings, Supabase project settings, or a private password manager/secret manager.
+
+Never commit real API keys or service-role keys. If a new integration needs a secret, add only the empty variable name and a short comment to `.env.example`, then document where the runtime reads it.
+
 ## Directory Conventions
 
 Use route-local modules when code belongs to one route:

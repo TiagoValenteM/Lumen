@@ -16,10 +16,9 @@ export function useAddWorkspaceForm() {
   const getStepState = (uploadedPhotos: string[]) => {
     const canProceedToNext = isAddWorkspaceStepValid(currentStep, formData, uploadedPhotos);
     const canSubmit = isAddWorkspaceStepValid(totalAddWorkspaceSteps, formData, uploadedPhotos);
-    const validationMessage =
-      !canProceedToNext && currentStep < totalAddWorkspaceSteps
-        ? getAddWorkspaceValidationMessage(currentStep, formData, uploadedPhotos)
-        : null;
+    const validationMessage = !canProceedToNext
+      ? getAddWorkspaceValidationMessage(currentStep, formData, uploadedPhotos)
+      : null;
 
     return { canProceedToNext, canSubmit, validationMessage };
   };

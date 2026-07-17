@@ -2,6 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AdminWorkspaceFormState, WorkspacePhotoRow } from "./types";
 
 export const STATUS_OPTIONS = ["pending", "under_review", "approved", "rejected"];
+export const WORKSPACE_TYPE_OPTIONS = [
+  { value: "cafe", label: "Cafe" },
+  { value: "coworking", label: "Coworking Space" },
+  { value: "hotel_lobby", label: "Hotel Lobby" },
+  { value: "library", label: "Library" },
+  { value: "restaurant", label: "Restaurant" },
+  { value: "other", label: "Other" },
+];
 
 const slugify = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
@@ -79,7 +87,10 @@ export const isMissingColumnError = (error: unknown) => {
   return (
     candidate.code === "42703" ||
     candidate.code === "PGRST204" ||
-    Boolean(candidate.message?.toLowerCase().includes("could not find") && candidate.message.includes("column"))
+    candidate.code === "42P01" ||
+    candidate.code === "PGRST205" ||
+    Boolean(candidate.message?.toLowerCase().includes("could not find") && candidate.message.includes("column")) ||
+    Boolean(candidate.message?.toLowerCase().includes("workspace_ai_enrichments"))
   );
 };
 
@@ -136,12 +147,45 @@ export function buildWorkspaceUpdatePayload(
 ) {
   const updatePayload: Record<string, unknown> = {
     name: form.name,
+    type: form.type || "cafe",
     short_description: form.short_description,
+    description: form.description,
     address: form.address,
+    website: form.website || null,
+    phone: form.phone || null,
     city_id: cityId,
     latitude: form.latitude,
     longitude: form.longitude,
     status: form.status,
+    has_wifi: form.has_wifi,
+    wifi_speed: form.has_wifi ? form.wifi_speed || null : null,
+    has_power_outlets: form.has_power_outlets,
+    power_outlet_availability: form.has_power_outlets ? form.power_outlet_availability : null,
+    seating_capacity: form.seating_capacity || null,
+    seating_comfort: form.seating_comfort || null,
+    has_outdoor_seating: form.has_outdoor_seating,
+    has_standing_desks: form.has_standing_desks,
+    noise_level: form.noise_level || null,
+    music_volume: form.music_volume || null,
+    has_natural_light: form.has_natural_light,
+    has_air_conditioning: form.has_air_conditioning,
+    has_heating: form.has_heating,
+    has_restrooms: form.has_restrooms,
+    has_parking: form.has_parking,
+    has_bike_parking: form.has_bike_parking,
+    is_accessible: form.is_accessible,
+    allows_pets: form.allows_pets,
+    has_food: form.has_food,
+    has_veg: form.has_veg,
+    has_coffee: form.has_coffee,
+    has_alcohol: form.has_alcohol,
+    price_range: form.price_range || null,
+    laptop_friendly: form.laptop_friendly,
+    time_limit_hours: form.time_limit_hours || null,
+    minimum_purchase_required: form.minimum_purchase_required,
+    good_for_meetings: form.good_for_meetings,
+    good_for_calls: form.good_for_calls,
+    good_for_groups: form.good_for_groups,
   };
 
   if (includeLocationMetadata) {
@@ -184,6 +228,31 @@ export async function updateWorkspacePhoto(
   if (next.is_approved) payload.rejection_reason = null;
   const { error } = await supabase.from("workspace_photos").update(payload).eq("id", photoId);
   if (error) throw error;
+}
+
+export async function createWorkspacePhoto(
+  supabase: SupabaseClient,
+  workspaceId: string,
+  userId: string,
+  url: string,
+  isPrimary: boolean,
+) {
+  const { data, error } = await supabase
+    .from("workspace_photos")
+    .insert({
+      workspace_id: workspaceId,
+      user_id: userId,
+      url,
+      is_primary: isPrimary,
+      is_approved: true,
+      reviewed_by: userId,
+      reviewed_at: new Date().toISOString(),
+    })
+    .select("id, url, caption, is_primary, is_approved")
+    .single();
+
+  if (error) throw error;
+  return data as WorkspacePhotoRow;
 }
 
 export async function deleteWorkspacePhoto(

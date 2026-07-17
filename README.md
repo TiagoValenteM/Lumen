@@ -45,13 +45,20 @@ docs/            # project docs
 Create `.env.local` from `.env.example`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=your-publishable-key
 GEOAPIFY_API_KEY=optional-geocoding-key
 LOCATIONIQ_API_KEY=optional-fallback-geocoding-key
+OPENROUTER_API_KEY=optional-server-side-ai-enrichment-key
+OPENROUTER_PLACE_ENRICHMENT_MODEL=openai/gpt-oss-20b:free
+OPENROUTER_PLACE_ENRICHMENT_WEB_SEARCH=false
 ```
 `.env.local` is gitignored—never commit secrets.
 
+For another machine or deployment, copy the variable names from `.env.example` and retrieve the real values from your private secret source: Vercel/hosting environment variables, Supabase project settings, or a password manager. Do not store real API keys in tracked files.
+
 Location search uses `GEOAPIFY_API_KEY` first, then `LOCATIONIQ_API_KEY`. If neither is configured, users can still place a pin manually on the map. Pin clicks and drags also try a cached OpenStreetMap Nominatim reverse lookup so the address, city, and country can be filled without an autocomplete key.
+
+AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs. `OPENROUTER_PLACE_ENRICHMENT_WEB_SEARCH=true` enables OpenRouter web search, but OpenRouter can charge extra for web search even when the model itself is free.
 
 ## Setup
 ```bash
@@ -68,6 +75,8 @@ supabase db push
 ```
 
 The trust/location migration adds moderation metadata, edit suggestions, photo review fields, city cleanup helpers, and RPCs for atomic suggestion reporting and city merges. Run it before testing `/admin/cities`, edit suggestions, admin notes, or photo moderation.
+
+The AI enrichment migration adds `workspace_ai_enrichments`. Run it before expecting submitted workspaces to collect AI-generated descriptions, source links, or reviewer notes.
 
 ## Usage Notes
 - “Saved” filter on city page requires login; filters workspaces saved by the user in that city.

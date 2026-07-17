@@ -30,6 +30,7 @@ export default function AddWorkspacePage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [attemptedSteps, setAttemptedSteps] = useState<Set<number>>(() => new Set());
   const supabase = useMemo(() => createClient(), []);
   const { currentStep, formData, getStepState, resetForm, setCurrentStep, setFormData, updateField } = useAddWorkspaceForm();
   const {
@@ -71,8 +72,29 @@ export default function AddWorkspacePage() {
     return null;
   }
 
+  const markStepAttempted = (step: number) => {
+    setAttemptedSteps((prev) => {
+      const next = new Set(prev);
+      next.add(step);
+      return next;
+    });
+  };
+
+  const handleNext = () => {
+    if (!canProceedToNext) {
+      markStepAttempted(currentStep);
+      return;
+    }
+
+    setCurrentStep((prev) => Math.min(totalAddWorkspaceSteps, prev + 1));
+  };
+
   const handleSubmit = async () => {
     if (!user) return;
+    if (!canSubmit) {
+      markStepAttempted(currentStep);
+      return;
+    }
     if (uploadedPhotos.length === 0) {
       alert("Please upload at least one photo before submitting.");
       return;
@@ -84,9 +106,13 @@ export default function AddWorkspacePage() {
 
     setSubmitting(true);
     try {
-      const { citySlug } = await submitWorkspace(supabase, formData, uploadedPhotos, user.id);
+      const { workspaceId, citySlug } = await submitWorkspace(supabase, formData, uploadedPhotos, user.id);
+      void fetch(`/api/workspaces/${workspaceId}/enrich`, { method: "POST", keepalive: true }).catch((enrichmentError) => {
+        console.warn("Workspace submitted, but AI enrichment could not be queued", enrichmentError);
+      });
       clearDraft();
       resetForm();
+      setAttemptedSteps(new Set());
       clearUploadedPhotos();
       router.push(`/profile/my-workspaces?submitted=1&city=${citySlug}`);
     } catch (error) {
@@ -98,9 +124,11 @@ export default function AddWorkspacePage() {
   };
 
   const { canProceedToNext, canSubmit, validationMessage } = getStepState(uploadedPhotos);
+  const visibleValidationMessage = attemptedSteps.has(currentStep) ? validationMessage : null;
   const handleClearDraft = async () => {
     clearDraft();
     resetForm();
+    setAttemptedSteps(new Set());
     await deleteUploadedPhotos();
   };
 
@@ -176,16 +204,14 @@ export default function AddWorkspacePage() {
           <ReviewStep formData={formData} uploadedPhotos={uploadedPhotos} onEditStep={setCurrentStep} />
         )}
 
-        <ValidationMessage message={validationMessage} />
+        <ValidationMessage message={visibleValidationMessage} />
 
         <FormNavigation
           currentStep={currentStep}
           totalSteps={totalAddWorkspaceSteps}
           submitting={submitting}
-          canProceedToNext={canProceedToNext}
-          canSubmit={canSubmit}
           onPrevious={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-          onNext={() => setCurrentStep((prev) => Math.min(totalAddWorkspaceSteps, prev + 1))}
+          onNext={handleNext}
           onSubmit={handleSubmit}
         />
       </div>

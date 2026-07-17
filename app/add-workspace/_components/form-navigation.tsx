@@ -7,8 +7,6 @@ type FormNavigationProps = {
   currentStep: number;
   totalSteps: number;
   submitting: boolean;
-  canProceedToNext: boolean;
-  canSubmit: boolean;
   onPrevious: () => void;
   onNext: () => void;
   onSubmit: () => void;
@@ -18,8 +16,6 @@ export function FormNavigation({
   currentStep,
   totalSteps,
   submitting,
-  canProceedToNext,
-  canSubmit,
   onPrevious,
   onNext,
   onSubmit,
@@ -32,12 +28,12 @@ export function FormNavigation({
       </Button>
 
       {currentStep < totalSteps ? (
-        <Button onClick={onNext} disabled={submitting || !canProceedToNext} className="min-w-0 flex-1 cursor-pointer sm:flex-none">
+        <Button onClick={onNext} disabled={submitting} className="min-w-0 flex-1 cursor-pointer sm:flex-none">
           Next
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       ) : (
-        <Button onClick={onSubmit} disabled={submitting || !canSubmit} className="min-w-0 flex-1 cursor-pointer sm:flex-none">
+        <Button onClick={onSubmit} disabled={submitting} className="min-w-0 flex-1 cursor-pointer sm:flex-none">
           {submitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

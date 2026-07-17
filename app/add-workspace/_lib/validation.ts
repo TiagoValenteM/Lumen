@@ -23,11 +23,21 @@ export function isAddWorkspaceStepValid(step: number, formData: AddWorkspaceForm
 }
 
 export function getAddWorkspaceValidationMessage(step: number, formData: AddWorkspaceFormData, uploadedPhotos: string[] = []) {
-  if (step === 1) return "Choose a location and add a place name before continuing.";
+  if (step === 1) {
+    if (!formData.name.trim()) return "Add the place name before continuing.";
+    if (!formData.type) return "Choose what type of place this is before continuing.";
+    if (formData.latitude === null || formData.longitude === null) return "Select a location before continuing.";
+  }
   if (step === 2 && formData.has_wifi && !formData.wifi_speed) return "Please select WiFi speed";
   if (step === 2 && formData.has_power_outlets && !formData.power_outlet_availability) {
     return "Please select power outlet availability";
   }
   if (step === 5 && uploadedPhotos.length === 0) return "Add at least one photo before reviewing your submission.";
+  if (step === 6) {
+    if (!formData.name.trim()) return "Add the place name before submitting.";
+    if (!formData.type) return "Choose what type of place this is before submitting.";
+    if (formData.latitude === null || formData.longitude === null) return "Select a location before submitting.";
+    if (uploadedPhotos.length === 0) return "Add at least one photo before submitting.";
+  }
   return null;
 }

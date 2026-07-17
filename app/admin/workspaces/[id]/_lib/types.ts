@@ -152,10 +152,49 @@ export type EditSuggestionRow = {
   admin_notes: string | null;
 };
 
+export type AiEnrichmentRow = {
+  id: string;
+  created_at: string;
+  status: string;
+  provider: string;
+  model: string;
+  suggested_fields: {
+    core_details?: {
+      name?: string | null;
+      type?: "cafe" | "coworking" | "hotel_lobby" | "library" | "restaurant" | "other" | null;
+      address?: string | null;
+      city?: string | null;
+      country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+    } | null;
+    short_description?: string | null;
+    description?: string | null;
+    website?: string | null;
+    phone?: string | null;
+    opening_hours_note?: string | null;
+    work_notes?: string[] | null;
+    review_insights?: {
+      summary: string | null;
+      positives: string[] | null;
+      cautions: string[] | null;
+      remote_work_signal: string | null;
+    } | null;
+    work_details?: Record<string, string | number | boolean | null> | null;
+  } | null;
+  field_sources: Record<string, string[]> | null;
+  citations: { url?: string; title?: string | null; content?: string | null }[] | null;
+  error_message: string | null;
+};
+
 export type AdminWorkspaceFormState = {
   name: string;
+  type: string;
   short_description: string;
+  description: string;
   address: string;
+  website: string;
+  phone: string;
   city_id: string | null;
   city_name: string;
   country: string;
@@ -169,4 +208,33 @@ export type AdminWorkspaceFormState = {
   rejection_reason: string;
   admin_notes: string;
   status: string;
+  has_wifi: boolean;
+  wifi_speed: string;
+  has_power_outlets: boolean;
+  power_outlet_availability: number;
+  seating_capacity: number;
+  seating_comfort: string;
+  has_outdoor_seating: boolean;
+  has_standing_desks: boolean;
+  noise_level: string;
+  music_volume: number;
+  has_natural_light: boolean;
+  has_air_conditioning: boolean;
+  has_heating: boolean;
+  has_restrooms: boolean;
+  has_parking: boolean;
+  has_bike_parking: boolean;
+  is_accessible: boolean;
+  allows_pets: boolean;
+  has_food: boolean;
+  has_veg: boolean;
+  has_coffee: boolean;
+  has_alcohol: boolean;
+  price_range: number;
+  laptop_friendly: boolean;
+  time_limit_hours: number;
+  minimum_purchase_required: boolean;
+  good_for_meetings: boolean;
+  good_for_calls: boolean;
+  good_for_groups: boolean;
 };
