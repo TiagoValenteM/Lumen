@@ -70,6 +70,7 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
             <Label htmlFor="name">Place name *</Label>
             <Input
               id="name"
+              maxLength={255}
               value={formData.name}
               onChange={(e) => updateField("name", e.target.value)}
               placeholder="e.g., Café Malea"
@@ -106,6 +107,19 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
               placeholder="Street address"
               className="pl-9"
             />
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="place-city">City *</Label>
+            <Input id="place-city" value={formData.city_name} maxLength={255} required
+              onChange={(event) => updateField("city_name", event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="place-country">Country *</Label>
+            <Input id="place-country" value={formData.country} maxLength={100} required
+              onChange={(event) => updateField("country", event.target.value)} />
           </div>
         </div>
 

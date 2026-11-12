@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState, useMemo, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Input } from "@/components/ui/input";
-import { Search, Building2, Loader2, MapPin, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, Building2, Compass, Loader2, MapPin, Sparkles } from "lucide-react";
 import type { City } from "@/lib/types";
 
 export default function CitiesPage() {
@@ -131,10 +132,10 @@ export default function CitiesPage() {
     <div className="min-h-full bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
-            <Building2 className="h-10 w-10" />
-            Cities
-          </h1>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="flex items-center gap-3 text-4xl font-bold"><Building2 className="size-10" aria-hidden="true" /> Cities</h1>
+            <Button asChild variant="secondary"><Link href="/find"><Compass aria-hidden="true" /> Find a Spot</Link></Button>
+          </div>
           <p className="text-muted-foreground">
             Explore {totalCities} cities with {totalWorkspaces} workspaces across {filteredData.length} countries
           </p>

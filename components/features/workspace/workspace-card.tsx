@@ -14,8 +14,8 @@ interface WorkspaceCardProps {
     type: string;
     short_description: string | null;
     address: string | null;
-    has_wifi: boolean;
-    has_power_outlets: boolean;
+    has_wifi: boolean | null;
+    has_power_outlets: boolean | null;
     has_coffee: boolean;
     noise_level?: string | null;
     music_volume?: number | null;
@@ -25,7 +25,8 @@ interface WorkspaceCardProps {
     good_for_groups?: boolean;
     overall_rating: number | null;
     total_reviews: number;
-    last_verified_at?: string | null;
+    laptop_friendly?: boolean | null;
+    work_facts_checked_at?: string | null;
     primary_photo?: {
       url: string;
     } | null;
@@ -54,10 +55,10 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
             >
               {workspace.type.replace("_", " ")}
             </Badge>
-            {workspace.last_verified_at && (
+            {workspace.work_facts_checked_at && (
               <Badge variant="secondary" className="gap-1 border border-white/40 bg-background/90 text-foreground shadow-sm shadow-black/10 backdrop-blur-sm dark:shadow-black/30">
                 <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                Verified
+                Work facts checked
               </Badge>
             )}
           </div>
@@ -123,14 +124,6 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
             </div>
           )}
 
-          {workspace.last_verified_at && (
-            <p className="border-t pt-2 text-xs text-muted-foreground">
-              Verified {new Date(workspace.last_verified_at).toLocaleDateString("en-US", {
-                month: "short",
-                year: "numeric",
-              })}
-            </p>
-          )}
         </CardContent>
       </Card>
     </Link>

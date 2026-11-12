@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   CardContent,
@@ -204,10 +205,16 @@ export default function AdminWorkspacesPage() {
 
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
+      const queryRows = (data ?? []) as WorkspaceQueryRow[];
+      const [proposals, latestAiByWorkspace] = await Promise.all([
+        readWorkspaceCityProposals(supabase, queryRows.filter((row) => !row.city || (Array.isArray(row.city) && !row.city.length)).map((row) => row.id)),
+        loadLatestAiRuns(queryRows.map((row) => row.id)),
+      ]);
 
       const baseRows: WorkspaceRow[] =
-        (data as WorkspaceQueryRow[] | null)?.map((w) => {
+        queryRows.map((w) => {
           const cityField = Array.isArray(w.city) ? w.city[0] ?? null : w.city;
+          const proposal = proposals.get(w.id);
           return {
             id: w.id,
             name: w.name,
@@ -216,16 +223,15 @@ export default function AdminWorkspacesPage() {
             created_at: w.created_at,
             submitted_by: w.submitted_by ?? null,
             city_slug: cityField?.slug ?? null,
-            city_name: cityField?.name ?? null,
-            country: cityField?.country ?? null,
+            city_name: cityField?.name ?? proposal?.name ?? null,
+            country: cityField?.country ?? proposal?.country ?? null,
             short_description: w.short_description ?? null,
             ai_status: "none",
             ai_run_mode: null,
             ai_error: null,
           };
-        }) || [];
+        });
 
-      const latestAiByWorkspace = await loadLatestAiRuns(baseRows.map((workspace) => workspace.id));
       setWorkspaces(
         baseRows.map((workspace) => {
           const aiRun = latestAiByWorkspace.get(workspace.id);

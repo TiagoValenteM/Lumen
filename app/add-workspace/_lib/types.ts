@@ -19,7 +19,6 @@ export type WorkspaceDuplicateCandidate = {
 export interface AddWorkspaceFormData {
   name: string;
   type: string;
-  city_id: string | null;
   city_name: string;
   country: string;
   address: string;
@@ -34,9 +33,9 @@ export interface AddWorkspaceFormData {
   phone: string;
   description: string;
   short_description: string;
-  has_wifi: boolean;
+  has_wifi: boolean | null;
   wifi_speed: string;
-  has_power_outlets: boolean;
+  has_power_outlets: boolean | null;
   power_outlet_availability: number;
   seating_capacity: number;
   seating_comfort: string;
@@ -57,8 +56,8 @@ export interface AddWorkspaceFormData {
   has_coffee: boolean;
   has_alcohol: boolean;
   price_range: number;
-  laptop_friendly: boolean;
-  time_limit_hours: number;
+  laptop_friendly: boolean | null;
+  time_limit_hours: number | null;
   minimum_purchase_required: boolean;
   good_for_meetings: boolean;
   good_for_calls: boolean;

@@ -1,5 +1,6 @@
 import { after, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   buildWorkspaceEnrichmentSnapshot,
@@ -92,13 +93,19 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   const city = Array.isArray(workspace.city) ? workspace.city[0] : workspace.city;
+  const proposal = city ? null : await readWorkspaceCityProposals(supabase, [workspace.id])
+    .then((proposals) => proposals.get(workspace.id))
+    .catch((error) => {
+      console.warn("Could not read proposed city for AI enrichment", { workspaceId: workspace.id, code: error?.code });
+      return null;
+    });
   const workspaceInput = {
     id: workspace.id,
     name: workspace.name,
     type: workspace.type,
     address: workspace.address,
-    city: city?.name ?? null,
-    country: city?.country ?? null,
+    city: city?.name ?? proposal?.name ?? null,
+    country: city?.country ?? proposal?.country ?? null,
     website: workspace.website,
     phone: workspace.phone,
     description: workspace.description,

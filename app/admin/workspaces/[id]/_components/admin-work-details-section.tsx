@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { StayLimitField, WorkFactSelect } from "@/components/features/workspace/work-fact-fields";
 import {
   Select,
   SelectContent,
@@ -16,9 +17,10 @@ import type { AdminWorkspaceFormState } from "../_lib/types";
 type AdminWorkDetailsSectionProps = {
   form: AdminWorkspaceFormState;
   onChange: (updater: (prev: AdminWorkspaceFormState) => AdminWorkspaceFormState) => void;
+  verification: ReactNode;
 };
 
-export function AdminWorkDetailsSection({ form, onChange }: AdminWorkDetailsSectionProps) {
+export function AdminWorkDetailsSection({ form, onChange, verification }: AdminWorkDetailsSectionProps) {
   const update = <Key extends keyof AdminWorkspaceFormState>(key: Key, value: AdminWorkspaceFormState[Key]) => {
     onChange((prev) => ({ ...prev, [key]: value }));
   };
@@ -38,7 +40,7 @@ export function AdminWorkDetailsSection({ form, onChange }: AdminWorkDetailsSect
       </div>
 
       <FieldGroup title="Core setup">
-        <BooleanToggle label="WiFi" value={form.has_wifi} onChange={(value) => update("has_wifi", value)} />
+        <WorkFactSelect label="Wi-Fi available" value={form.has_wifi} onChange={(value) => update("has_wifi", value)} />
         <SelectField
           label="WiFi speed"
           value={form.wifi_speed}
@@ -46,10 +48,10 @@ export function AdminWorkDetailsSection({ form, onChange }: AdminWorkDetailsSect
           options={["slow", "moderate", "fast", "very_fast"]}
           disabled={!form.has_wifi}
         />
-        <BooleanToggle label="Power outlets" value={form.has_power_outlets} onChange={(value) => update("has_power_outlets", value)} />
+        <WorkFactSelect label="Power outlets available" value={form.has_power_outlets} onChange={(value) => update("has_power_outlets", value)} />
         <NumberField label="Power availability" value={form.power_outlet_availability} min={0} max={5} onChange={(value) => update("power_outlet_availability", value)} />
-        <BooleanToggle label="Laptop friendly" value={form.laptop_friendly} onChange={(value) => update("laptop_friendly", value)} />
-        <NumberField label="Time limit hours" value={form.time_limit_hours} min={0} onChange={(value) => update("time_limit_hours", value)} />
+        <WorkFactSelect label="Laptops welcome" value={form.laptop_friendly} onChange={(value) => update("laptop_friendly", value)} />
+        <StayLimitField value={form.time_limit_hours} onChange={(value) => update("time_limit_hours", value)} />
       </FieldGroup>
 
       <FieldGroup title="Space and atmosphere">
@@ -93,6 +95,7 @@ export function AdminWorkDetailsSection({ form, onChange }: AdminWorkDetailsSect
         <BooleanToggle label="Calls" value={form.good_for_calls} onChange={(value) => update("good_for_calls", value)} />
         <BooleanToggle label="Groups" value={form.good_for_groups} onChange={(value) => update("good_for_groups", value)} />
       </FieldGroup>
+      {verification}
     </section>
   );
 }

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveAvatarUrl } from "@/lib/utils";
+import { submitWorkspaceReview } from "@/lib/features/workspaces/submit-review";
+import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
 import { useToast } from "@/hooks/useToast";
 import { useSavedWorkspace } from "@/hooks/useSavedWorkspace";
 import { useVisitedWorkspace } from "@/hooks/useVisitedWorkspace";
@@ -105,27 +107,28 @@ export default function WorkspacePage() {
           .from('workspaces')
           .select('*')
           .eq('slug', workspaceSlug)
-          .eq('city_id', (await supabase.from('cities').select('id').eq('slug', citySlug).single()).data?.id)
+          .eq('city_id', cityData.id)
           .eq('status', 'approved')
           .single();
 
         if (workspaceData) {
-          setWorkspace(workspaceData);
-
-          // Fetch photos
-          const { data: photosData } = await supabase
+          const [{ data: photosData }, checks] = await Promise.all([
+            supabase
             .from('workspace_photos')
             .select('id, url, caption, is_primary')
             .eq('workspace_id', workspaceData.id)
             .eq('is_approved', true)
             .order('is_primary', { ascending: false })
-            .order('created_at', { ascending: true });
+            .order('created_at', { ascending: true }),
+            readWorkFactChecks(supabase, { workspaceId: workspaceData.id }),
+            loadReviews(workspaceData.id),
+          ]);
+          setWorkspace({ ...workspaceData, work_facts_checked_at: checks.get(workspaceData.id) ?? null });
 
           if (photosData) {
             setPhotos(photosData);
           }
 
-          await loadReviews(workspaceData.id);
         }
       }
 
@@ -148,27 +151,7 @@ export default function WorkspacePage() {
 
     setSubmittingReview(true);
     try {
-      // Ensure profile exists to satisfy FK
-      await supabase.from('profiles').upsert(
-        {
-          id: user.id,
-          first_name: user.user_metadata?.first_name || null,
-          last_name: user.user_metadata?.last_name || null,
-          avatar_url: user.user_metadata?.avatar_url || null,
-        },
-        { onConflict: 'id' }
-      );
-
-      const { error } = await supabase
-        .from('reviews')
-        .upsert({
-          workspace_id: workspace.id,
-          user_id: user.id,
-          rating,
-          comment: comment.trim() || null,
-        }, { onConflict: "workspace_id,user_id" });
-
-      if (error) throw error;
+      await submitWorkspaceReview(supabase, { workspaceId: workspace.id, userId: user.id, rating, comment });
 
       // Refresh reviews
       await loadReviews(workspace.id);
@@ -177,8 +160,7 @@ export default function WorkspacePage() {
       return true;
     } catch (error: unknown) {
       console.error('Error submitting review:', error);
-      const errorMessage = (error as Error)?.message || 'Failed to submit review';
-      showError(`Error: ${errorMessage}. Please make sure the reviews table migration has been run in Supabase.`, 4000);
+      showError("Could not save your review. Please try again.", 4000);
       return false;
     } finally {
       setSubmittingReview(false);

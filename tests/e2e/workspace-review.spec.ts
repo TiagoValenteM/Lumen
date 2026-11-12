@@ -18,7 +18,7 @@ test.skip(
   "Requires an explicitly opted-in staging app, database, and two test accounts",
 );
 
-test("a member submission can be reviewed, saved, previewed, and published", async ({ page, browser }) => {
+test("the first place in a new city stays private until a moderator publishes it", async ({ page, browser }) => {
   const options = { auth: { persistSession: false, autoRefreshToken: false } };
   const member = createClient(settings.url!, settings.publishableKey!, options);
   const service = createClient(settings.url!, settings.secretKey!, options);
@@ -29,18 +29,27 @@ test("a member submission can be reviewed, saved, previewed, and published", asy
   expect((await member.rpc("is_admin")).data).toBe(false);
 
   const id = randomUUID();
-  const cityId = randomUUID();
-  const citySlug = `e2e-city-${cityId}`;
+  const cityName = `E2E City ${id}`;
+  const citySlug = `e2e-city-${id}-switzerland`;
   const slug = `e2e-cafe-${id}`;
   const publicPath = `/cities/${citySlug}/${slug}`;
+  const photoPath = `${login.user!.id}/temp/${id}.png`;
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=", "base64");
   const suggestion = "A quiet table by the window works well for focused laptop sessions.";
 
   try {
-    expect((await service.from("cities").insert({ id: cityId, name: citySlug, slug: citySlug, country: "Switzerland" })).error).toBeNull();
-    expect((await member.from("workspaces").insert({
-      id, name: "E2E Cafe", slug, city_id: cityId, status: "pending", submitted_by: login.user!.id,
-      address: "1 Test Street", latitude: 47.37, longitude: 8.54,
-    })).error).toBeNull();
+    const photos = member.storage.from("workspace-photos");
+    expect((await photos.upload(photoPath, png, { contentType: "image/png" })).error).toBeNull();
+    const submission = await member.rpc("submit_workspace_with_photos", {
+      submission_uuid: id,
+      city_name: cityName,
+      country_name: "Switzerland",
+      details: { name: `E2E Cafe ${id}`, address: "1 Test Street", latitude: 47.37, longitude: 8.54, laptop_friendly: true },
+      photo_urls: [photos.getPublicUrl(photoPath).data.publicUrl],
+    });
+    expect(submission.error).toBeNull();
+    expect(submission.data).toBe(id);
+    expect((await member.from("cities").select("id").eq("name", cityName).maybeSingle()).data).toBeNull();
     expect((await service.from("workspace_ai_enrichments").insert({
       workspace_id: id, requested_by: login.user!.id, status: "ready_for_review", model: "e2e-fixture",
       suggested_fields: { description: suggestion },
@@ -62,6 +71,7 @@ test("a member submission can be reviewed, saved, previewed, and published", asy
     await page.getByRole("button", { name: "Save changes" }).first().click();
     await expect(page.getByRole("link", { name: "Admin preview" }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Public after approval" }).first()).toBeDisabled();
+    expect((await member.from("cities").select("id").eq("name", cityName).maybeSingle()).data).toBeNull();
     const preview = await page.context().newPage();
     await preview.goto(`/admin/workspaces/${id}/preview`);
     await expect(preview.getByText(suggestion, { exact: true }).first()).toBeVisible();
@@ -71,18 +81,23 @@ test("a member submission can be reviewed, saved, previewed, and published", asy
     await page.getByRole("option", { name: "approved", exact: true }).click();
     await page.getByRole("button", { name: "Save changes" }).first().click();
     await expect(page.getByRole("link", { name: "Public view" }).first()).toHaveAttribute("href", publicPath);
+    await page.getByRole("button", { name: "Mark known facts checked" }).click();
+    await expect(page.getByRole("status").filter({ hasText: /^Checked / })).toBeVisible();
 
     const visitor = await browser.newContext({ baseURL: settings.baseUrl });
     try {
       const publicPage = await visitor.newPage();
       await publicPage.goto(publicPath);
       await expect(publicPage.getByText(suggestion, { exact: true }).first()).toBeVisible();
+      await expect(publicPage.getByText(/Known facts checked by a Lumen moderator/)).toBeVisible();
+      await expect(publicPage.getByText("Unknown", { exact: true })).toHaveCount(3);
     } finally {
       await visitor.close();
     }
   } finally {
     const deletedPlace = await service.from("workspaces").delete().eq("id", id);
-    const deletedCity = await service.from("cities").delete().eq("id", cityId);
-    expect(deletedPlace.error ?? deletedCity.error).toBeNull();
+    const deletedCity = await service.from("cities").delete().eq("slug", citySlug);
+    const deletedPhoto = await service.storage.from("workspace-photos").remove([photoPath]);
+    expect(deletedPlace.error ?? deletedCity.error ?? deletedPhoto.error).toBeNull();
   }
 });

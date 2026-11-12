@@ -50,6 +50,7 @@ GEOAPIFY_API_KEY=optional-geocoding-key
 LOCATIONIQ_API_KEY=optional-fallback-geocoding-key
 OPENROUTER_API_KEY=optional-server-side-ai-enrichment-key
 OPENROUTER_PLACE_ENRICHMENT_MODEL=openai/gpt-oss-20b:free
+FIND_A_SPOT_AI_ENABLED=false
 SUPABASE_SECRET_KEY=server-only-secret-for-ai-and-geocoding
 ```
 `.env.local` is gitignored—never commit secrets.
@@ -59,6 +60,8 @@ For another machine or deployment, copy the variable names from `.env.example` a
 Location lookups require a signed-in user and a server-side Supabase secret for shared quota checks. Provider preference is Geoapify, then LocationIQ, then Photon for search and Nominatim for reverse lookup. The pin and manual address fields remain usable without a lookup.
 
 AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs and first tries web search, then falls back to no-web structured extraction when free server tools fail. Remove stale `OPENROUTER_PLACE_ENRICHMENT_MODEL` overrides in hosting environments unless they point to a current free structured model.
+
+Find a Spot (`/find`) works without AI. To enable the optional OpenRouter interpretation in Preview, see the [Find a Spot rollout plan](docs/FIND_A_SPOT_PLAN.md). It uses the free router and does not use the enrichment model setting.
 
 ## Setup
 ```bash

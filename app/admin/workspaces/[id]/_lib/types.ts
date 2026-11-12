@@ -1,3 +1,5 @@
+import type { WorkspaceCityProposal } from "@/lib/features/locations/workspace-city-proposals";
+
 export type WorkspaceStatus = "pending" | "under_review" | "approved" | "rejected";
 
 export type LocationSource = "search" | "pin" | "manual";
@@ -14,6 +16,7 @@ export type WorkspaceDetailMinimal = {
   address: string | null;
   city_id: string | null;
   city_slug: string | null;
+  city_proposal?: WorkspaceCityProposal | null;
   city_name: string | null;
   country: string | null;
   latitude: number | null;
@@ -62,6 +65,7 @@ export type WorkspaceDetailMinimal = {
   atmosphere_rating?: number | null;
   total_reviews?: number | null;
   last_verified_at?: string | null;
+  work_facts_checked_at?: string | null;
   reported_change_count?: number | null;
   best_time_to_visit?: string | null;
   website?: string | null;
@@ -239,9 +243,9 @@ export type AdminWorkspaceFormState = {
   rejection_reason: string;
   admin_notes: string;
   status: string;
-  has_wifi: boolean;
+  has_wifi: boolean | null;
   wifi_speed: string;
-  has_power_outlets: boolean;
+  has_power_outlets: boolean | null;
   power_outlet_availability: number;
   seating_capacity: number;
   seating_comfort: string;
@@ -262,8 +266,8 @@ export type AdminWorkspaceFormState = {
   has_coffee: boolean;
   has_alcohol: boolean;
   price_range: number;
-  laptop_friendly: boolean;
-  time_limit_hours: number;
+  laptop_friendly: boolean | null;
+  time_limit_hours: number | null;
   minimum_purchase_required: boolean;
   good_for_meetings: boolean;
   good_for_calls: boolean;

@@ -1,6 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import { WorkFactSelect } from "@/components/features/workspace/work-fact-fields";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,21 +24,17 @@ export function ProductivityStep({ formData, updateField }: ProductivityStepProp
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-border/35 bg-muted/15 p-4">
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="has_wifi" checked={formData.has_wifi} onCheckedChange={(checked) => updateField("has_wifi", checked)} />
-                <Label htmlFor="has_wifi" className="font-normal">
-                  Has WiFi
-                </Label>
-              </div>
+              <WorkFactSelect label="Wi-Fi available" value={formData.has_wifi} onChange={(value) => updateField("has_wifi", value)} />
 
               {formData.has_wifi && (
                 <div className="space-y-2">
                   <Label htmlFor="wifi_speed">WiFi Speed</Label>
-                  <Select value={formData.wifi_speed} onValueChange={(value) => updateField("wifi_speed", value)}>
-                    <SelectTrigger>
+                  <Select value={formData.wifi_speed || "unknown"} onValueChange={(value) => updateField("wifi_speed", value === "unknown" ? "" : value)}>
+                    <SelectTrigger id="wifi_speed" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="unknown">Unknown</SelectItem>
                       <SelectItem value="slow">Slow</SelectItem>
                       <SelectItem value="moderate">Moderate</SelectItem>
                       <SelectItem value="fast">Fast</SelectItem>
@@ -51,16 +48,7 @@ export function ProductivityStep({ formData, updateField }: ProductivityStepProp
 
           <div className="rounded-xl border border-border/35 bg-muted/15 p-4">
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="has_power_outlets"
-                  checked={formData.has_power_outlets}
-                  onCheckedChange={(checked) => updateField("has_power_outlets", checked)}
-                />
-                <Label htmlFor="has_power_outlets" className="font-normal">
-                  Has Power Outlets
-                </Label>
-              </div>
+              <WorkFactSelect label="Power outlets available" value={formData.has_power_outlets} onChange={(value) => updateField("has_power_outlets", value)} />
 
               {formData.has_power_outlets && (
                 <div className="space-y-2">
@@ -69,10 +57,11 @@ export function ProductivityStep({ formData, updateField }: ProductivityStepProp
                     value={formData.power_outlet_availability.toString()}
                     onValueChange={(value) => updateField("power_outlet_availability", parseInt(value))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger id="power_outlet_availability" className="w-full">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="0">Unknown</SelectItem>
                       <SelectItem value="1">Very Limited</SelectItem>
                       <SelectItem value="2">Limited</SelectItem>
                       <SelectItem value="3">Moderate</SelectItem>

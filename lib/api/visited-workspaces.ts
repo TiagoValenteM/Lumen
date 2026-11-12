@@ -43,7 +43,6 @@ export async function markWorkspaceAsVisited(
 
   if (error) throw error;
 }
-
 export async function unmarkWorkspaceAsVisited(
   userId: string,
   workspaceId: string
@@ -57,20 +56,4 @@ export async function unmarkWorkspaceAsVisited(
     .eq("workspace_id", workspaceId);
 
   if (error) throw error;
-}
-
-export async function getVisitedWorkspaces(userId: string): Promise<string[]> {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("visited_workspaces")
-    .select("workspace_id")
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error("Error fetching visited workspaces:", error);
-    return [];
-  }
-
-  return data.map((item) => item.workspace_id);
 }

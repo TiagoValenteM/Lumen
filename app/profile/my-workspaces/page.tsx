@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle2, Clock, Loader2, MapPin, Plus, Wrench, XCircle, type LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -144,6 +145,9 @@ export default function MyWorkspacesPage() {
         }
 
         if (fetchError) throw fetchError;
+        const proposals = await readWorkspaceCityProposals(
+          supabase, (data ?? []).filter((row) => !row.city || (Array.isArray(row.city) && !row.city.length)).map((row) => row.id),
+        );
 
         const mapped =
           data?.map((w) => {
@@ -153,7 +157,7 @@ export default function MyWorkspacesPage() {
               name: w.name,
               slug: w.slug,
               city_slug: cityField?.slug ?? null,
-              city_name: cityField?.name ?? null,
+              city_name: cityField?.name ?? proposals.get(w.id)?.name ?? null,
               status: w.status ?? null,
               created_at: w.created_at ?? null,
               updated_at: w.updated_at ?? null,
@@ -306,11 +310,10 @@ export default function MyWorkspacesPage() {
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {items.map((ws) => {
-                const citySlug = ws.city_slug || "global";
-                const cityName = ws.city_name || "Global";
+                const cityName = ws.city_name || "City not set";
                 const meta = statusMeta(ws.status);
                 const StatusIcon = meta.icon;
-                const canViewPublic = ws.status === "approved";
+                const canViewPublic = ws.status === "approved" && ws.city_slug;
                 return (
                   <Card key={ws.id} className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20">
                     <CardContent className="pt-5 pb-5 space-y-4">
@@ -344,7 +347,7 @@ export default function MyWorkspacesPage() {
                       </div>
                       {canViewPublic ? (
                         <Link
-                          href={`/cities/${citySlug}/${ws.slug}`}
+                          href={`/cities/${ws.city_slug}/${ws.slug}`}
                           className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1"
                         >
                           View live page

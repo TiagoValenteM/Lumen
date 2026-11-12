@@ -55,10 +55,10 @@ export interface Workspace {
   opening_hours: OpeningHours | null;
   
   // Productivity Features
-  has_wifi: boolean;
+  has_wifi: boolean | null;
   wifi_speed: WifiSpeed | null;
   wifi_password_required: boolean;
-  has_power_outlets: boolean;
+  has_power_outlets: boolean | null;
   power_outlet_availability: number | null;
   
   // Seating
@@ -88,7 +88,7 @@ export interface Workspace {
   price_range: number | null;
   
   // Policies
-  laptop_friendly: boolean;
+  laptop_friendly: boolean | null;
   time_limit_hours: number | null;
   minimum_purchase_required: boolean;
   

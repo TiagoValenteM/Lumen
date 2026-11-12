@@ -36,7 +36,7 @@ export const FILTER_GROUPS: FilterGroup[] = [
   },
   {
     label: "Focus & Duration",
-    options: ["Quiet", "Laptop-ready", "Long stays"],
+    options: ["Quiet", "Laptops welcome", "Long stays"],
   },
   {
     label: "Food & Drink",
@@ -59,7 +59,7 @@ export const FILTER_ICONS: Record<string, ComponentType<{ className?: string }>>
   Coffee: Coffee,
   Quiet: Moon,
   "Long stays": Clock3,
-  "Laptop-ready": Laptop,
+  "Laptops welcome": Laptop,
   Food: UtensilsCrossed,
   Veggie: Sprout,
   Alcohol: Wine,
@@ -78,7 +78,7 @@ export const SUPPORTED_FILTERS: Record<string, keyof Workspace> = {
   "Wi-Fi": "has_wifi",
   Power: "has_power_outlets",
   Coffee: "has_coffee",
-  "Laptop-ready": "laptop_friendly",
+  "Laptops welcome": "laptop_friendly",
   Food: "has_food",
   Veggie: "has_veg",
   Alcohol: "has_alcohol",

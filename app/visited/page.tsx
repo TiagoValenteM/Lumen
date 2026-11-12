@@ -74,8 +74,8 @@ export default function VisitedWorkspacesPage() {
             type: string;
             short_description: string | null;
             address: string | null;
-            has_wifi: boolean;
-            has_power_outlets: boolean;
+            has_wifi: boolean | null;
+            has_power_outlets: boolean | null;
             has_coffee: boolean;
             overall_rating: number | null;
             total_reviews: number;

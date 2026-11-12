@@ -73,9 +73,9 @@ export function MemberHome({ data }: MemberHomeProps) {
 
         <section className="grid gap-4 md:grid-cols-3">
           <ActionCard
-            href="/cities"
-            title="Find your next work session"
-            body="Browse by city, filter by work style, and compare workability before you go."
+            href="/find"
+            title="Find a Spot"
+            body="Compare places by activity, stay length, Wi-Fi, and outlets."
           />
           <ActionCard
             href="/profile"

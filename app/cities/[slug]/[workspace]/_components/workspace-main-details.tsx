@@ -4,11 +4,12 @@ import type { ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getWorkabilityReport } from "@/lib/features/workspaces/workability-report";
+import { getAvailabilityLabel, getStayLimitLabel } from "@/lib/features/workspaces/work-facts";
 import type { WorkspaceDetail } from "@/lib/types";
 import {
   Accessibility,
   Bike,
-  BriefcaseBusiness,
+  Laptop,
   Car,
   CheckCircle2,
   Clock,
@@ -33,6 +34,7 @@ type WorkspaceMainDetailsProps = {
 
 export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
   const workability = getWorkabilityReport(workspace);
+  const checkedAt = workspace.work_facts_checked_at;
 
   return (
     <>
@@ -40,22 +42,28 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
         <CardHeader>
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
-            <CardTitle>Workability Report</CardTitle>
+            <CardTitle>Work facts</CardTitle>
           </div>
         </CardHeader>
         <CardContent className="space-y-5">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <ScoreBlock
-              label="Productivity"
-              score={workability.productivityScore}
-              icon={<BriefcaseBusiness className="h-4 w-4" />}
-            />
-            <ScoreBlock
-              label="Comfort"
-              score={workability.comfortScore}
-              icon={<Coffee className="h-4 w-4" />}
-            />
-          </div>
+          <p className="text-sm text-muted-foreground">
+            {checkedAt ? (
+              <>Known facts checked by a Lumen moderator on{" "}
+                <time dateTime={checkedAt}>{new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(checkedAt))}</time>.</>
+            ) : "Listed facts have not been checked by Lumen."}
+          </p>
+          <dl className="grid grid-cols-1 gap-x-5 divide-y border-y sm:grid-cols-2 sm:divide-y-0">
+            <Fact label="Laptops" icon={<Laptop className="size-4" />}
+              value={getAvailabilityLabel(workspace.laptop_friendly, "Welcome", "Not allowed")} />
+            <Fact label="Stay limit" icon={<Clock className="size-4" />}
+              value={getStayLimitLabel(workspace.time_limit_hours, Boolean(checkedAt))} />
+            <Fact label="Wi-Fi" icon={<Wifi className="size-4" />}
+              value={getAvailabilityLabel(workspace.has_wifi)}
+              detail={workspace.has_wifi === true && workspace.wifi_speed ? `Reported speed: ${workspace.wifi_speed.replaceAll("_", " ")}` : undefined} />
+            <Fact label="Power outlets" icon={<Zap className="size-4" />}
+              value={getAvailabilityLabel(workspace.has_power_outlets)}
+              detail={workspace.has_power_outlets === true && workspace.power_outlet_availability ? `Reported availability: ${workspace.power_outlet_availability}/5` : undefined} />
+          </dl>
 
           {workability.bestFor.length > 0 && (
             <div className="space-y-2">
@@ -105,22 +113,6 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
           <CardTitle>Productivity</CardTitle>
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-4">
-          <div className="flex items-center gap-3">
-            <Wifi className={`h-5 w-5 ${workspace.has_wifi ? "text-primary" : "text-muted-foreground"}`} />
-            <div>
-              <p className="font-medium">WiFi</p>
-              {workspace.wifi_speed && <p className="text-sm text-muted-foreground capitalize">{workspace.wifi_speed}</p>}
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Zap className={`h-5 w-5 ${workspace.has_power_outlets ? "text-primary" : "text-muted-foreground"}`} />
-            <div>
-              <p className="font-medium">Power Outlets</p>
-              {workspace.power_outlet_availability && (
-                <p className="text-sm text-muted-foreground">{workspace.power_outlet_availability}/5 availability</p>
-              )}
-            </div>
-          </div>
           {workspace.seating_capacity && (
             <div className="flex items-center gap-3">
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -145,17 +137,6 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
               <div>
                 <p className="font-medium">Calls</p>
                 <p className="text-sm text-muted-foreground">Call-friendly</p>
-              </div>
-            </div>
-          )}
-          {workspace.time_limit_hours !== null && workspace.time_limit_hours !== undefined && (
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="font-medium">Stay Length</p>
-                <p className="text-sm text-muted-foreground">
-                  {workspace.time_limit_hours === 0 ? "No listed limit" : `${workspace.time_limit_hours}h limit`}
-                </p>
               </div>
             </div>
           )}
@@ -193,21 +174,14 @@ function AmenityItem({ icon, label }: { icon: ReactNode; label: string }) {
   );
 }
 
-function ScoreBlock({ icon, label, score }: { icon: ReactNode; label: string; score: number }) {
+function Fact({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded-xl border border-border/35 bg-muted/20 p-4 shadow-sm shadow-black/5 dark:shadow-black/20">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <span className="text-primary">{icon}</span>
-          {label}
-        </div>
-        <span className="text-sm font-semibold tabular-nums">
-          {score}<span className="text-muted-foreground">/100</span>
-        </span>
-      </div>
-      <div className="h-2 overflow-hidden rounded-full bg-muted">
-        <div className="h-full rounded-full bg-primary" style={{ width: `${score}%` }} />
-      </div>
+    <div className="flex min-w-0 items-start justify-between gap-3 py-3 text-sm">
+      <dt className="flex items-center gap-2 text-muted-foreground"><span className="shrink-0">{icon}</span>{label}</dt>
+      <dd className="min-w-0 text-right">
+        <span className={value === "Unknown" ? "text-muted-foreground" : "font-medium"}>{value}</span>
+        {detail && <span className="block text-xs text-muted-foreground">{detail}</span>}
+      </dd>
     </div>
   );
 }

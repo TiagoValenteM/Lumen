@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AddWorkspaceFormData } from "../_lib/types";
+import { getAvailabilityLabel, getStayLimitLabel } from "@/lib/features/workspaces/work-facts";
 
 type ReviewStepProps = {
   formData: AddWorkspaceFormData;
@@ -16,9 +17,6 @@ type ReviewStepProps = {
 
 export function ReviewStep({ formData, onEditStep, uploadedPhotos }: ReviewStepProps) {
   const workBadges = [
-    formData.has_wifi ? `${formatSelectValue(formData.wifi_speed)} WiFi` : null,
-    formData.has_power_outlets ? `${formatPowerAvailability(formData.power_outlet_availability)} outlets` : null,
-    formData.laptop_friendly ? "Laptop friendly" : null,
     formData.good_for_calls ? "Call-friendly" : null,
     formData.good_for_meetings ? "Meeting-friendly" : null,
   ].filter(Boolean);
@@ -64,16 +62,23 @@ export function ReviewStep({ formData, onEditStep, uploadedPhotos }: ReviewStepP
           <div className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
             <span className="inline-flex items-center gap-2">
               <Wifi className="h-4 w-4" />
-              {formData.has_wifi ? "WiFi" : "No WiFi"}
+              Wi-Fi: {getAvailabilityLabel(formData.has_wifi)}
             </span>
             <span className="inline-flex items-center gap-2">
               <Plug className="h-4 w-4" />
-              {formData.has_power_outlets ? "Power" : "No power noted"}
+              Outlets: {getAvailabilityLabel(formData.has_power_outlets)}
             </span>
             <span className="inline-flex items-center gap-2">
               <Volume2 className="h-4 w-4" />
               {formatSelectValue(formData.noise_level)}
             </span>
+          </div>
+        </ReviewBlock>
+
+        <ReviewBlock title="Laptop policy" step={4} onEditStep={onEditStep}>
+          <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted-foreground">
+            <span>Laptops: {getAvailabilityLabel(formData.laptop_friendly, "Welcome", "Not allowed")}</span>
+            <span>Stay limit: {getStayLimitLabel(formData.time_limit_hours, true)}</span>
           </div>
         </ReviewBlock>
 
@@ -130,11 +135,4 @@ function ReviewBlock({
 
 function formatSelectValue(value: string) {
   return value.replace(/_/g, " ");
-}
-
-function formatPowerAvailability(value: number) {
-  if (value >= 5) return "Excellent";
-  if (value >= 4) return "Good";
-  if (value >= 3) return "Moderate";
-  return "Limited";
 }

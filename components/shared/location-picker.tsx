@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Map, Marker, StyleSpecification } from "maplibre-gl";
 import { CheckCircle2, Crosshair, Loader2, Pencil, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
+import { createLatestRequest } from "@/lib/features/locations/latest-request";
 
 export type LocationValue = {
   latitude: number | null;
@@ -64,6 +65,10 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const mapRef = useRef<Map | null>(null);
   const markerRef = useRef<Marker | null>(null);
   const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+  const searchTimer = useRef<number | undefined>(undefined);
+  const [searchRequest] = useState(createLatestRequest);
+  const [reverseRequest] = useState(createLatestRequest);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeocodeCandidate[]>([]);
   const [searching, setSearching] = useState(false);
@@ -73,17 +78,34 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const [manualMode, setManualMode] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
 
-  const hasCoordinates = value.latitude !== null && value.longitude !== null;
+  const { latitude, longitude } = value;
+  const hasCoordinates = latitude !== null && longitude !== null;
   const shouldShowMap = !hasCoordinates || mapExpanded || manualMode;
   const selectedTitle = getSelectedTitle(value);
 
   useEffect(() => {
     valueRef.current = value;
-  }, [value]);
+    onChangeRef.current = onChange;
+  }, [value, onChange]);
 
-  const updateLocation = (next: Partial<LocationValue>) => {
-    onChange({ ...valueRef.current, ...next });
-  };
+  useEffect(() => () => {
+    window.clearTimeout(searchTimer.current);
+    searchRequest.cancel();
+    reverseRequest.cancel();
+  }, [searchRequest, reverseRequest]);
+
+  const updateLocation = useCallback((next: Partial<LocationValue>) => {
+    const location = { ...valueRef.current, ...next };
+    valueRef.current = location;
+    onChangeRef.current(location);
+  }, []);
+
+  const stopSearch = useCallback(() => {
+    window.clearTimeout(searchTimer.current);
+    searchRequest.cancel();
+    setSearching(false);
+    setResults([]);
+  }, [searchRequest]);
 
   const focusMap = () => {
     window.requestAnimationFrame(() => {
@@ -109,7 +131,10 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     focusMap();
   };
 
-  const reverseLookup = async (latitude: number, longitude: number) => {
+  const reverseLookup = useCallback(async (latitude: number, longitude: number) => {
+    stopSearch();
+    setError(null);
+    const request = reverseRequest.start();
     updateLocation({
       latitude,
       longitude,
@@ -119,18 +144,20 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       confidence: null,
       raw: null,
     });
+    const pinned = valueRef.current;
 
     try {
       setReverseSearching(true);
-      const response = await fetch(`/api/geocode/reverse?lat=${latitude}&lng=${longitude}`);
+      const response = await fetch(`/api/geocode/reverse?lat=${latitude}&lng=${longitude}`, { signal: request.signal });
       const data = await response.json();
+      if (!request.isCurrent()) return;
+      const current = valueRef.current;
+      if (current.latitude !== latitude || current.longitude !== longitude || current.source !== "pin") return;
       if (!response.ok) throw new Error(data.error || "Address lookup failed.");
       updateLocation({
-        latitude,
-        longitude,
-        address: data.address || valueRef.current.address,
-        city: data.city || valueRef.current.city,
-        country: data.country || valueRef.current.country,
+        address: current.address === pinned.address ? data.address || current.address : current.address,
+        city: current.city === pinned.city ? data.city || current.city : current.city,
+        country: current.country === pinned.country ? data.country || current.country : current.country,
         source: "pin",
         provider: data.provider || "manual",
         providerId: data.providerId || null,
@@ -138,42 +165,24 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         raw: data.raw ?? null,
       });
     } catch (error) {
+      if (!request.isCurrent()) return;
       setError(error instanceof Error && error.message
         ? `Pin saved. ${error.message}`
         : "The pin was saved, but address lookup failed. You can edit the address manually.");
     } finally {
-      setReverseSearching(false);
+      if (request.finish()) setReverseSearching(false);
     }
-  };
-
-  const setMarker = async (latitude: number, longitude: number, zoom = 16) => {
-    const maplibregl = await importMapLibre();
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (!markerRef.current) {
-      markerRef.current = new maplibregl.Marker({ draggable: true })
-        .setLngLat([longitude, latitude])
-        .addTo(map);
-      markerRef.current.on("dragend", async () => {
-        const lngLat = markerRef.current?.getLngLat();
-        if (!lngLat) return;
-        await reverseLookup(lngLat.lat, lngLat.lng);
-      });
-    } else {
-      markerRef.current.setLngLat([longitude, latitude]);
-    }
-
-    map.flyTo({ center: [longitude, latitude], zoom, essential: true });
-  };
+  }, [reverseRequest, stopSearch, updateLocation]);
 
   const searchLocations = async (nextQuery = query) => {
+    stopSearch();
     const trimmed = nextQuery.trim();
     if (trimmed.length < 3) {
       setResults([]);
       setError("Type at least 3 characters to search.");
       return;
     }
+    const request = searchRequest.start();
     setSearching(true);
     setError(null);
     try {
@@ -184,27 +193,31 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         params.set("lat", String(valueRef.current.latitude));
         params.set("lng", String(valueRef.current.longitude));
       }
-      const response = await fetch(`/api/geocode/search?${params.toString()}`);
+      const response = await fetch(`/api/geocode/search?${params.toString()}`, { signal: request.signal });
       const data = await response.json();
+      if (!request.isCurrent()) return;
       setResults(data.results || []);
       if (data.error) setError(data.error);
       if (!data.error && (!data.results || data.results.length === 0)) {
         setError("No places found. Try a fuller address or use the map pin.");
       }
     } catch {
+      if (!request.isCurrent()) return;
       setError("Location search failed. You can still place the pin manually.");
     } finally {
-      setSearching(false);
+      if (request.finish()) setSearching(false);
     }
   };
 
-  const chooseCandidate = async (candidate: GeocodeCandidate) => {
+  const chooseCandidate = (candidate: GeocodeCandidate) => {
+    stopSearch();
+    reverseRequest.cancel();
+    setReverseSearching(false);
     setQuery(candidate.label);
-    setResults([]);
     setManualMode(false);
     setMapExpanded(true);
     setError(null);
-    onChange({
+    updateLocation({
       latitude: candidate.latitude,
       longitude: candidate.longitude,
       address: candidate.address,
@@ -216,15 +229,16 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       confidence: candidate.confidence,
       raw: candidate.raw,
     });
-    await setMarker(candidate.latitude, candidate.longitude);
   };
 
   const clearSelection = () => {
+    stopSearch();
+    reverseRequest.cancel();
+    setReverseSearching(false);
     setQuery("");
-    setResults([]);
     setError(null);
     setManualMode(false);
-    onChange({
+    updateLocation({
       latitude: null,
       longitude: null,
       address: "",
@@ -267,7 +281,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       });
     }
 
-    setupMap();
+    void setupMap();
 
     return () => {
       cancelled = true;
@@ -278,22 +292,37 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         setMapReady(false);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shouldShowMap]);
+  }, [shouldShowMap, reverseLookup]);
 
   useEffect(() => {
-    if (!mapReady || value.latitude === null || value.longitude === null) return;
-    setMarker(value.latitude, value.longitude);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, value.latitude, value.longitude]);
+    const map = mapRef.current;
+    if (!mapReady || !map || latitude === null || longitude === null) return;
+    let cancelled = false;
+    void importMapLibre().then(({ Marker }) => {
+      if (cancelled || mapRef.current !== map) return;
+      if (!markerRef.current) {
+        const marker = new Marker({ draggable: true }).setLngLat([longitude, latitude]).addTo(map);
+        marker.on("dragend", () => {
+          const position = marker.getLngLat();
+          void reverseLookup(position.lat, position.lng);
+        });
+        markerRef.current = marker;
+      } else {
+        markerRef.current.setLngLat([longitude, latitude]);
+      }
+      map.flyTo({ center: [longitude, latitude], zoom: 16, essential: true });
+    });
+    return () => { cancelled = true; };
+  }, [mapReady, latitude, longitude, reverseLookup]);
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      if (query.trim().length >= 3) searchLocations(query);
-    }, 350);
-    return () => window.clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  const changeQuery = (nextQuery: string) => {
+    stopSearch();
+    setQuery(nextQuery);
+    setError(null);
+    if (nextQuery.trim().length >= 3) {
+      searchTimer.current = window.setTimeout(() => { void searchLocations(nextQuery); }, 350);
+    }
+  };
 
   const providerLabel = useMemo(() => getProviderLabel(value.provider), [value.provider]);
 
@@ -318,7 +347,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => changeQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();

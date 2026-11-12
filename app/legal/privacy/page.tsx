@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const updatedAt = "June 5, 2026";
+const updatedAt = "November 12, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -19,7 +19,11 @@ export default function PrivacyPage() {
             </Section>
 
             <Section title="Location data">
-              If you use location-based features, your browser may ask for permission to share your approximate position. Lumen uses that location to show nearby workspaces and may request reverse-geocoding results from a mapping provider. You can deny or revoke location permission in your browser.
+              If you use location-based features, your browser may ask for permission to share your position. Find a Spot calculates distances in your browser and does not store your device coordinates. Address lookup and other location features may contact a mapping provider. You can deny or revoke location permission in your browser.
+            </Section>
+
+            <Section title="Find a Spot and optional AI">
+              Common requests are interpreted in your browser. When you choose Try with AI, Lumen sends the text you entered to OpenRouter to suggest filters. Lumen does not attach your account details or device location, and does not save the request text. It keeps a request count tied to your account to enforce daily limits. Do not include personal information in the request.
             </Section>
 
             <Section title="Workspace and moderation data">

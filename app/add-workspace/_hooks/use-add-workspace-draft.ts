@@ -8,11 +8,13 @@ import type { AddWorkspaceFormData } from "../_lib/types";
 const legacyDraftStorageKey = "lumen:add-place-draft:v1";
 
 const getDraftStorageKey = (userId: string) => `lumen:add-place-draft:v1:${userId}`;
+const getSubmissionStorageKey = (userId: string) => `${getDraftStorageKey(userId)}:submission`;
 
 type AddWorkspaceDraft = {
   formData: AddWorkspaceFormData;
   uploadedPhotos: string[];
   savedAt: string;
+  workFactsVersion: 1;
 };
 
 type UseAddWorkspaceDraftParams = {
@@ -27,6 +29,7 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const skipNextSaveRef = useRef(false);
+  const submissionIdRef = useRef<{ userId: string; id: string } | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -43,7 +46,21 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
       try {
         const draft = JSON.parse(rawDraft) as Partial<AddWorkspaceDraft>;
         if (draft.formData) {
-          setFormData({ ...defaultAddWorkspaceFormData, ...draft.formData });
+          const restored = { ...defaultAddWorkspaceFormData, ...draft.formData };
+          if (!draft.workFactsVersion) {
+            // Legacy drafts could not distinguish these defaults from deliberate answers.
+            if (restored.has_wifi === true && restored.wifi_speed === "moderate") {
+              restored.has_wifi = null;
+              restored.wifi_speed = "";
+            }
+            if (restored.has_power_outlets === true && restored.power_outlet_availability === 3) {
+              restored.has_power_outlets = null;
+              restored.power_outlet_availability = 0;
+            }
+            if (restored.laptop_friendly === true) restored.laptop_friendly = null;
+            if (restored.time_limit_hours === 0) restored.time_limit_hours = null;
+          }
+          setFormData(restored);
         }
         if (Array.isArray(draft.uploadedPhotos)) {
           setUploadedPhotos(draft.uploadedPhotos.filter((photo): photo is string => typeof photo === "string"));
@@ -77,13 +94,14 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
 
       if (!hasMeaningfulDraft) {
         window.localStorage.removeItem(draftStorageKey);
+        window.localStorage.removeItem(getSubmissionStorageKey(userId));
         setDraftSavedAt(null);
         return;
       }
 
       try {
         const savedAt = new Date().toISOString();
-        const draft: AddWorkspaceDraft = { formData, uploadedPhotos, savedAt };
+        const draft: AddWorkspaceDraft = { formData, uploadedPhotos, savedAt, workFactsVersion: 1 };
         window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
         setDraftSavedAt(savedAt);
       } catch (error) {
@@ -96,13 +114,35 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
 
   const clearDraft = () => {
     if (userId) {
-      window.localStorage.removeItem(getDraftStorageKey(userId));
+      try {
+        window.localStorage.removeItem(getDraftStorageKey(userId));
+        window.localStorage.removeItem(getSubmissionStorageKey(userId));
+      } catch {
+        // The form still resets when browser storage is disabled.
+      }
     }
+    submissionIdRef.current = null;
     setDraftSavedAt(null);
+  };
+
+  const getSubmissionId = () => {
+    if (!userId) throw new Error("Sign in to submit a place.");
+    if (submissionIdRef.current?.userId === userId) return submissionIdRef.current.id;
+    let id: string = crypto.randomUUID();
+    try {
+      const stored = window.localStorage.getItem(getSubmissionStorageKey(userId));
+      if (stored && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(stored)) id = stored;
+      else window.localStorage.setItem(getSubmissionStorageKey(userId), id);
+    } catch {
+      // Retries still share an ID for the lifetime of this page.
+    }
+    submissionIdRef.current = { userId, id };
+    return id;
   };
 
   return {
     clearDraft,
+    getSubmissionId,
     draftLoaded,
     draftSavedAt,
   };

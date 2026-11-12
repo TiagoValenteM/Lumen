@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceSuggestionKind } from "@/lib/features/workspace-suggestions/actions";
+import { getStayLimitLabel } from "@/lib/features/workspaces/work-facts";
+import { getWorkspaceDirections } from "@/lib/features/locations/directions";
 import type { WorkspaceDetail } from "@/lib/types";
 import { Bookmark, BookmarkCheck, Clock, DollarSign, Globe, Loader2, MapPin, MapPinCheck, MessageSquare, Phone, Users } from "lucide-react";
 
@@ -148,6 +150,7 @@ export function WorkspaceSidebar({
 }
 
 function ContactCard({ workspace }: { workspace: WorkspaceDetail }) {
+  const directions = getWorkspaceDirections(workspace);
   return (
     <Card>
       <CardHeader>
@@ -166,11 +169,9 @@ function ContactCard({ workspace }: { workspace: WorkspaceDetail }) {
             <span className="text-sm">{workspace.phone}</span>
           </a>
         )}
-        {(workspace.address || (workspace.latitude && workspace.longitude)) && (
+        {directions && (
           <a
-            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-              workspace.address ? `${workspace.name}, ${workspace.address}` : `${workspace.latitude},${workspace.longitude}`,
-            )}`}
+            href={directions}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-primary hover:underline"
@@ -193,13 +194,7 @@ function PoliciesCard({ workspace }: { workspace: WorkspaceDetail }) {
       <CardContent className="space-y-2 text-sm">
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          {workspace.time_limit_hours && workspace.time_limit_hours > 0 ? (
-            <span>
-              {workspace.time_limit_hours} {workspace.time_limit_hours === 1 ? "hour" : "hours"} time limit
-            </span>
-          ) : (
-            <span className="text-foreground font-medium">No maximum time</span>
-          )}
+          <span>Stay limit: {getStayLimitLabel(workspace.time_limit_hours, Boolean(workspace.work_facts_checked_at))}</span>
         </div>
         {workspace.minimum_purchase_required && (
           <div className="flex items-center gap-2">

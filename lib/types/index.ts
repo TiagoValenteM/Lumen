@@ -19,8 +19,8 @@ export interface Workspace {
   address: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  has_wifi: boolean;
-  has_power_outlets: boolean;
+  has_wifi: boolean | null;
+  has_power_outlets: boolean | null;
   has_coffee: boolean;
   has_food?: boolean;
   has_veg?: boolean;
@@ -32,7 +32,7 @@ export interface Workspace {
   has_natural_light?: boolean;
   is_accessible?: boolean;
   allows_pets?: boolean;
-  laptop_friendly?: boolean;
+  laptop_friendly?: boolean | null;
   good_for_meetings?: boolean;
   good_for_calls?: boolean;
   good_for_groups?: boolean;
@@ -42,6 +42,7 @@ export interface Workspace {
   overall_rating: number | null;
   total_reviews: number;
   last_verified_at?: string | null;
+  work_facts_checked_at?: string | null;
   reported_change_count?: number | null;
   rejection_reason?: string | null;
   admin_notes?: string | null;
@@ -77,7 +78,7 @@ export interface WorkspaceDetail extends Workspace {
   allows_pets: boolean;
   website: string | null;
   phone: string | null;
-  laptop_friendly: boolean;
+  laptop_friendly: boolean | null;
   time_limit_hours: number | null;
   minimum_purchase_required: boolean;
   good_for_meetings: boolean;

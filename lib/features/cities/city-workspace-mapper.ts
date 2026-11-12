@@ -17,8 +17,8 @@ export function mapCityWorkspaceRow(row: CityWorkspaceRow): Workspace {
 
   return {
     ...workspace,
-    has_wifi: Boolean(row.has_wifi),
-    has_power_outlets: Boolean(row.has_power_outlets),
+    has_wifi: row.has_wifi ?? null,
+    has_power_outlets: row.has_power_outlets ?? null,
     has_coffee: Boolean(row.has_coffee),
     has_food: Boolean(row.has_food),
     has_veg: Boolean(row.has_veg),
@@ -30,7 +30,7 @@ export function mapCityWorkspaceRow(row: CityWorkspaceRow): Workspace {
     has_natural_light: Boolean(row.has_natural_light),
     is_accessible: Boolean(row.is_accessible),
     allows_pets: Boolean(row.allows_pets),
-    laptop_friendly: Boolean(row.laptop_friendly),
+    laptop_friendly: row.laptop_friendly ?? null,
     good_for_calls: Boolean(row.good_for_calls),
     good_for_meetings: Boolean(row.good_for_meetings),
     good_for_groups: Boolean(row.good_for_groups),

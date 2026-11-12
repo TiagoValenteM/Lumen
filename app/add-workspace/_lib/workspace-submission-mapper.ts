@@ -1,11 +1,9 @@
-import { slugify } from "./workspace-submission-repository";
 import type { AddWorkspaceFormData } from "./types";
 
-export function buildWorkspaceSubmissionPayload(formData: AddWorkspaceFormData, cityId: string | null, userId: string) {
+export function buildWorkspaceSubmissionPayload(formData: AddWorkspaceFormData) {
   return {
     name: formData.name,
     type: formData.type,
-    city_id: cityId,
     address: formData.address,
     latitude: formData.latitude,
     longitude: formData.longitude,
@@ -19,9 +17,9 @@ export function buildWorkspaceSubmissionPayload(formData: AddWorkspaceFormData, 
     description: formData.description,
     short_description: formData.short_description,
     has_wifi: formData.has_wifi,
-    wifi_speed: formData.wifi_speed,
+    wifi_speed: formData.has_wifi === true ? formData.wifi_speed || null : null,
     has_power_outlets: formData.has_power_outlets,
-    power_outlet_availability: formData.power_outlet_availability,
+    power_outlet_availability: formData.has_power_outlets === true ? formData.power_outlet_availability || null : null,
     seating_capacity: formData.seating_capacity,
     seating_comfort: formData.seating_comfort,
     has_outdoor_seating: formData.has_outdoor_seating,
@@ -48,8 +46,5 @@ export function buildWorkspaceSubmissionPayload(formData: AddWorkspaceFormData, 
     good_for_calls: formData.good_for_calls,
     good_for_groups: formData.good_for_groups,
     wifi_password_required: false,
-    slug: slugify(formData.name),
-    submitted_by: userId,
-    status: "pending",
   };
 }

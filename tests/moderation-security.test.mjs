@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
@@ -69,10 +70,144 @@ before(async () => {
     "20261112000100_lock_down_moderation_permissions.sql",
     "20261112000200_make_ai_review_atomic.sql",
     "20261112000300_limit_geocoding_requests.sql",
+    "20261112000400_submit_workspace_with_city_proposal.sql",
+    "20261112000500_verify_workspace_work_facts.sql",
   ]) await apply(name);
 });
 
 after(async () => db?.close());
+
+const uploadedPhoto = (owner, file = "test.jpg") =>
+  `https://test.supabase.co/storage/v1/object/public/workspace-photos/${owner}/temp/${file}`;
+const newPlace = (id, city, photos, details = {}) => row(
+  "SELECT public.submit_workspace_with_photos($1, $2, 'Switzerland', $3, $4) AS id",
+  [id, city, JSON.stringify({ name: "First place", latitude: 47, longitude: 8, ...details }), photos],
+);
+
+test("work fact checks require a moderator and saved facts, and expire when the facts change", async () => {
+  const id = randomUUID();
+  const snapshot = {
+    name: "First place", city_id: null, address: null, latitude: 47, longitude: 8,
+    has_wifi: null, has_power_outlets: null, laptop_friendly: null, time_limit_hours: null,
+  };
+  const check = (value) => row("SELECT check_workspace_work_facts($1, $2) AS checked_at", [id, JSON.stringify(value)]);
+  await role("authenticated", member);
+  await newPlace(id, "Work Fact Test City", [uploadedPhoto(member)]);
+  assert.deepEqual(await row("SELECT has_wifi, has_power_outlets, laptop_friendly, time_limit_hours FROM workspaces WHERE id = $1", [id]), {
+    has_wifi: null, has_power_outlets: null, laptop_friendly: null, time_limit_hours: null,
+  });
+  await denied(check(snapshot));
+  await denied(db.query("INSERT INTO workspace_work_fact_checks (workspace_id) VALUES ($1)", [id]));
+
+  await role("authenticated", admin);
+  await denied(check(snapshot), "22023");
+  const published = await row("UPDATE workspaces SET status = 'approved' WHERE id = $1 RETURNING city_id", [id]);
+  snapshot.city_id = published.city_id;
+  await denied(check(snapshot), "22023");
+  await db.query("UPDATE workspaces SET laptop_friendly = true, has_wifi = false, time_limit_hours = 0 WHERE id = $1", [id]);
+  await denied(check(snapshot), "22023");
+  Object.assign(snapshot, { laptop_friendly: true, has_wifi: false, time_limit_hours: 0 });
+  const { checked_at } = await check(snapshot);
+  assert.ok(checked_at);
+  await db.query("UPDATE workspaces SET description = 'Updated copy' WHERE id = $1", [id]);
+
+  await role("anon");
+  assert.deepEqual(await row("SELECT checked_at FROM workspace_work_fact_checks WHERE workspace_id = $1", [id]), { checked_at });
+  await denied(db.query("SELECT checked_by FROM workspace_work_fact_checks WHERE workspace_id = $1", [id]));
+  await role("authenticated", admin);
+  await db.query("UPDATE workspaces SET has_wifi = true WHERE id = $1", [id]);
+  await role("anon");
+  assert.equal(await row("SELECT checked_at FROM workspace_work_fact_checks WHERE workspace_id = $1", [id]), undefined);
+});
+
+test("a member can propose a city, retry without duplicates, and publish only after moderation", async () => {
+  const first = randomUUID();
+  const second = randomUUID();
+  const third = randomUUID();
+  const cityName = "First Place City";
+  const urls = [uploadedPhoto(member), uploadedPhoto(member, "other.jpg")];
+  await role("anon");
+  await denied(newPlace(first, cityName, urls));
+  await role("authenticated", member);
+  await denied(db.query("INSERT INTO cities (name, country, slug) VALUES ($1, 'Switzerland', 'unmoderated')", [cityName]));
+  await denied(newPlace(first, cityName, [uploadedPhoto(anotherMember)]), "22023");
+  await denied(newPlace(first, cityName, urls, { status: "approved" }), "22023");
+  assert.deepEqual(await newPlace(first, cityName, urls), { id: first });
+  assert.deepEqual(await newPlace(first, cityName, urls), { id: first });
+  assert.deepEqual(await newPlace(second, " first place CITY ", [uploadedPhoto(member, "second.jpg")]), { id: second });
+  assert.deepEqual(await row("SELECT city_id, proposed_city_name, status FROM workspaces WHERE id = $1", [first]), {
+    city_id: null, proposed_city_name: cityName, status: "pending",
+  });
+  const photos = await db.query("SELECT url, is_primary, is_approved FROM workspace_photos WHERE workspace_id = $1 ORDER BY is_primary DESC", [first]);
+  assert.deepEqual(photos.rows, [
+    { url: urls[0], is_primary: true, is_approved: false },
+    { url: urls[1], is_primary: false, is_approved: false },
+  ]);
+  const workspaceSlugs = await db.query("SELECT slug FROM workspaces WHERE id IN ($1, $2)", [first, second]);
+  assert.equal(new Set(workspaceSlugs.rows.map(({ slug }) => slug)).size, 2);
+  await denied(db.query("UPDATE workspaces SET status = 'approved' WHERE id = $1", [first]));
+
+  await role("anon");
+  assert.equal(await row("SELECT id FROM cities WHERE name = $1", [cityName]), undefined);
+  assert.equal(await row("SELECT id FROM workspaces WHERE id = $1", [first]), undefined);
+
+  await role("authenticated", admin);
+  await db.query("UPDATE workspaces SET status = 'under_review' WHERE id = $1", [first]);
+  assert.equal(await row("SELECT id FROM cities WHERE name = $1", [cityName]), undefined);
+  await db.query("UPDATE workspaces SET status = 'approved' WHERE id IN ($1, $2)", [first, second]);
+  const city = await row("SELECT id, slug, workspace_count FROM cities WHERE name ILIKE $1", [cityName]);
+  assert.equal(city.slug, "first-place-city-switzerland");
+  assert.equal(city.workspace_count, 2);
+  assert.deepEqual(await row("SELECT city_id, proposed_city_name FROM workspaces WHERE id = $1", [first]), {
+    city_id: city.id, proposed_city_name: null,
+  });
+  await role("authenticated", member);
+  assert.deepEqual(await newPlace(third, cityName, [uploadedPhoto(member, "third.jpg")]), { id: third });
+  assert.deepEqual(await row("SELECT city_id, proposed_city_name FROM workspaces WHERE id = $1", [third]), {
+    city_id: city.id, proposed_city_name: null,
+  });
+});
+
+test("a photo insert failure rolls back the workspace and permits retrying the draft", async () => {
+  const id = randomUUID();
+  const invalid = uploadedPhoto(member, "fail.jpg");
+  await role("postgres");
+  await db.exec("ALTER TABLE workspace_photos ADD CONSTRAINT test_photo_failure CHECK (url NOT LIKE '%/fail.jpg')");
+  try {
+    await role("authenticated", member);
+    await denied(newPlace(id, "Rollback City", [uploadedPhoto(member), invalid]), "23514");
+    assert.equal(await row("SELECT id FROM workspaces WHERE id = $1", [id]), undefined);
+    assert.equal(await row("SELECT id FROM workspace_photos WHERE workspace_id = $1", [id]), undefined);
+    assert.deepEqual(await newPlace(id, "Rollback City", [uploadedPhoto(member)]), { id });
+  } finally {
+    await role("postgres");
+    await db.exec("ALTER TABLE workspace_photos DROP CONSTRAINT test_photo_failure");
+  }
+});
+
+test("saving AI decisions and approving a corrected city proposal share a transaction", async () => {
+  const id = randomUUID();
+  await role("authenticated", member);
+  await newPlace(id, "Original Proposal", [uploadedPhoto(member)]);
+  await role("service_role");
+  const run = await enqueue(id, member);
+  await db.query("UPDATE workspace_ai_enrichments SET status = 'ready_for_review', suggested_fields = '{\"description\":\"Reviewed text\"}' WHERE id = $1", [run.run_id]);
+  await role("authenticated", admin);
+  const save = (paths) => row(
+    "SELECT public.save_workspace_ai_review_with_city_proposal($1, $2, $3, $4, 'Corrected Proposal', 'Switzerland') AS city",
+    [id, run.run_id, JSON.stringify({ description: "Reviewed text", status: "approved", city_id: null }), paths],
+  );
+  await denied(save(["invalid_field"]), "22023");
+  assert.deepEqual(await row("SELECT proposed_city_name, status FROM workspaces WHERE id = $1", [id]), {
+    proposed_city_name: "Original Proposal", status: "pending",
+  });
+  const saved = await save(["description"]);
+  assert.equal(saved.city.slug, "corrected-proposal-switzerland");
+  assert.deepEqual(await row("SELECT description, city_id, proposed_city_name FROM workspaces WHERE id = $1", [id]), {
+    description: "Reviewed text", city_id: saved.city.id, proposed_city_name: null,
+  });
+  assert.equal((await row("SELECT status FROM workspace_ai_enrichments WHERE id = $1", [run.run_id])).status, "applied");
+});
 
 test("normal profile edits work, but members cannot insert or update admin flags", async () => {
   await role("authenticated", member);

@@ -461,10 +461,8 @@ function inferWorkDetailsFromNotes(
 
   for (const note of notes) {
     const text = note.toLowerCase();
-    if (/\bwifi\b|\bwi-fi\b|wireless internet/.test(text)) setInferred("has_wifi", true, note);
-    if (/power outlet|outlets?|plug sockets?|charging/.test(text)) setInferred("has_power_outlets", true, note);
+    // Core work facts require an explicit structured suggestion; a mention can describe a restriction.
     if (/quiet|silent|reading room|study room/.test(text)) setInferred("noise_level", "quiet", note);
-    if (/laptop|study|work-friendly|work friendly|remote work|cowork/.test(text)) setInferred("laptop_friendly", true, note, "low");
     if (/reading room|study room|seating|seats?|tables?|desk/.test(text)) setInferred("seating_comfort", "adequate", note, "low");
     if (/food|drink|beverage/.test(text)) {
       if (/strict|not allowed|no food|no drink|prohibit|restricted/.test(text)) {

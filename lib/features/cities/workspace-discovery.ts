@@ -1,4 +1,5 @@
 import type { Workspace } from "@/lib/types";
+import { isLaptopReadyWorkspace, isLongStayWorkspace } from "../workspaces/work-facts";
 
 export type CityWorkspaceSortMode =
   | "best"
@@ -52,9 +53,8 @@ export function filterAndSortCityWorkspaces({
         const hasSavedFilter = activeFilters.includes("Saved");
         const hasQuiet = activeFilters.includes("Quiet");
         const hasLongStays = activeFilters.includes("Long stays");
-        const hasLaptopReady = activeFilters.includes("Laptop-ready");
         const otherFilters = activeFilters.filter(
-          (filter) => filter !== "Saved" && filter !== "Quiet" && filter !== "Long stays" && filter !== "Laptop-ready"
+          (filter) => filter !== "Saved" && filter !== "Quiet" && filter !== "Long stays"
         );
 
         if (hasSavedFilter && !savedWorkspaceIds.has(workspace.id)) return false;
@@ -62,8 +62,6 @@ export function filterAndSortCityWorkspaces({
         if (hasQuiet && !isQuietWorkspace(workspace)) return false;
 
         if (hasLongStays && !isLongStayWorkspace(workspace)) return false;
-
-        if (hasLaptopReady && !isLaptopReadyWorkspace(workspace)) return false;
 
         return otherFilters.every((filter) => {
           const key = supportedFilters[filter];
@@ -83,7 +81,7 @@ export function getCityWorkspaceCollections(workspaces: Workspace[]): CityWorksp
 
   const collections: CityWorkspaceCollection[] = [
     { label: "Quiet picks", count: quiet.length, action: "filter", value: "Quiet" },
-    { label: "Laptop-ready", count: laptopReady.length, action: "filter", value: "Laptop-ready" },
+    { label: "Laptops welcome", count: laptopReady.length, action: "filter", value: "Laptops welcome" },
     { label: "Long-stay friendly", count: longStay.length, action: "filter", value: "Long stays" },
     { label: "Recently added", count: recentlyAdded.length, action: "sort", value: "newest" },
   ];
@@ -149,15 +147,6 @@ function getQuietScore(workspace: Workspace) {
 function isQuietWorkspace(workspace: Workspace) {
   return workspace.noise_level === "quiet" ||
     (typeof workspace.music_volume === "number" && workspace.music_volume <= 2);
-}
-
-function isLongStayWorkspace(workspace: Workspace) {
-  return workspace.time_limit_hours === null || workspace.time_limit_hours === 0;
-}
-
-function isLaptopReadyWorkspace(workspace: Workspace) {
-  return workspace.laptop_friendly === true ||
-    (workspace.has_wifi === true && workspace.has_power_outlets === true);
 }
 
 function getLaptopReadyScore(workspace: Workspace) {

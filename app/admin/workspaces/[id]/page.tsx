@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils/error";
+import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import {
   Card,
   CardContent,
@@ -36,21 +37,21 @@ import { Label } from "@/components/ui/label";
 import { Eye, Loader2, Shield, ArrowLeft, Save, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AdminWorkDetailsSection } from "./_components/admin-work-details-section";
+import { WorkFactVerification } from "./_components/work-fact-verification";
 import { AiEnrichmentPanel } from "./_components/ai-enrichment-panel";
 import { LocationSection } from "./_components/location-section";
 import { PhotoModeration } from "./_components/photo-moderation";
 import { SuggestionsPanel } from "./_components/suggestions-panel";
+import { saveAdminWorkspace } from "./_lib/save-workspace";
+import { emptyWorkspaceForm, toWorkspaceForm } from "./_lib/workspace-form";
 import {
-  buildWorkspaceUpdatePayload,
   createWorkspacePhoto,
   deleteWorkspace,
   deleteWorkspacePhoto,
   deleteWorkspacePhotoStorageObject,
   isMissingColumnError,
-  resolveWorkspaceCity,
   setWorkspacePrimaryPhoto,
   STATUS_OPTIONS,
-  stripLocationMetadataPayload,
   updateWorkspacePhoto,
   WORKSPACE_TYPE_OPTIONS,
   workspaceSelect,
@@ -85,57 +86,7 @@ export default function AdminWorkspaceDetailPage() {
   const [hasLocationMetadataColumns, setHasLocationMetadataColumns] = useState(true);
   const [workspace, setWorkspace] = useState<WorkspaceDetailMinimal | null>(null);
   const [photos, setPhotos] = useState<WorkspacePhotoRow[]>([]);
-  const [form, setForm] = useState<AdminWorkspaceFormState>({
-    name: "",
-    type: "cafe",
-    short_description: "",
-    description: "",
-    address: "",
-    website: "",
-    phone: "",
-    city_id: null as string | null,
-    city_name: "",
-    country: "",
-    latitude: null as number | null,
-    longitude: null as number | null,
-    location_source: "manual" as "search" | "pin" | "manual",
-    location_provider: null as string | null,
-    location_provider_id: null as string | null,
-    location_confidence: null as number | null,
-    location_raw: null as unknown,
-    rejection_reason: "",
-    admin_notes: "",
-    status: "pending",
-    has_wifi: false,
-    wifi_speed: "",
-    has_power_outlets: false,
-    power_outlet_availability: 0,
-    seating_capacity: 0,
-    seating_comfort: "",
-    has_outdoor_seating: false,
-    has_standing_desks: false,
-    noise_level: "",
-    music_volume: 0,
-    has_natural_light: false,
-    has_air_conditioning: false,
-    has_heating: false,
-    has_restrooms: false,
-    has_parking: false,
-    has_bike_parking: false,
-    is_accessible: false,
-    allows_pets: false,
-    has_food: false,
-    has_veg: false,
-    has_coffee: false,
-    has_alcohol: false,
-    price_range: 0,
-    laptop_friendly: true,
-    time_limit_hours: 0,
-    minimum_purchase_required: false,
-    good_for_meetings: false,
-    good_for_calls: false,
-    good_for_groups: false,
-  });
+  const [form, setForm] = useState<AdminWorkspaceFormState>(emptyWorkspaceForm);
   const [aiEnrichments, setAiEnrichments] = useState<AiEnrichmentRow[]>([]);
   const [runningAiEnrichment, setRunningAiEnrichment] = useState(false);
   const [aiEnrichmentError, setAiEnrichmentError] = useState<string | null>(null);
@@ -199,9 +150,13 @@ export default function AdminWorkspaceDetailPage() {
         return;
       }
       const row = data as unknown as WorkspaceQueryRow;
-      const notes = await supabase.rpc("get_workspace_admin_notes", { workspace_uuid: id });
+      const [notes, proposals] = await Promise.all([
+        supabase.rpc("get_workspace_admin_notes", { workspace_uuid: id }),
+        readWorkspaceCityProposals(supabase, row.city_id ? [] : [id]),
+      ]);
       if (notes.error && notes.error.code !== "PGRST202") throw notes.error;
       const cityField = Array.isArray(row.city) ? row.city[0] ?? null : row.city;
+      const proposal = proposals.get(id) ?? null;
       const mapped: WorkspaceDetailMinimal = {
         ...row,
         id: row.id,
@@ -213,8 +168,9 @@ export default function AdminWorkspaceDetailPage() {
         city_id: row.city_id,
         submitted_by: row.submitted_by ?? null,
         city_slug: cityField?.slug ?? null,
-        city_name: cityField?.name ?? null,
-        country: cityField?.country ?? null,
+        city_proposal: proposal,
+        city_name: cityField?.name ?? proposal?.name ?? null,
+        country: cityField?.country ?? proposal?.country ?? null,
         latitude: row.latitude,
         longitude: row.longitude,
         location_source: includeLocationMetadata ? row.location_source : null,
@@ -226,57 +182,7 @@ export default function AdminWorkspaceDetailPage() {
         admin_notes: notes.error ? row.admin_notes ?? null : notes.data,
       };
       setWorkspace(mapped);
-      setForm({
-        name: mapped.name || "",
-        type: mapped.type || "cafe",
-        short_description: mapped.short_description || "",
-        description: mapped.description || "",
-        address: mapped.address || "",
-        website: mapped.website || "",
-        phone: mapped.phone || "",
-        city_id: mapped.city_id,
-        city_name: mapped.city_name || "",
-        country: mapped.country || "",
-        latitude: mapped.latitude,
-        longitude: mapped.longitude,
-        location_source: mapped.location_source || "manual",
-        location_provider: mapped.location_provider,
-        location_provider_id: mapped.location_provider_id,
-        location_confidence: mapped.location_confidence,
-        location_raw: mapped.location_raw,
-        rejection_reason: mapped.rejection_reason || "",
-        admin_notes: mapped.admin_notes || "",
-        status: mapped.status || "pending",
-        has_wifi: Boolean(mapped.has_wifi),
-        wifi_speed: mapped.wifi_speed || "",
-        has_power_outlets: Boolean(mapped.has_power_outlets),
-        power_outlet_availability: Number(mapped.power_outlet_availability || 0),
-        seating_capacity: Number(mapped.seating_capacity || 0),
-        seating_comfort: mapped.seating_comfort || "",
-        has_outdoor_seating: Boolean(mapped.has_outdoor_seating),
-        has_standing_desks: Boolean(mapped.has_standing_desks),
-        noise_level: mapped.noise_level || "",
-        music_volume: Number(mapped.music_volume || 0),
-        has_natural_light: Boolean(mapped.has_natural_light),
-        has_air_conditioning: Boolean(mapped.has_air_conditioning),
-        has_heating: Boolean(mapped.has_heating),
-        has_restrooms: Boolean(mapped.has_restrooms),
-        has_parking: Boolean(mapped.has_parking),
-        has_bike_parking: Boolean(mapped.has_bike_parking),
-        is_accessible: Boolean(mapped.is_accessible),
-        allows_pets: Boolean(mapped.allows_pets),
-        has_food: Boolean(mapped.has_food),
-        has_veg: Boolean(mapped.has_veg),
-        has_coffee: Boolean(mapped.has_coffee),
-        has_alcohol: Boolean(mapped.has_alcohol),
-        price_range: Number(mapped.price_range || 0),
-        laptop_friendly: mapped.laptop_friendly ?? true,
-        time_limit_hours: Number(mapped.time_limit_hours || 0),
-        minimum_purchase_required: Boolean(mapped.minimum_purchase_required),
-        good_for_meetings: Boolean(mapped.good_for_meetings),
-        good_for_calls: Boolean(mapped.good_for_calls),
-        good_for_groups: Boolean(mapped.good_for_groups),
-      });
+      setForm(toWorkspaceForm(mapped));
       const { data: photoRows, error: photosError } = await supabase
         .from("workspace_photos")
         .select("id, url, caption, is_primary, is_approved")
@@ -383,106 +289,12 @@ export default function AdminWorkspaceDetailPage() {
     }
 
     try {
-      const previousCityId = workspace.city_id;
-      const { cityId, citySlug } = await resolveWorkspaceCity(supabase, form, workspace.city_slug);
-      const updatePayload = buildWorkspaceUpdatePayload(form, cityId, user.id, hasLocationMetadataColumns);
-
-      if (stagedAiReview) {
-        const { error: updateError } = await supabase.rpc("save_workspace_ai_review", {
-          workspace_uuid: workspace.id,
-          enrichment_uuid: stagedAiReview.id,
-          patch: updatePayload,
-          applied_paths: stagedAiReview.paths,
-        });
-        if (updateError) throw new Error(updateError.message);
-      } else {
-        let { error: updateError } = await supabase
-          .from("workspaces")
-          .update(updatePayload)
-          .eq("id", workspace.id)
-          .select("id")
-          .single();
-        if (updateError && hasLocationMetadataColumns && isMissingColumnError(updateError)) {
-          setHasLocationMetadataColumns(false);
-          const fallback = await supabase.from("workspaces")
-            .update(stripLocationMetadataPayload(updatePayload)).eq("id", workspace.id).select("id").single();
-          updateError = fallback.error;
-        }
-        if (updateError) throw new Error(updateError.message);
-      }
-      if (previousCityId && cityId && previousCityId !== cityId) {
-        const { error: cleanupError } = await supabase.rpc("delete_city_if_empty", { city_uuid: previousCityId });
-        if (cleanupError) {
-          console.warn("Workspace moved, but the old empty city could not be cleaned up", cleanupError);
-        }
-      }
-      if (form.status === "approved") {
-        const { error: photoError } = await supabase
-          .from("workspace_photos")
-          .update({ is_approved: true })
-          .eq("workspace_id", workspace.id)
-          .is("reviewed_at", null);
-        if (photoError) {
-          console.warn("Workspace saved, but photos could not be auto-approved", photoError);
-        }
-      }
-      setWorkspace((prev) =>
-        prev
-          ? {
-              ...prev,
-              name: form.name,
-              type: form.type,
-              short_description: form.short_description,
-              description: form.description,
-              address: form.address,
-              website: form.website,
-              phone: form.phone,
-              city_id: cityId,
-              city_slug: citySlug,
-              city_name: form.city_name,
-              country: form.country,
-              latitude: form.latitude,
-              longitude: form.longitude,
-              location_source: form.location_source,
-              location_provider: form.location_provider,
-              location_provider_id: form.location_provider_id,
-              location_confidence: form.location_confidence,
-              location_raw: form.location_raw,
-              rejection_reason: form.rejection_reason,
-              admin_notes: form.admin_notes,
-              status: form.status,
-              has_wifi: form.has_wifi,
-              wifi_speed: form.wifi_speed,
-              has_power_outlets: form.has_power_outlets,
-              power_outlet_availability: form.power_outlet_availability,
-              seating_capacity: form.seating_capacity,
-              seating_comfort: form.seating_comfort,
-              has_outdoor_seating: form.has_outdoor_seating,
-              has_standing_desks: form.has_standing_desks,
-              noise_level: form.noise_level,
-              music_volume: form.music_volume,
-              has_natural_light: form.has_natural_light,
-              has_air_conditioning: form.has_air_conditioning,
-              has_heating: form.has_heating,
-              has_restrooms: form.has_restrooms,
-              has_parking: form.has_parking,
-              has_bike_parking: form.has_bike_parking,
-              is_accessible: form.is_accessible,
-              allows_pets: form.allows_pets,
-              has_food: form.has_food,
-              has_veg: form.has_veg,
-              has_coffee: form.has_coffee,
-              has_alcohol: form.has_alcohol,
-              price_range: form.price_range,
-              laptop_friendly: form.laptop_friendly,
-              time_limit_hours: form.time_limit_hours,
-              minimum_purchase_required: form.minimum_purchase_required,
-              good_for_meetings: form.good_for_meetings,
-              good_for_calls: form.good_for_calls,
-              good_for_groups: form.good_for_groups,
-            }
-          : prev
-      );
+      const saved = await saveAdminWorkspace(supabase, workspace, form, user.id, hasLocationMetadataColumns, stagedAiReview);
+      setHasLocationMetadataColumns(saved.hasLocationMetadataColumns);
+      setWorkspace((prev) => prev ? {
+        ...prev, ...form, city_id: saved.cityId, city_slug: saved.citySlug, city_proposal: saved.proposal,
+      } : prev);
+      setForm((prev) => ({ ...prev, city_id: saved.cityId }));
       if (stagedAiReview) {
         setAiEnrichments((prev) => prev.map((run) => run.id === stagedAiReview.id
           ? { ...run, status: "applied" }
@@ -946,7 +758,9 @@ export default function AdminWorkspaceDetailPage() {
                 {validationError}
               </p>
             )}
-            <AdminWorkDetailsSection form={form} onChange={(updater) => setForm(updater)} />
+            <AdminWorkDetailsSection form={form} onChange={setForm}
+              verification={<WorkFactVerification supabase={supabase} workspace={workspace} form={form}
+                busy={saving || hasStagedAiChanges} />} />
             {hasStagedAiChanges && (
               <p className="rounded-md border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
                 AI suggestions are staged in this form. Save changes before opening the saved preview or public page.
@@ -1215,11 +1029,11 @@ function applyAiFieldPaths(
   return next;
 }
 
-function getBooleanField(fields: Record<string, string | number | boolean | null>, key: string, fallback: boolean) {
+function getBooleanField<T extends boolean | null>(fields: Record<string, string | number | boolean | null>, key: string, fallback: T) {
   return typeof fields[key] === "boolean" ? fields[key] : fallback;
 }
 
-function getNumberField(fields: Record<string, string | number | boolean | null>, key: string, fallback: number) {
+function getNumberField<T extends number | null>(fields: Record<string, string | number | boolean | null>, key: string, fallback: T) {
   return typeof fields[key] === "number" && Number.isFinite(fields[key]) ? fields[key] : fallback;
 }
 

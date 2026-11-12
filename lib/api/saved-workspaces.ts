@@ -43,7 +43,6 @@ export async function saveWorkspace(
 
   if (error) throw error;
 }
-
 export async function unsaveWorkspace(
   userId: string,
   workspaceId: string
@@ -57,20 +56,4 @@ export async function unsaveWorkspace(
     .eq("workspace_id", workspaceId);
 
   if (error) throw error;
-}
-
-export async function getSavedWorkspaces(userId: string): Promise<string[]> {
-  const supabase = createClient();
-
-  const { data, error } = await supabase
-    .from("saved_workspaces")
-    .select("workspace_id")
-    .eq("user_id", userId);
-
-  if (error) {
-    console.error("Error fetching saved workspaces:", error);
-    return [];
-  }
-
-  return data.map((item) => item.workspace_id);
 }

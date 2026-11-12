@@ -16,7 +16,9 @@ import type { City, Workspace } from "@/lib/types";
 import { LocationProvider, useLocation } from "@/contexts/LocationContext";
 import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } from "@/lib/constants/filters";
 import { mapCityWorkspaceRow } from "@/lib/features/cities/city-workspace-mapper";
+import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
+import { workspaceMapStyle } from "@/lib/features/locations/workspace-map-style";
 import {
   filterAndSortCityWorkspaces,
   getCityWorkspaceCollections,
@@ -30,6 +32,7 @@ import {
   Loader2,
   Building2,
   SlidersHorizontal,
+  Compass,
 } from "lucide-react";
 
 type MapInstance = import("maplibre-gl").Map & {
@@ -126,7 +129,8 @@ function CityPageContent() {
         setCity(cityData);
 
         // Fetch workspace card summaries and photos in one query.
-        const { data: workspacesData, error: workspacesError } = await supabase
+        const [{ data: workspacesData, error: workspacesError }, checks] = await Promise.all([
+          supabase
           .from('workspaces')
           .select(`
             id,
@@ -164,10 +168,14 @@ function CityPageContent() {
           `)
           .eq('city_id', cityData.id)
           .eq('status', 'approved')
-          .order('overall_rating', { ascending: false });
+          .order('overall_rating', { ascending: false }),
+          readWorkFactChecks(supabase, { cityId: cityData.id }),
+        ]);
 
         if (workspacesData && !workspacesError) {
-          setWorkspaces(workspacesData.map(mapCityWorkspaceRow));
+          setWorkspaces(workspacesData.map((row) => mapCityWorkspaceRow({
+            ...row, work_facts_checked_at: checks.get(row.id) ?? null,
+          })));
         } else if (workspacesError) {
           console.error("Failed to load city workspaces", workspacesError);
           setWorkspaces([]);
@@ -330,29 +338,7 @@ function CityPageContent() {
         if (!mapInstanceRef.current) {
           mapInstanceRef.current = new maplibregl.Map({
             container: mapContainerRef.current,
-            style: {
-              version: 8,
-              sources: {
-                osm: {
-                  type: "raster",
-                  tiles: [
-                    "https://cartodb-basemaps-a.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-                    "https://cartodb-basemaps-b.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-                    "https://cartodb-basemaps-c.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-                    "https://cartodb-basemaps-d.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png"
-                  ],
-                  tileSize: 256,
-                  attribution: "© OpenStreetMap contributors, © CARTO",
-                },
-              },
-              layers: [
-                {
-                  id: "osm",
-                  type: "raster",
-                  source: "osm",
-                },
-              ],
-            },
+            style: workspaceMapStyle,
             center,
             zoom: 13,
           });
@@ -450,7 +436,12 @@ function CityPageContent() {
             <MapPin className="h-4 w-4" />
             <span>{city.country}</span>
           </div>
-          <h1 className="text-5xl font-bold mb-4">{city.name}</h1>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-5xl font-bold">{city.name}</h1>
+            <Button asChild variant="secondary">
+              <Link href={`/find?city=${encodeURIComponent(city.slug)}`}><Compass aria-hidden="true" /> Find a Spot</Link>
+            </Button>
+          </div>
           {city.description ? (
             <p className="text-xl text-muted-foreground">{city.description}</p>
           ) : (
