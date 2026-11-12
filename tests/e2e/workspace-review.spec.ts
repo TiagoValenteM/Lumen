@@ -91,6 +91,29 @@ test("the first place in a new city stays private until a moderator publishes it
       await expect(publicPage.getByText(suggestion, { exact: true }).first()).toBeVisible();
       await expect(publicPage.getByText(/Known facts checked by a Lumen moderator/)).toBeVisible();
       await expect(publicPage.getByText("Unknown", { exact: true })).toHaveCount(3);
+
+      await publicPage.goto(`/find?city=${citySlug}`);
+      const placeName = `E2E Cafe ${id}`;
+      const matches = publicPage.getByRole("list", { name: "Matching places" });
+      const toCheck = publicPage.getByRole("list", { name: "Places with details to check" });
+      await expect(toCheck.getByRole("link", { name: placeName, exact: true })).toBeVisible();
+      await expect(matches.getByRole("link", { name: placeName, exact: true })).toHaveCount(0);
+
+      await page.getByRole("button", { name: "No limit", exact: true }).click();
+      await page.getByRole("button", { name: "Save changes" }).first().click();
+      const check = page.getByRole("button", { name: "Mark known facts checked" });
+      await expect(check).toBeEnabled();
+      await check.click();
+      await expect(page.getByRole("status").filter({ hasText: /^Checked / })).toBeVisible();
+      await publicPage.reload();
+      await expect(matches.getByRole("link", { name: placeName, exact: true })).toBeVisible();
+
+      const ask = publicPage.getByRole("textbox", { name: "What kind of spot do you need?" });
+      await ask.fill("Work for two hours with Wi-Fi");
+      await ask.press("Enter");
+      await expect(publicPage.getByRole("checkbox", { name: "Wi-Fi", exact: true })).toBeChecked();
+      await expect(toCheck.getByRole("link", { name: placeName, exact: true })).toBeVisible();
+      await expect(matches.getByRole("link", { name: placeName, exact: true })).toHaveCount(0);
     } finally {
       await visitor.close();
     }
