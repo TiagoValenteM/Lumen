@@ -107,9 +107,13 @@ export default function AddWorkspacePage() {
     setSubmitting(true);
     try {
       const { workspaceId, citySlug } = await submitWorkspace(supabase, formData, uploadedPhotos, user.id);
-      void fetch(`/api/workspaces/${workspaceId}/enrich`, { method: "POST", keepalive: true }).catch((enrichmentError) => {
-        console.warn("Workspace submitted, but AI enrichment could not be queued", enrichmentError);
-      });
+      void fetch(`/api/workspaces/${workspaceId}/enrich`, { method: "POST", keepalive: true })
+        .then((response) => {
+          if (!response.ok) console.warn("Workspace submitted, but AI enrichment could not be queued", response.status);
+        })
+        .catch((enrichmentError) => {
+          console.warn("Workspace submitted, but AI enrichment could not be queued", enrichmentError);
+        });
       clearDraft();
       resetForm();
       setAttemptedSteps(new Set());

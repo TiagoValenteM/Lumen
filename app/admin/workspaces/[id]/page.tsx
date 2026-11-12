@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/utils/error";
 import {
   Card,
   CardContent,
@@ -57,11 +58,16 @@ import {
 import type {
   AdminWorkspaceFormState,
   AiEnrichmentRow,
+  AiRunMode,
   EditSuggestionRow,
   WorkspaceDetailMinimal,
   WorkspacePhotoRow,
   WorkspaceQueryRow,
 } from "./_lib/types";
+
+const AI_ACTIVE_STATUSES = new Set(["queued", "researching", "extracting", "pending"]);
+const AI_REVIEWABLE_STATUSES = new Set(["ready_for_review", "completed"]);
+const AI_ENRICHMENT_SELECT = "id, created_at, updated_at, status, provider, model, run_mode, suggested_fields, field_evidence, unknown_fields, field_decisions, run_metadata, field_sources, citations, error_message";
 
 export default function AdminWorkspaceDetailPage() {
   const { user } = useAuth();
@@ -134,7 +140,8 @@ export default function AdminWorkspaceDetailPage() {
   const [runningAiEnrichment, setRunningAiEnrichment] = useState(false);
   const [aiEnrichmentError, setAiEnrichmentError] = useState<string | null>(null);
   const [aiStagedMessage, setAiStagedMessage] = useState<string | null>(null);
-  const [stagedAiEnrichmentId, setStagedAiEnrichmentId] = useState<string | null>(null);
+  const [stagedAiReview, setStagedAiReview] = useState<{ id: string; paths: string[] } | null>(null);
+  const [rejectingAiFields, setRejectingAiFields] = useState(false);
   const [discardingAiEnrichment, setDiscardingAiEnrichment] = useState(false);
   const hasStagedAiChanges = Boolean(aiStagedMessage);
   const [suggestions, setSuggestions] = useState<EditSuggestionRow[]>([]);
@@ -147,6 +154,7 @@ export default function AdminWorkspaceDetailPage() {
   const statusBadge = useMemo(() => workspace?.status || "pending", [workspace]);
   const approvalNeedsLocation = form.status === "approved" && (form.latitude === null || form.longitude === null);
   const latestAiStatus = aiEnrichments[0]?.status;
+  const latestAiUpdate = aiEnrichments[0]?.updated_at ?? aiEnrichments[0]?.created_at;
 
   const loadProfile = useCallback(async () => {
     if (!user) {
@@ -154,15 +162,10 @@ export default function AdminWorkspaceDetailPage() {
       return;
     }
     setLoadingProfile(true);
-    const { data, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
+    const { data, error: profileError } = await supabase.rpc("is_admin");
+    setIsAdmin(data === true);
     if (profileError) {
       console.error("Failed to load profile", profileError);
-    } else {
-      setIsAdmin(Boolean(data?.is_admin));
     }
     setLoadingProfile(false);
   }, [supabase, user]);
@@ -196,6 +199,8 @@ export default function AdminWorkspaceDetailPage() {
         return;
       }
       const row = data as unknown as WorkspaceQueryRow;
+      const notes = await supabase.rpc("get_workspace_admin_notes", { workspace_uuid: id });
+      if (notes.error && notes.error.code !== "PGRST202") throw notes.error;
       const cityField = Array.isArray(row.city) ? row.city[0] ?? null : row.city;
       const mapped: WorkspaceDetailMinimal = {
         ...row,
@@ -218,7 +223,7 @@ export default function AdminWorkspaceDetailPage() {
         location_confidence: includeLocationMetadata ? row.location_confidence : null,
         location_raw: includeLocationMetadata ? row.location_raw : null,
         rejection_reason: includeLocationMetadata ? row.rejection_reason : null,
-        admin_notes: includeLocationMetadata ? row.admin_notes : null,
+        admin_notes: notes.error ? row.admin_notes ?? null : notes.data,
       };
       setWorkspace(mapped);
       setForm({
@@ -282,7 +287,7 @@ export default function AdminWorkspaceDetailPage() {
 
       const { data: suggestionRows, error: suggestionsError } = await supabase
         .from("workspace_edit_suggestions")
-        .select("id, created_at, kind, message, status, admin_notes")
+        .select("id, created_at, kind, message, status")
         .eq("workspace_id", row.id)
         .order("created_at", { ascending: false });
       if (!suggestionsError) {
@@ -293,7 +298,7 @@ export default function AdminWorkspaceDetailPage() {
 
       const { data: enrichmentRows, error: enrichmentError } = await supabase
         .from("workspace_ai_enrichments")
-        .select("id, created_at, status, provider, model, suggested_fields, field_sources, citations, error_message")
+        .select(AI_ENRICHMENT_SELECT)
         .eq("workspace_id", row.id)
         .order("created_at", { ascending: false });
       if (!enrichmentError) {
@@ -302,7 +307,7 @@ export default function AdminWorkspaceDetailPage() {
         console.warn("Could not load AI enrichment", enrichmentError);
       }
       setAiStagedMessage(null);
-      setStagedAiEnrichmentId(null);
+      setStagedAiReview(null);
     } catch (err) {
       console.error("Failed to load workspace", err);
       setError("Could not load workspace. Please try again.");
@@ -315,7 +320,7 @@ export default function AdminWorkspaceDetailPage() {
     async (workspaceId: string) => {
       const { data, error: enrichmentError } = await supabase
         .from("workspace_ai_enrichments")
-        .select("id, created_at, status, provider, model, suggested_fields, field_sources, citations, error_message")
+        .select(AI_ENRICHMENT_SELECT)
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
 
@@ -346,22 +351,28 @@ export default function AdminWorkspaceDetailPage() {
   }, [isAdmin, loadWorkspace]);
 
   useEffect(() => {
-    if (!workspace?.id || latestAiStatus !== "pending") return;
+    if (!workspace?.id || !AI_ACTIVE_STATUSES.has(String(latestAiStatus))) return;
 
-    const initialTimer = window.setTimeout(() => {
-      void refreshAiEnrichments(workspace.id);
-    }, 0);
-    const timer = window.setInterval(() => {
-      void refreshAiEnrichments(workspace.id);
-    }, 4000);
+    const workspaceId = workspace.id;
+    let cancelled = false;
+    let timer: number | undefined;
+    async function poll() {
+      if (latestAiUpdate && Date.now() - Date.parse(latestAiUpdate) >= 180_000) {
+        await fetch(`/api/workspaces/${workspaceId}/enrich`, { cache: "no-store" }).catch(() => null);
+      }
+      if (cancelled) return;
+      await refreshAiEnrichments(workspaceId);
+      if (!cancelled) timer = window.setTimeout(poll, 4000);
+    }
+    timer = window.setTimeout(poll, 0);
     return () => {
-      window.clearTimeout(initialTimer);
-      window.clearInterval(timer);
+      cancelled = true;
+      window.clearTimeout(timer);
     };
-  }, [latestAiStatus, refreshAiEnrichments, workspace?.id]);
+  }, [latestAiStatus, latestAiUpdate, refreshAiEnrichments, workspace?.id]);
 
   const handleSave = async () => {
-    if (!user || !isAdmin || !workspace) return;
+    if (!user || !isAdmin || !workspace || saving || rejectingAiFields || discardingAiEnrichment) return;
     setSaving(true);
     setError(null);
     setValidationError(null);
@@ -376,17 +387,29 @@ export default function AdminWorkspaceDetailPage() {
       const { cityId, citySlug } = await resolveWorkspaceCity(supabase, form, workspace.city_slug);
       const updatePayload = buildWorkspaceUpdatePayload(form, cityId, user.id, hasLocationMetadataColumns);
 
-      let { error: updateError } = await supabase
-        .from("workspaces")
-        .update(updatePayload)
-        .eq("id", workspace.id);
-      if (updateError && hasLocationMetadataColumns && isMissingColumnError(updateError)) {
-        setHasLocationMetadataColumns(false);
-        const fallbackPayload = stripLocationMetadataPayload(updatePayload);
-        const fallback = await supabase.from("workspaces").update(fallbackPayload).eq("id", workspace.id);
-        updateError = fallback.error;
+      if (stagedAiReview) {
+        const { error: updateError } = await supabase.rpc("save_workspace_ai_review", {
+          workspace_uuid: workspace.id,
+          enrichment_uuid: stagedAiReview.id,
+          patch: updatePayload,
+          applied_paths: stagedAiReview.paths,
+        });
+        if (updateError) throw new Error(updateError.message);
+      } else {
+        let { error: updateError } = await supabase
+          .from("workspaces")
+          .update(updatePayload)
+          .eq("id", workspace.id)
+          .select("id")
+          .single();
+        if (updateError && hasLocationMetadataColumns && isMissingColumnError(updateError)) {
+          setHasLocationMetadataColumns(false);
+          const fallback = await supabase.from("workspaces")
+            .update(stripLocationMetadataPayload(updatePayload)).eq("id", workspace.id).select("id").single();
+          updateError = fallback.error;
+        }
+        if (updateError) throw new Error(updateError.message);
       }
-      if (updateError) throw updateError;
       if (previousCityId && cityId && previousCityId !== cityId) {
         const { error: cleanupError } = await supabase.rpc("delete_city_if_empty", { city_uuid: previousCityId });
         if (cleanupError) {
@@ -397,7 +420,8 @@ export default function AdminWorkspaceDetailPage() {
         const { error: photoError } = await supabase
           .from("workspace_photos")
           .update({ is_approved: true })
-          .eq("workspace_id", workspace.id);
+          .eq("workspace_id", workspace.id)
+          .is("reviewed_at", null);
         if (photoError) {
           console.warn("Workspace saved, but photos could not be auto-approved", photoError);
         }
@@ -459,15 +483,17 @@ export default function AdminWorkspaceDetailPage() {
             }
           : prev
       );
-      if (stagedAiEnrichmentId) {
-        await markAiEnrichmentApplied(stagedAiEnrichmentId);
+      if (stagedAiReview) {
+        setAiEnrichments((prev) => prev.map((run) => run.id === stagedAiReview.id
+          ? { ...run, status: "applied" }
+          : run));
       }
       setAiStagedMessage(null);
-      setStagedAiEnrichmentId(null);
+      setStagedAiReview(null);
       router.refresh();
     } catch (err) {
       console.error("Failed to save workspace", err);
-      setError(err instanceof Error ? err.message : "Could not save changes. Please try again.");
+      setError(getErrorMessage(err, "Could not save changes. Please try again."));
     } finally {
       setSaving(false);
     }
@@ -561,15 +587,15 @@ export default function AdminWorkspaceDetailPage() {
     }
   };
 
-  const runAiEnrichment = async () => {
-    if (!workspace) return;
+  const runAiEnrichment = async (mode: AiRunMode = "full") => {
+    if (!workspace || runningAiEnrichment || stagedAiReview || AI_ACTIVE_STATUSES.has(String(latestAiStatus))) return;
     setRunningAiEnrichment(true);
     setAiEnrichmentError(null);
     try {
       const response = await fetch(`/api/workspaces/${workspace.id}/enrich`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ force: true }),
+        body: JSON.stringify({ force: true, mode }),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || result?.ok === false || result?.skipped) {
@@ -614,102 +640,47 @@ export default function AdminWorkspaceDetailPage() {
     }
   };
 
-  const applyAiCoreFields = (fields: NonNullable<AiEnrichmentRow["suggested_fields"]>["core_details"]) => {
-    if (!fields) return;
-    const hasCoordinates = typeof fields.latitude === "number" && typeof fields.longitude === "number";
-    setForm((prev) => ({
-      ...prev,
-      name: fields.name || prev.name,
-      type: fields.type || prev.type,
-      address: fields.address || prev.address,
-      city_name: fields.city || prev.city_name,
-      country: fields.country || prev.country,
-      latitude: typeof fields.latitude === "number" ? fields.latitude : prev.latitude,
-      longitude: typeof fields.longitude === "number" ? fields.longitude : prev.longitude,
-      location_source: hasCoordinates ? "search" : prev.location_source,
-      location_provider: hasCoordinates ? "ai_enrichment" : prev.location_provider,
-      location_confidence: hasCoordinates ? 0.7 : prev.location_confidence,
-    }));
-    setAiStagedMessage("AI core details were copied into the form. Review name, type, address, city, and map location, then click Save changes.");
-    stageLatestAiEnrichment();
-  };
-
-  const applyAiTextFields = (fields: NonNullable<AiEnrichmentRow["suggested_fields"]>) => {
-    setForm((prev) => ({
-      ...prev,
-      short_description: fields.short_description || prev.short_description,
-      description: mergePublicAiDescription(fields.description || prev.description, fields),
-      website: fields.website || prev.website,
-      phone: fields.phone || prev.phone,
-      admin_notes: appendAiContextNotes(prev.admin_notes, fields),
-    }));
-    setAiStagedMessage("AI text fields were copied into the form. Review them, then click Save changes before opening preview or public view.");
-    stageLatestAiEnrichment();
-  };
-
-  const applyAiDetailsFields = (fields: Record<string, string | number | boolean | null>) => {
-    setForm((prev) => applyAiWorkDetails(prev, fields));
-    setAiStagedMessage("AI work details were copied into the form. Review them, then click Save changes before opening preview or public view.");
-    stageLatestAiEnrichment();
-  };
-
-  const applyAllAiFields = (fields: NonNullable<AiEnrichmentRow["suggested_fields"]>) => {
-    setForm((prev) => {
-      const hasCoordinates =
-        typeof fields.core_details?.latitude === "number" && typeof fields.core_details?.longitude === "number";
-      const withText = {
-        ...prev,
-        name: fields.core_details?.name || prev.name,
-        type: fields.core_details?.type || prev.type,
-        address: fields.core_details?.address || prev.address,
-        city_name: fields.core_details?.city || prev.city_name,
-        country: fields.core_details?.country || prev.country,
-        latitude: typeof fields.core_details?.latitude === "number" ? fields.core_details.latitude : prev.latitude,
-        longitude: typeof fields.core_details?.longitude === "number" ? fields.core_details.longitude : prev.longitude,
-        location_source: hasCoordinates ? "search" as const : prev.location_source,
-        location_provider: hasCoordinates ? "ai_enrichment" : prev.location_provider,
-        location_confidence: hasCoordinates ? 0.7 : prev.location_confidence,
-        short_description: fields.short_description || prev.short_description,
-        description: mergePublicAiDescription(fields.description || prev.description, fields),
-        website: fields.website || prev.website,
-        phone: fields.phone || prev.phone,
-        admin_notes: appendAiContextNotes(prev.admin_notes, fields),
-      };
-      return fields.work_details ? applyAiWorkDetails(withText, fields.work_details) : withText;
-    });
-    setAiStagedMessage("All AI suggestions were copied into the form. Review every field, then click Save changes before opening preview or public view.");
-    stageLatestAiEnrichment();
-  };
-
-  const stageLatestAiEnrichment = () => {
+  const applySelectedAiFields = (
+    fields: NonNullable<AiEnrichmentRow["suggested_fields"]>,
+    fieldPaths: string[],
+  ) => {
     const latest = aiEnrichments[0];
-    if (!latest || latest.status !== "completed") return;
-    setStagedAiEnrichmentId(latest.id);
+    if (!latest || !AI_REVIEWABLE_STATUSES.has(String(latest.status)) || saving || rejectingAiFields || discardingAiEnrichment) return;
+    if (stagedAiReview && stagedAiReview.id !== latest.id) return;
+    const newPaths = fieldPaths.filter((path) => !stagedAiReview?.paths.includes(path));
+    if (!newPaths.length) return;
+    const paths = [...(stagedAiReview?.paths ?? []), ...newPaths];
+    setForm((prev) => applyAiFieldPaths(prev, fields, newPaths));
+    setStagedAiReview({ id: latest.id, paths });
+    setAiStagedMessage(`${paths.length} AI suggestion${paths.length === 1 ? " is" : "s are"} staged. Save changes to update the preview.`);
   };
 
-  const markAiEnrichmentApplied = async (enrichmentId: string) => {
-    if (!workspace) return;
+  const rejectAiFields = async (fieldPaths: string[]) => {
+    const latest = aiEnrichments[0];
+    if (!workspace || !latest || !fieldPaths.length || rejectingAiFields || saving || discardingAiEnrichment) return;
+    setRejectingAiFields(true);
+    setAiEnrichmentError(null);
     try {
-      const response = await fetch(`/api/workspaces/${workspace.id}/enrich/${enrichmentId}`, {
+      const response = await fetch(`/api/workspaces/${workspace.id}/enrich/${latest.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "applied" }),
+        body: JSON.stringify({ field_decisions: Object.fromEntries(fieldPaths.map((path) => [path, "rejected"])) }),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || result?.ok === false) {
-        throw new Error(result?.error || "Could not mark AI suggestions as applied.");
+        throw new Error(result?.error || "Could not save AI review decisions.");
       }
-      setAiEnrichments((prev) =>
-        prev.map((enrichment) => (enrichment.id === enrichmentId ? { ...enrichment, status: "applied" } : enrichment)),
-      );
+      await refreshAiEnrichments(workspace.id);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not mark AI suggestions as applied.";
+      const message = err instanceof Error ? err.message : "Could not save AI review decisions.";
       setAiEnrichmentError(message);
+    } finally {
+      setRejectingAiFields(false);
     }
   };
 
   const discardAiEnrichment = async (enrichmentId: string) => {
-    if (!workspace) return;
+    if (!workspace || stagedAiReview || saving || rejectingAiFields || discardingAiEnrichment) return;
     setDiscardingAiEnrichment(true);
     setAiEnrichmentError(null);
     try {
@@ -722,9 +693,7 @@ export default function AdminWorkspaceDetailPage() {
       if (!response.ok || result?.ok === false) {
         throw new Error(result?.error || "Could not discard AI suggestions.");
       }
-      setAiStagedMessage(null);
-      setStagedAiEnrichmentId(null);
-      await loadWorkspace();
+      await refreshAiEnrichments(workspace.id);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Could not discard AI suggestions.";
       setAiEnrichmentError(message);
@@ -811,7 +780,7 @@ export default function AdminWorkspaceDetailPage() {
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || rejectingAiFields || discardingAiEnrichment}
               className="inline-flex items-center gap-2"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -837,16 +806,17 @@ export default function AdminWorkspaceDetailPage() {
           <CardContent className="px-5">
             <AiEnrichmentPanel
               enrichments={aiEnrichments}
+              currentValues={form}
               running={runningAiEnrichment}
               runError={aiEnrichmentError}
-              onApplyCore={applyAiCoreFields}
-              onApplyText={applyAiTextFields}
-              onApplyWorkDetails={applyAiDetailsFields}
-              onApplyAll={applyAllAiFields}
+              onApplySelected={applySelectedAiFields}
+              onRejectSelected={rejectAiFields}
               onDiscard={discardAiEnrichment}
               discarding={discardingAiEnrichment}
               onRun={runAiEnrichment}
               stagedMessage={aiStagedMessage}
+              stagedPaths={stagedAiReview?.paths ?? []}
+              reviewBusy={saving || rejectingAiFields || discardingAiEnrichment}
             />
           </CardContent>
         </Card>
@@ -902,7 +872,7 @@ export default function AdminWorkspaceDetailPage() {
                     if (val !== "approved") setValidationError(null);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Workspace status">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1013,7 +983,7 @@ export default function AdminWorkspaceDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || rejectingAiFields || discardingAiEnrichment}
                 className="inline-flex items-center gap-2"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -1168,6 +1138,83 @@ function applyAiWorkDetails(
   };
 }
 
+function applyAiFieldPaths(
+  form: AdminWorkspaceFormState,
+  fields: NonNullable<AiEnrichmentRow["suggested_fields"]>,
+  fieldPaths: string[],
+): AdminWorkspaceFormState {
+  const selected = new Set(fieldPaths);
+  const next = { ...form };
+  const core = fields.core_details;
+
+  if (core) {
+    if (selected.has("core_details.name") && core.name) next.name = core.name;
+    if (selected.has("core_details.type") && core.type) next.type = core.type;
+    if (selected.has("core_details.address") && core.address) next.address = core.address;
+    if (selected.has("core_details.city") && core.city) next.city_name = core.city;
+    if (selected.has("core_details.country") && core.country) next.country = core.country;
+    if (selected.has("core_details.latitude") && typeof core.latitude === "number") next.latitude = core.latitude;
+    if (selected.has("core_details.longitude") && typeof core.longitude === "number") next.longitude = core.longitude;
+
+    const hasSelectedCoordinates =
+      selected.has("core_details.latitude") &&
+      selected.has("core_details.longitude") &&
+      typeof core.latitude === "number" &&
+      typeof core.longitude === "number";
+    if (hasSelectedCoordinates) {
+      next.location_source = "search";
+      next.location_provider = "ai_enrichment";
+      next.location_confidence = 0.7;
+    }
+  }
+
+  if (selected.has("short_description") && fields.short_description) {
+    next.short_description = fields.short_description;
+  }
+  if (selected.has("description") && fields.description) {
+    next.description = fields.description;
+  }
+  if (selected.has("website") && fields.website) {
+    next.website = fields.website;
+  }
+  if (selected.has("phone") && fields.phone) {
+    next.phone = fields.phone;
+  }
+
+  const selectedContextFields = {
+    opening_hours_note: selected.has("opening_hours_note") ? fields.opening_hours_note : null,
+    work_notes: (fields.work_notes || []).filter((_, index) => selected.has(`work_notes.${index}`)),
+    review_insights: fields.review_insights
+      ? {
+          summary: selected.has("review_insights.summary") ? fields.review_insights.summary : null,
+          positives: null,
+          cautions: null,
+          remote_work_signal: selected.has("review_insights.remote_work_signal")
+            ? fields.review_insights.remote_work_signal
+            : null,
+        }
+      : null,
+  };
+  if (
+    selectedContextFields.opening_hours_note ||
+    selectedContextFields.work_notes.length > 0 ||
+    selectedContextFields.review_insights?.summary ||
+    selectedContextFields.review_insights?.remote_work_signal
+  ) {
+    next.description = mergePublicAiDescription(next.description, selectedContextFields);
+    next.admin_notes = appendAiContextNotes(next.admin_notes, selectedContextFields);
+  }
+
+  const selectedWorkDetails = Object.fromEntries(
+    Object.entries(fields.work_details || {}).filter(([key]) => selected.has(`work_details.${key}`)),
+  ) as Record<string, string | number | boolean | null>;
+  if (Object.keys(selectedWorkDetails).length > 0) {
+    return applyAiWorkDetails(next, selectedWorkDetails);
+  }
+
+  return next;
+}
+
 function getBooleanField(fields: Record<string, string | number | boolean | null>, key: string, fallback: boolean) {
   return typeof fields[key] === "boolean" ? fields[key] : fallback;
 }
@@ -1186,7 +1233,12 @@ function appendAdminNote(existing: string, note: string) {
   return `${existing.trim()}\n\n${note}`;
 }
 
-function appendAiContextNotes(existing: string, fields: NonNullable<AiEnrichmentRow["suggested_fields"]>) {
+type AiContextFields = Pick<
+  NonNullable<AiEnrichmentRow["suggested_fields"]>,
+  "opening_hours_note" | "review_insights" | "work_notes"
+>;
+
+function appendAiContextNotes(existing: string, fields: Partial<AiContextFields>) {
   let notes = existing;
   if (fields.opening_hours_note) {
     notes = appendAdminNote(notes, `AI opening hours note: ${fields.opening_hours_note}`);
@@ -1202,7 +1254,7 @@ function appendAiContextNotes(existing: string, fields: NonNullable<AiEnrichment
 
 function mergePublicAiDescription(
   baseDescription: string,
-  fields: NonNullable<AiEnrichmentRow["suggested_fields"]>,
+  fields: Partial<AiContextFields>,
 ) {
   const reviewSummary = fields.review_insights?.summary?.trim();
   const remoteWorkSignal = fields.review_insights?.remote_work_signal?.trim();

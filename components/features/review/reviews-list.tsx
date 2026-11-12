@@ -15,7 +15,7 @@ export function ReviewsList({ reviews, profilesById }: ReviewsListProps) {
         const profile = profilesById[review.user_id];
         const tag =
           profile?.tag ||
-          profile?.email?.split("@")[0] ||
+          profile?.first_name ||
           review.user_id?.slice(0, 6) ||
           "user";
         const initials = getInitials(tag);

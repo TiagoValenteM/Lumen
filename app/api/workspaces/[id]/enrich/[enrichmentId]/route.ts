@@ -9,33 +9,38 @@ function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
 
+function normalizeFieldDecisions(value: unknown) {
+  if (value === undefined) return {};
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const entries = Object.entries(value);
+  if (entries.length > 100 || entries.some(([path, decision]) => !path || path.length > 100 || decision !== "rejected")) {
+    return null;
+  }
+  return Object.fromEntries(entries);
+}
+
 export async function PATCH(request: Request, context: RouteContext) {
   const { id, enrichmentId } = await context.params;
   const supabase = await createClient();
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData.user) return json({ error: "Unauthorized" }, 401);
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("is_admin")
-    .eq("id", authData.user.id)
-    .maybeSingle();
-  if (!profile?.is_admin) return json({ error: "Forbidden" }, 403);
-
   const body = await request.json().catch(() => null);
-  if (body?.status !== "dismissed" && body?.status !== "applied") {
-    return json({ error: "Unsupported enrichment status" }, 400);
+  const dismiss = body?.status === "dismissed";
+  const decisions = normalizeFieldDecisions(body?.field_decisions);
+  if (!decisions || (body?.status !== undefined && !dismiss) || (!dismiss && !Object.keys(decisions).length)) {
+    return json({ error: "Unsupported enrichment update" }, 400);
   }
 
-  const { error } = await supabase
-    .from("workspace_ai_enrichments")
-    .update({
-      status: body.status,
-      error_message: null,
-    })
-    .eq("id", enrichmentId)
-    .eq("workspace_id", id);
-
-  if (error) return json({ error: error.message }, 500);
+  const { error } = await supabase.rpc("review_workspace_ai_run", {
+    workspace_uuid: id, enrichment_uuid: enrichmentId, decisions, dismiss,
+  });
+  if (error) {
+    if (error.code === "42501") return json({ error: "Forbidden" }, 403);
+    if (error.code === "P0002") return json({ error: "AI enrichment run not found." }, 404);
+    if (error.code === "22023") return json({ error: error.message }, 409);
+    console.error("Could not update AI review", { id, enrichmentId, code: error.code });
+    return json({ error: "Could not update AI review." }, 500);
+  }
   return json({ ok: true });
 }

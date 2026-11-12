@@ -7,7 +7,7 @@ export async function getProfile(userId: string): Promise<ProfileSummary | null>
   
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, first_name, last_name, avatar_url, email, tag")
+    .select("id, first_name, last_name, avatar_url, tag")
     .eq("id", userId)
     .single();
 
@@ -26,7 +26,7 @@ export async function getProfile(userId: string): Promise<ProfileSummary | null>
 
 export async function updateProfile(
   userId: string,
-  updates: Partial<ProfileSummary>
+  updates: Partial<Pick<ProfileSummary, "first_name" | "last_name" | "avatar_url" | "tag">>
 ) {
   const supabase = createClient();
   

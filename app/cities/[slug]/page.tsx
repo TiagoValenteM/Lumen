@@ -16,6 +16,7 @@ import type { City, Workspace } from "@/lib/types";
 import { LocationProvider, useLocation } from "@/contexts/LocationContext";
 import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } from "@/lib/constants/filters";
 import { mapCityWorkspaceRow } from "@/lib/features/cities/city-workspace-mapper";
+import { importMapLibre } from "@/lib/features/locations/load-maplibre";
 import {
   filterAndSortCityWorkspaces,
   getCityWorkspaceCollections,
@@ -308,7 +309,7 @@ function CityPageContent() {
         document.head.appendChild(style);
       }
 
-      return await import("maplibre-gl");
+      return await importMapLibre();
     }
 
     loadMapLibre()
@@ -354,7 +355,6 @@ function CityPageContent() {
             },
             center,
             zoom: 13,
-            attributionControl: true,
           });
         }
 
@@ -375,15 +375,13 @@ function CityPageContent() {
           markerEl.className = "map-marker";
           markerEl.style.setProperty("--marker-color", primaryColor || "#0ea5e9");
 
-          const popupHtml = `
-            <a href="/cities/${city.slug}/${workspace.slug}">
-              ${workspace.name}
-            </a>
-          `;
+          const popupLink = document.createElement("a");
+          popupLink.href = `/cities/${encodeURIComponent(city.slug)}/${encodeURIComponent(workspace.slug)}`;
+          popupLink.textContent = workspace.name;
 
           const marker = new maplibregl.Marker({ element: markerEl })
             .setLngLat(coords)
-            .setPopup(new maplibregl.Popup({ offset: 12 }).setHTML(popupHtml))
+            .setPopup(new maplibregl.Popup({ offset: 12 }).setDOMContent(popupLink))
             .addTo(mapInstance);
           mapInstance._markers = mapInstance._markers ?? [];
           mapInstance._markers.push(marker);
@@ -398,9 +396,7 @@ function CityPageContent() {
         }
 
         // Ensure map renders correctly after being toggled visible
-        if ((mapInstance as unknown as { resize?: () => void }).resize) {
-          (mapInstance as unknown as { resize: () => void }).resize();
-        }
+        mapInstance.resize();
       })
       .catch((err) => console.error("Failed to load map", err));
 

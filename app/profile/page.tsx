@@ -114,14 +114,20 @@ function ProfilePageContent() {
       // Load profile data
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, tag, avatar_url, bio, created_at")
+        .select("id, first_name, last_name, tag, avatar_url, bio, created_at")
         .eq("id", user?.id)
         .maybeSingle();
 
       if (error) {
         console.error("Failed to fetch profile", error);
-      } else if (data) {
-        setProfile(data as Profile);
+      } else if (user) {
+        setProfile({
+          id: user.id,
+          first_name: user.user_metadata?.first_name ?? null,
+          last_name: user.user_metadata?.last_name ?? null,
+          ...data,
+          email: user.email ?? null,
+        } as Profile);
         
         // Load saved workspaces count
         const { count: savedWorkspacesCount } = await supabase

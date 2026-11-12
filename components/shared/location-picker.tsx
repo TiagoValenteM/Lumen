@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Map, Marker } from "maplibre-gl";
+import type { Map, Marker, StyleSpecification } from "maplibre-gl";
 import { CheckCircle2, Crosshair, Loader2, Pencil, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { importMapLibre } from "@/lib/features/locations/load-maplibre";
 
 export type LocationValue = {
   latitude: number | null;
@@ -39,7 +40,7 @@ type LocationPickerProps = {
   onChange: (value: LocationValue) => void;
 };
 
-const mapStyle = {
+const mapStyle: StyleSpecification = {
   version: 8,
   sources: {
     carto: {
@@ -55,7 +56,7 @@ const mapStyle = {
     },
   },
   layers: [{ id: "carto", type: "raster", source: "carto" }],
-} as const;
+};
 
 export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
@@ -123,6 +124,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       setReverseSearching(true);
       const response = await fetch(`/api/geocode/reverse?lat=${latitude}&lng=${longitude}`);
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Address lookup failed.");
       updateLocation({
         latitude,
         longitude,
@@ -135,15 +137,17 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         confidence: data.confidence ?? null,
         raw: data.raw ?? null,
       });
-    } catch {
-      setError("The pin was saved, but address lookup failed. You can edit the address manually.");
+    } catch (error) {
+      setError(error instanceof Error && error.message
+        ? `Pin saved. ${error.message}`
+        : "The pin was saved, but address lookup failed. You can edit the address manually.");
     } finally {
       setReverseSearching(false);
     }
   };
 
   const setMarker = async (latitude: number, longitude: number, zoom = 16) => {
-    const maplibregl = await import("maplibre-gl");
+    const maplibregl = await importMapLibre();
     const map = mapRef.current;
     if (!map) return;
 
@@ -240,7 +244,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     let cancelled = false;
     async function setupMap() {
       if (!shouldShowMap || !mapContainerRef.current || mapRef.current) return;
-      const maplibregl = await import("maplibre-gl");
+      const maplibregl = await importMapLibre();
       if (cancelled || !mapContainerRef.current) return;
 
       const center: [number, number] =

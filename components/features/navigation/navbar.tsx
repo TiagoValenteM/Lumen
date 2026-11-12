@@ -23,14 +23,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDisplayName, getInitials } from "@/lib/utils";
 
 export default function NavBar() {
-  const { user, profile, signOut } = useAuth();
-  const isAdmin = Boolean(profile?.is_admin);
+  const { user, profile, isAdmin, signOut } = useAuth();
 
   const displayName = getDisplayName(
     profile?.first_name,
     profile?.last_name,
     profile?.tag,
-    profile?.email || user?.email
+    user?.email
   );
 
   const avatarUrl =

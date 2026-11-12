@@ -1,25 +1,41 @@
 import { NextResponse } from "next/server";
+import { fetchGeocodingProvider, guardGeocoding, parseCoordinates } from "@/lib/features/locations/geocode-guard";
 
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, {
     status,
     headers: {
-      "Cache-Control": "private, max-age=300",
+      "Cache-Control": status === 200 ? "private, max-age=300" : "no-store",
     },
   });
 }
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const latitude = Number(searchParams.get("lat"));
-  const longitude = Number(searchParams.get("lng"));
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+  const coordinates = parseCoordinates(searchParams.get("lat"), searchParams.get("lng"));
+  if (!coordinates) {
     return json({ error: "Invalid coordinates" }, 400);
   }
+  const { latitude, longitude } = coordinates;
 
   const geoapifyKey = process.env.GEOAPIFY_API_KEY;
   const locationIqKey = process.env.LOCATIONIQ_API_KEY;
+  const denied = await guardGeocoding(geoapifyKey ? "geoapify" : locationIqKey ? "locationiq" : "nominatim");
+  if (denied) return denied;
 
+  try {
+    return await reverseGeocode(latitude, longitude, geoapifyKey, locationIqKey);
+  } catch {
+    return json({ error: "Address lookup failed. You can enter the address manually." }, 502);
+  }
+}
+
+async function reverseGeocode(
+  latitude: number,
+  longitude: number,
+  geoapifyKey: string | undefined,
+  locationIqKey: string | undefined,
+) {
   if (geoapifyKey) {
     const url = new URL("https://api.geoapify.com/v1/geocode/reverse");
     url.searchParams.set("lat", String(latitude));
@@ -27,7 +43,7 @@ export async function GET(request: Request) {
     url.searchParams.set("format", "geojson");
     url.searchParams.set("apiKey", geoapifyKey);
 
-    const response = await fetch(url, { next: { revalidate: 300 } });
+    const response = await fetchGeocodingProvider(url);
     if (!response.ok) return json({ error: "Reverse geocoding provider failed" }, 502);
     const data = await response.json();
     const feature = data.features?.[0];
@@ -50,7 +66,7 @@ export async function GET(request: Request) {
     url.searchParams.set("format", "json");
     url.searchParams.set("key", locationIqKey);
 
-    const response = await fetch(url, { next: { revalidate: 300 } });
+    const response = await fetchGeocodingProvider(url);
     if (!response.ok) return json({ error: "Reverse geocoding provider failed" }, 502);
     const data = await response.json();
     const address = data.address || {};
@@ -72,20 +88,16 @@ export async function GET(request: Request) {
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("zoom", "18");
 
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        Referer: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-        "User-Agent": "Lumen/1.0 (location moderation)",
-      },
-      next: { revalidate: 300 },
-    });
-    if (!response.ok) throw new Error("Nominatim reverse geocoding failed");
+  const response = await fetchGeocodingProvider(url, {
+    Accept: "application/json",
+    Referer: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+    "User-Agent": "Lumen/1.0 (location moderation)",
+  });
+  if (!response.ok) throw new Error("Nominatim reverse geocoding failed");
 
-    const data = await response.json();
-    const address = data.address || {};
-    return json({
+  const data = await response.json();
+  const address = data.address || {};
+  return json({
       address: data.display_name || "",
       city:
         address.city ||
@@ -99,16 +111,5 @@ export async function GET(request: Request) {
       providerId: data.osm_type && data.osm_id ? `${data.osm_type}:${data.osm_id}` : data.place_id || null,
       confidence: typeof data.importance === "number" ? data.importance : null,
       raw: data,
-    });
-  } catch {
-    return json({
-      address: "",
-      city: "",
-      country: "",
-      provider: "manual",
-      providerId: null,
-      confidence: null,
-      raw: null,
-    });
-  }
+  });
 }

@@ -11,6 +11,7 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   profile: ProfileSummary | null;
+  isAdmin: boolean;
   signOut: () => Promise<void>;
 }
 
@@ -21,23 +22,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileSummary | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const profileUserIdRef = useRef<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
   const loadProfile = useCallback(async (userId: string) => {
     if (profileUserIdRef.current === userId) return;
 
-    const { data: profileData } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, avatar_url, email, tag, is_admin")
-      .eq("id", userId)
-      .maybeSingle();
-
     profileUserIdRef.current = userId;
+    const [{ data: profileData }, { data: admin }] = await Promise.all([
+      supabase.from("profiles").select("id, first_name, last_name, avatar_url, tag").eq("id", userId).maybeSingle(),
+      supabase.rpc("is_admin"),
+    ]);
+    if (profileUserIdRef.current !== userId) return;
     setProfile(profileData ? { ...profileData, avatar_url: resolveAvatarUrl(profileData.avatar_url) } : null);
+    setIsAdmin(admin === true);
   }, [supabase]);
 
   useEffect(() => {
+    let profileTimer: number | undefined;
     const getSessionAndProfile = async () => {
       const {
         data: { session },
@@ -50,6 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         profileUserIdRef.current = null;
         setProfile(null);
+        setIsAdmin(false);
       }
 
       setLoading(false);
@@ -60,20 +64,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      window.clearTimeout(profileTimer);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user?.id) {
         if (event !== "TOKEN_REFRESHED") {
-          loadProfile(session.user.id);
+          profileTimer = window.setTimeout(() => void loadProfile(session.user.id), 0);
         }
       } else {
         profileUserIdRef.current = null;
         setProfile(null);
+        setIsAdmin(false);
       }
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      window.clearTimeout(profileTimer);
+      subscription.unsubscribe();
+    };
   }, [loadProfile, supabase]);
 
   useEffect(() => {
@@ -93,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, profile, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, profile, isAdmin, signOut }}>
       {children}
     </AuthContext.Provider>
   );

@@ -39,15 +39,10 @@ export default function AdminCitiesPage() {
       return;
     }
     setLoadingProfile(true);
-    const { data, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
+    const { data, error: profileError } = await supabase.rpc("is_admin");
+    setIsAdmin(data === true);
     if (profileError) {
       console.error("Failed to load profile", profileError);
-    } else {
-      setIsAdmin(Boolean(data?.is_admin));
     }
     setLoadingProfile(false);
   }, [supabase, user]);

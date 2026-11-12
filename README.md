@@ -50,20 +50,23 @@ GEOAPIFY_API_KEY=optional-geocoding-key
 LOCATIONIQ_API_KEY=optional-fallback-geocoding-key
 OPENROUTER_API_KEY=optional-server-side-ai-enrichment-key
 OPENROUTER_PLACE_ENRICHMENT_MODEL=openai/gpt-oss-20b:free
+SUPABASE_SECRET_KEY=server-only-secret-for-ai-and-geocoding
 ```
 `.env.local` is gitignored—never commit secrets.
 
 For another machine or deployment, copy the variable names from `.env.example` and retrieve the real values from your private secret source: Vercel/hosting environment variables, Supabase project settings, or a password manager. Do not store real API keys in tracked files.
 
-Location search uses `GEOAPIFY_API_KEY` first, then `LOCATIONIQ_API_KEY`. If neither is configured, users can still place a pin manually on the map. Pin clicks and drags also try a cached OpenStreetMap Nominatim reverse lookup so the address, city, and country can be filled without an autocomplete key.
+Location lookups require a signed-in user and a server-side Supabase secret for shared quota checks. Provider preference is Geoapify, then LocationIQ, then Photon for search and Nominatim for reverse lookup. The pin and manual address fields remain usable without a lookup.
 
-AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs and gives the model access to OpenRouter web search when public verification is useful. OpenRouter can charge extra for web search even when the model itself is free.
+AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs and first tries web search, then falls back to no-web structured extraction when free server tools fail. Remove stale `OPENROUTER_PLACE_ENRICHMENT_MODEL` overrides in hosting environments unless they point to a current free structured model.
 
 ## Setup
 ```bash
 pnpm install
 pnpm dev      # http://localhost:3000
 pnpm lint
+pnpm typecheck
+pnpm test
 ```
 
 ## Database & Migrations (Supabase)
@@ -76,6 +79,8 @@ supabase db push
 The trust/location migration adds moderation metadata, edit suggestions, photo review fields, city cleanup helpers, and RPCs for atomic suggestion reporting and city merges. Run it before testing `/admin/cities`, edit suggestions, admin notes, or photo moderation.
 
 The AI enrichment migration adds `workspace_ai_enrichments`. Run it before expecting submitted workspaces to collect AI-generated descriptions, source links, or reviewer notes.
+
+See [Security and AI rollout](docs/SECURITY_AND_AI_ROLLOUT.md) for the migration order, admin verification, and staging browser test.
 
 ## Usage Notes
 - “Saved” filter on city page requires login; filters workspaces saved by the user in that city.

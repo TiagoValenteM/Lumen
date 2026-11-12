@@ -58,14 +58,13 @@ export default function SignupPage() {
       if (error) throw error;
 
       // Ensure profile row exists for the new user (needed for reviews display)
-      if (data?.user) {
+      if (data?.user && data.session) {
         const tag = email.split("@")[0] || null;
         const { error: profileError } = await supabase.from("profiles").upsert(
           {
             id: data.user.id,
             first_name: firstName || null,
             last_name: lastName || null,
-            email: email || null,
             tag,
           },
           { onConflict: "id" }

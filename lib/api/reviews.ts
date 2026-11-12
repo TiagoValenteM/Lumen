@@ -26,7 +26,7 @@ export async function getReviews(workspaceId: string): Promise<{
     const userIds = [...new Set(reviews.map((r) => r.user_id))];
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, avatar_url, email, tag")
+      .select("id, first_name, last_name, avatar_url, tag")
       .in("id", userIds);
 
     if (profileData) {

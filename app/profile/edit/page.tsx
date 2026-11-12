@@ -46,15 +46,21 @@ export default function EditProfilePage() {
       
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, tag, avatar_url, bio")
+        .select("id, first_name, last_name, tag, avatar_url, bio")
         .eq("id", user?.id)
         .maybeSingle();
 
       if (error) {
         console.error("Failed to fetch profile", error);
-      } else if (data) {
-        setProfile(data as Profile);
-        setBio(data.bio || "");
+      } else if (user) {
+        setProfile({
+          id: user.id,
+          first_name: data?.first_name ?? user.user_metadata?.first_name ?? null,
+          last_name: data?.last_name ?? user.user_metadata?.last_name ?? null,
+          ...data,
+          email: user.email ?? null,
+        } as Profile);
+        setBio(data?.bio || "");
       }
       setLoading(false);
     }
@@ -98,13 +104,11 @@ export default function EditProfilePage() {
         tag: profile.tag?.trim() || null,
         avatar_url: newAvatarUrl,
         bio: bio.trim() || null,
-        email: profile.email,
       };
 
       const { error } = await supabase
         .from("profiles")
-        .update(updates)
-        .eq("id", user.id);
+        .upsert({ id: user.id, ...updates }, { onConflict: "id" });
 
       if (error) throw error;
       

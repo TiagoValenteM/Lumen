@@ -67,7 +67,7 @@ export default function WorkspacePage() {
       if (userIds.length > 0) {
         const { data: profileData, error: profileError } = await supabase
           .from("profiles")
-          .select("id, first_name, last_name, avatar_url, email, tag")
+          .select("id, first_name, last_name, avatar_url, tag")
           .in("id", userIds);
 
         if (profileError) {

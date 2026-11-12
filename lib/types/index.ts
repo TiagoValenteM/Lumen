@@ -112,7 +112,7 @@ export interface Profile {
   is_admin?: boolean;
 }
 
-export type ProfileSummary = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'avatar_url' | 'email' | 'tag' | 'is_admin'>;
+export type ProfileSummary = Pick<Profile, 'id' | 'first_name' | 'last_name' | 'avatar_url' | 'tag'>;
 
 export interface CountryGroup {
   name: string;

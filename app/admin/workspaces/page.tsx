@@ -5,16 +5,28 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Building2, Loader2, Pencil, Filter, Shield, ArrowLeft, MapPin, CheckCircle, XCircle, Clock, Wrench } from "lucide-react";
+import {
+  AccessRestricted,
+  FeedbackState,
+  LoadingState,
+  MetricButton,
+  PageContainer,
+  PageHeader,
+  PageShell,
+  SectionPanel,
+} from "@/components/shared";
+import { Building2, Pencil, Filter, Shield, MapPin, CheckCircle, XCircle, Clock, Wrench, Globe2, Loader2 } from "lucide-react";
+
+type AiStatus = "none" | "queued" | "researching" | "extracting" | "pending" | "ready_for_review" | "completed" | "failed" | "dismissed" | "applied";
 
 type WorkspaceRow = {
   id: string;
@@ -25,7 +37,11 @@ type WorkspaceRow = {
   submitted_by: string | null;
   city_slug: string | null;
   city_name: string | null;
+  country: string | null;
   short_description?: string | null;
+  ai_status: AiStatus;
+  ai_run_mode: string | null;
+  ai_error: string | null;
 };
 
 type WorkspaceQueryRow = {
@@ -36,7 +52,10 @@ type WorkspaceQueryRow = {
   created_at: string | null;
   submitted_by: string | null;
   short_description: string | null;
-  city: { slug: string | null; name: string | null } | { slug: string | null; name: string | null }[] | null;
+  city:
+    | { slug: string | null; name: string | null; country: string | null }
+    | { slug: string | null; name: string | null; country: string | null }[]
+    | null;
 };
 
 const STATUS_OPTIONS = [
@@ -46,6 +65,42 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" },
   { value: "all", label: "All" },
 ];
+
+const STATUS_META = {
+  pending: { label: "Pending", icon: Clock, color: "text-yellow-600" },
+  under_review: { label: "Needs fixes", icon: Wrench, color: "text-blue-600" },
+  approved: { label: "Approved", icon: CheckCircle, color: "text-green-600" },
+  rejected: { label: "Rejected", icon: XCircle, color: "text-red-600" },
+} as const;
+
+const AI_FILTER_OPTIONS = [
+  { value: "all", label: "All AI" },
+  { value: "ready", label: "Ready" },
+  { value: "running", label: "Running" },
+  { value: "failed", label: "Failed" },
+  { value: "applied", label: "Applied" },
+  { value: "dismissed", label: "Dismissed" },
+  { value: "none", label: "No AI" },
+];
+
+type AiRunRow = {
+  id: string;
+  workspace_id: string;
+  status: string | null;
+  run_mode: string | null;
+  error_message: string | null;
+  created_at: string | null;
+};
+
+type WorkspaceGroup = {
+  country: string;
+  total: number;
+  cities: {
+    city: string;
+    total: number;
+    workspaces: WorkspaceRow[];
+  }[];
+};
 
 export default function AdminWorkspacesPage() {
   const { user } = useAuth();
@@ -57,21 +112,35 @@ export default function AdminWorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [aiFilter, setAiFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState<string | null>(null);
+
+  const statusCounts = useMemo(() => {
+    const counts = { all: workspaces.length, pending: 0, under_review: 0, approved: 0, rejected: 0 };
+    for (const workspace of workspaces) {
+      const status = normalizeStatus(workspace.status);
+      counts[status] += 1;
+    }
+    return counts;
+  }, [workspaces]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return workspaces.filter((w) => {
       const matchesStatus = statusFilter === "all" ? true : (w.status || "pending") === statusFilter;
+      const matchesAi = matchesAiFilter(w, aiFilter);
       const matchesSearch =
         !q ||
         w.name.toLowerCase().includes(q) ||
         (w.city_name?.toLowerCase().includes(q) ?? false) ||
+        (w.country?.toLowerCase().includes(q) ?? false) ||
         (w.slug?.toLowerCase().includes(q) ?? false);
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesAi && matchesSearch;
     });
-  }, [workspaces, search, statusFilter]);
+  }, [aiFilter, workspaces, search, statusFilter]);
+
+  const grouped = useMemo(() => groupWorkspaces(filtered), [filtered]);
 
   const loadProfile = useCallback(async () => {
     if (!user) {
@@ -79,19 +148,38 @@ export default function AdminWorkspacesPage() {
       return;
     }
     setLoadingProfile(true);
-    const { data, error: profileError } = await supabase
-      .from("profiles")
-      .select("id, is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
+    const { data, error: profileError } = await supabase.rpc("is_admin");
+    setIsAdmin(data === true);
 
     if (profileError) {
       console.error("Failed to load profile", profileError);
-    } else {
-      setIsAdmin(Boolean(data?.is_admin));
     }
     setLoadingProfile(false);
   }, [supabase, user]);
+
+  const loadLatestAiRuns = useCallback(
+    async (workspaceIds: string[]) => {
+      const latestByWorkspace = new Map<string, AiRunRow>();
+      if (workspaceIds.length === 0) return latestByWorkspace;
+
+      const { data, error: aiError } = await supabase
+        .from("workspace_ai_enrichments")
+        .select("id, workspace_id, status, run_mode, error_message, created_at")
+        .in("workspace_id", workspaceIds)
+        .order("created_at", { ascending: false });
+
+      if (aiError) {
+        console.warn("Could not load workspace AI queue state", aiError);
+        return latestByWorkspace;
+      }
+
+      for (const run of (data as AiRunRow[] | null) || []) {
+        if (!latestByWorkspace.has(run.workspace_id)) latestByWorkspace.set(run.workspace_id, run);
+      }
+      return latestByWorkspace;
+    },
+    [supabase],
+  );
 
   const loadWorkspaces = useCallback(async () => {
     if (!user || !isAdmin) return;
@@ -109,19 +197,15 @@ export default function AdminWorkspacesPage() {
           created_at,
           submitted_by,
           short_description,
-          city:cities(slug, name)
+          city:cities(slug, name, country)
         `
         )
         .order("created_at", { ascending: false });
 
-      if (statusFilter !== "all") {
-        query.eq("status", statusFilter);
-      }
-
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
 
-      const mapped: WorkspaceRow[] =
+      const baseRows: WorkspaceRow[] =
         (data as WorkspaceQueryRow[] | null)?.map((w) => {
           const cityField = Array.isArray(w.city) ? w.city[0] ?? null : w.city;
           return {
@@ -133,18 +217,33 @@ export default function AdminWorkspacesPage() {
             submitted_by: w.submitted_by ?? null,
             city_slug: cityField?.slug ?? null,
             city_name: cityField?.name ?? null,
+            country: cityField?.country ?? null,
             short_description: w.short_description ?? null,
+            ai_status: "none",
+            ai_run_mode: null,
+            ai_error: null,
           };
         }) || [];
 
-      setWorkspaces(mapped);
+      const latestAiByWorkspace = await loadLatestAiRuns(baseRows.map((workspace) => workspace.id));
+      setWorkspaces(
+        baseRows.map((workspace) => {
+          const aiRun = latestAiByWorkspace.get(workspace.id);
+          return {
+            ...workspace,
+            ai_status: normalizeAiStatus(aiRun?.status ?? null),
+            ai_run_mode: aiRun?.run_mode ?? null,
+            ai_error: aiRun?.error_message ?? null,
+          };
+        }),
+      );
     } catch (err) {
       console.error("Failed to load workspaces", err);
       setError("Could not load workspaces. Please try again.");
     } finally {
       setLoading(false);
     }
-  }, [user, supabase, isAdmin, statusFilter]);
+  }, [user, supabase, isAdmin, loadLatestAiRuns]);
 
   useEffect(() => {
     // Admin profile is loaded from Supabase when the authenticated user changes.
@@ -194,53 +293,28 @@ export default function AdminWorkspacesPage() {
   };
 
   if (loadingProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Checking access...</span>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Checking access..." />;
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-destructive" />
-              Access restricted
-            </CardTitle>
-            <CardDescription>You need admin access to view this page.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/profile">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to profile
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AccessRestricted
+        icon={Shield}
+        description="You need admin access to view this page."
+      />
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-4 py-10 space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold">Admin · Workspaces</h1>
-            <p className="text-muted-foreground text-sm">
-              Review, approve, or edit submitted workspaces.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+    <PageShell>
+      <PageContainer>
+        <PageHeader
+          title="Admin · Workspaces"
+          description="Review, approve, or edit submitted workspaces."
+          actions={
+            <>
             <Input
-              placeholder="Search by name, city, or slug"
+              placeholder="Search by name, city, country, or slug"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-64"
@@ -257,6 +331,18 @@ export default function AdminWorkspacesPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={aiFilter} onValueChange={setAiFilter}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="AI" />
+              </SelectTrigger>
+              <SelectContent>
+                {AI_FILTER_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button variant="outline" onClick={() => loadWorkspaces()} className="inline-flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Refresh
@@ -267,15 +353,36 @@ export default function AdminWorkspacesPage() {
                 Cities
               </Link>
             </Button>
-          </div>
+            </>
+          }
+        />
+
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {STATUS_OPTIONS.map((option) => {
+            const isAll = option.value === "all";
+            const meta = isAll ? null : STATUS_META[option.value as keyof typeof STATUS_META];
+            const Icon = meta?.icon || Building2;
+            const count = statusCounts[option.value as keyof typeof statusCounts] ?? 0;
+            return (
+              <MetricButton
+                key={option.value}
+                label={option.label}
+                value={count}
+                icon={Icon}
+                iconClassName={meta?.color}
+                active={statusFilter === option.value}
+                onClick={() => setStatusFilter(option.value)}
+              />
+            );
+          })}
         </div>
 
-        <Card>
+        <SectionPanel>
           <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>Workspaces</CardTitle>
+              <CardTitle>Workspaces by location</CardTitle>
               <CardDescription>
-                {filtered.length} {filtered.length === 1 ? "workspace" : "workspaces"} shown
+                {filtered.length} {filtered.length === 1 ? "workspace" : "workspaces"} shown across {grouped.length} {grouped.length === 1 ? "country" : "countries"}
               </CardDescription>
             </div>
           </CardHeader>
@@ -288,63 +395,179 @@ export default function AdminWorkspacesPage() {
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             {!loading && !error && filtered.length === 0 && (
-              <p className="text-sm text-muted-foreground">No workspaces match this filter.</p>
+              <FeedbackState
+                icon={Building2}
+                title="No workspaces found"
+                description="Try another status, city, country, or search term."
+              />
             )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {filtered.map((ws) => {
-                return (
-                  <Card key={ws.id} className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20">
-                    <CardContent className="pt-4 pb-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold leading-tight truncate">{ws.name}</h3>
-                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                            <MapPin className="h-3.5 w-3.5 shrink-0" />
-                            <span className="truncate">{ws.city_name || "Unspecified city"}</span>
-                          </div>
+            <div className="space-y-5">
+              {grouped.map((countryGroup) => (
+                <section key={countryGroup.country} className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Globe2 className="h-4 w-4 text-muted-foreground" />
+                      <h2 className="truncate text-base font-semibold">{countryGroup.country}</h2>
+                    </div>
+                    <Badge variant="secondary">{countryGroup.total} places</Badge>
+                  </div>
+
+                  <div className="space-y-4">
+                    {countryGroup.cities.map((cityGroup) => (
+                      <div key={`${countryGroup.country}-${cityGroup.city}`} className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                          <h3 className="text-sm font-medium">{cityGroup.city}</h3>
+                          <Badge variant="outline">{cityGroup.total}</Badge>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-md border border-input/35 bg-background/70 shadow-sm shadow-black/5 dark:shadow-black/20">
-                            {ws.status === "approved" ? (
-                              <CheckCircle className="h-3.5 w-3.5 text-green-600" />
-                            ) : ws.status === "rejected" ? (
-                              <XCircle className="h-3.5 w-3.5 text-red-600" />
-                            ) : ws.status === "under_review" ? (
-                              <Wrench className="h-3.5 w-3.5 text-blue-600" />
-                            ) : (
-                              <Clock className="h-3.5 w-3.5 text-yellow-600" />
-                            )}
+                        <div className="overflow-hidden rounded-xl border border-border/35 bg-background/55 shadow-sm shadow-black/5">
+                          <div className="divide-y divide-border/40">
+                            {cityGroup.workspaces.map((ws) => (
+                              <WorkspaceListRow
+                                key={ws.id}
+                                workspace={ws}
+                                saving={savingId === ws.id}
+                                onStatusChange={updateStatus}
+                              />
+                            ))}
                           </div>
-                          <Select
-                            value={ws.status || "pending"}
-                            onValueChange={(val) => updateStatus(ws.id, val as "approved" | "rejected" | "pending" | "under_review")}
-                            disabled={savingId === ws.id}
-                          >
-                            <SelectTrigger className="h-8 w-[110px] text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="under_review">Needs fixes</SelectItem>
-                              <SelectItem value="approved">Approved</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button size="sm" variant="outline" className="h-8 w-8 p-0" asChild>
-                            <Link href={`/admin/workspaces/${ws.id}`}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    ))}
+                  </div>
+                </section>
+              ))}
             </div>
           </CardContent>
-        </Card>
+        </SectionPanel>
+      </PageContainer>
+    </PageShell>
+  );
+}
+
+function WorkspaceListRow({
+  workspace,
+  saving,
+  onStatusChange,
+}: {
+  workspace: WorkspaceRow;
+  saving: boolean;
+  onStatusChange: (id: string, status: "approved" | "rejected" | "pending" | "under_review") => void;
+}) {
+  const status = normalizeStatus(workspace.status);
+  const meta = STATUS_META[status];
+  const Icon = meta.icon;
+
+  return (
+    <div className="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_150px_170px_44px] md:items-center">
+      <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h4 className="truncate font-medium leading-tight">{workspace.name}</h4>
+          <Badge variant="outline" className="capitalize">{meta.label}</Badge>
+          <AiStatusBadge status={workspace.ai_status} />
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span className="truncate">{workspace.slug}</span>
+          {workspace.short_description && <span className="truncate md:max-w-[360px]">{workspace.short_description}</span>}
+        </div>
       </div>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Icon className={`h-4 w-4 ${meta.color}`} />
+        <span>{meta.label}</span>
+      </div>
+      <Select
+        value={status}
+        onValueChange={(val) => onStatusChange(workspace.id, val as "approved" | "rejected" | "pending" | "under_review")}
+        disabled={saving}
+      >
+        <SelectTrigger className="h-9 w-full text-sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="pending">Pending</SelectItem>
+          <SelectItem value="under_review">Needs fixes</SelectItem>
+          <SelectItem value="approved">Approved</SelectItem>
+          <SelectItem value="rejected">Rejected</SelectItem>
+        </SelectContent>
+      </Select>
+      <Button size="sm" variant="outline" className="h-9 w-9 p-0" asChild>
+        <Link href={`/admin/workspaces/${workspace.id}`} aria-label={`Edit ${workspace.name}`}>
+          <Pencil className="h-3.5 w-3.5" />
+        </Link>
+      </Button>
     </div>
   );
+}
+
+function normalizeStatus(status: string | null): "pending" | "under_review" | "approved" | "rejected" {
+  if (status === "approved" || status === "rejected" || status === "under_review") return status;
+  return "pending";
+}
+
+function normalizeAiStatus(status: string | null): AiStatus {
+  if (
+    status === "queued" ||
+    status === "researching" ||
+    status === "extracting" ||
+    status === "pending" ||
+    status === "ready_for_review" ||
+    status === "completed" ||
+    status === "failed" ||
+    status === "dismissed" ||
+    status === "applied"
+  ) {
+    return status;
+  }
+  return "none";
+}
+
+function matchesAiFilter(workspace: WorkspaceRow, filter: string) {
+  if (filter === "all") return true;
+  if (filter === "none") return workspace.ai_status === "none";
+  if (filter === "failed") return workspace.ai_status === "failed";
+  if (filter === "applied") return workspace.ai_status === "applied";
+  if (filter === "dismissed") return workspace.ai_status === "dismissed";
+  if (filter === "ready") return workspace.ai_status === "ready_for_review" || workspace.ai_status === "completed";
+  if (filter === "running") return ["queued", "researching", "extracting", "pending"].includes(workspace.ai_status);
+  return true;
+}
+
+function AiStatusBadge({ status }: { status: AiStatus }) {
+  if (status === "none") return null;
+  if (status === "failed") return <Badge variant="destructive">AI failed</Badge>;
+  if (status === "ready_for_review" || status === "completed") return <Badge variant="default">AI ready</Badge>;
+  if (status === "applied") return <Badge variant="secondary">AI applied</Badge>;
+  if (status === "dismissed") return <Badge variant="outline">AI hidden</Badge>;
+  return <Badge variant="secondary">AI running</Badge>;
+}
+
+function groupWorkspaces(workspaces: WorkspaceRow[]): WorkspaceGroup[] {
+  const countries = new Map<string, Map<string, WorkspaceRow[]>>();
+  for (const workspace of workspaces) {
+    const country = workspace.country || "Unknown country";
+    const city = workspace.city_name || "Unspecified city";
+    const cities = countries.get(country) ?? new Map<string, WorkspaceRow[]>();
+    const rows = cities.get(city) ?? [];
+    rows.push(workspace);
+    cities.set(city, rows);
+    countries.set(country, cities);
+  }
+
+  return Array.from(countries.entries())
+    .map(([country, cities]) => {
+      const cityGroups = Array.from(cities.entries())
+        .map(([city, rows]) => ({
+          city,
+          total: rows.length,
+          workspaces: rows,
+        }))
+        .sort((a, b) => b.total - a.total || a.city.localeCompare(b.city));
+
+      return {
+        country,
+        total: cityGroups.reduce((sum, city) => sum + city.total, 0),
+        cities: cityGroups,
+      };
+    })
+    .sort((a, b) => b.total - a.total || a.country.localeCompare(b.country));
 }

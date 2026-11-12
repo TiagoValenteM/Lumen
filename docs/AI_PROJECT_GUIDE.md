@@ -46,6 +46,23 @@ hooks/
 
 Do not put route-specific business logic in `lib/utils`.
 
+## Lumen UI Components
+
+Use `components/ui` only for shadcn-style primitives: buttons, cards, inputs, dialogs, badges, and form controls.
+
+Use `components/shared/lumen-page.tsx` for Lumen product-level layout patterns:
+
+- `PageShell`: route background and full-page wrapper.
+- `PageContainer`: consistent max-width, padding, and vertical rhythm.
+- `PageHeader`: title, description, and right-side actions.
+- `SectionPanel`: standard Lumen content panel composed from `Card`.
+- `LoadingState`: full-page loading state.
+- `AccessRestricted`: standard admin/auth restriction state.
+- `FeedbackState`: reusable empty/error/info state inside pages and panels.
+- `MetricButton`: dashboard filter/count tile.
+
+When a route repeats shell, header, loading, access, empty, or metric-card markup, prefer these shared components. Keep route-local `_components` for content-specific sections such as AI review tables, photo moderation, location editing, and city merge rows.
+
 ## Feature Module Plan
 
 Move shared business behavior toward domain folders. File names should describe the job they do, not the CRUD pattern they happen to use.
@@ -161,6 +178,48 @@ When improving UI, make the smallest shared primitive change that improves multi
 - Public pages should show only approved workspaces/photos.
 - Admin pages may load pending/unapproved data.
 - City cleanup should never blindly delete a city; use guarded RPCs.
+
+## AI Enrichment Workflow
+
+AI enrichment is reviewer assist, not auto-approval. New or rerun enrichment records live in `workspace_ai_enrichments`.
+
+Use these statuses:
+
+- `queued`: the run was created and the user can see that AI work is pending.
+- `researching`: the background call is collecting/extracting information.
+- `ready_for_review`: suggestions are available for an admin to compare and apply.
+- `failed`: the model or provider failed; reviewers can retry with another mode.
+- `dismissed`: the reviewer discarded the full run.
+- `applied`: selected suggestions were copied into the form and saved to the workspace.
+
+Legacy `pending` and `completed` still exist for older rows and should be treated like `queued` and `ready_for_review` in UI.
+
+Store reviewer decisions in `field_decisions` using dot paths such as `work_details.has_wifi`:
+
+- `applied`: committed with the workspace save, never when copied into the form.
+- `rejected`: hidden or declined by an admin.
+- `ignored`: legacy marker for suggestions intentionally left untouched.
+
+Only the server worker writes research results. Use the moderator RPCs for review decisions
+and staged saves; do not write the enrichment table from the browser.
+
+Do not bury metadata inside `suggested_fields`. Use first-class columns:
+
+- `suggested_fields`: only proposed workspace data.
+- `field_evidence`: confidence, basis, source quality, evidence text, and source per field.
+- `unknown_fields`: fields the model could not support.
+- `field_sources`: URLs or source labels per field.
+- `run_mode`: `full`, `no_web`, `text_only`, or `details_only`.
+- `run_metadata`: provider/run notes, reviewer notes, timing, and model confidence.
+
+Reviewer UI rules:
+
+- Auto-select only high-confidence fields.
+- Medium/low confidence should be visible but require deliberate selection.
+- Always show source quality when available: official, directory, review pattern, submitted data, model knowledge, or unknown.
+- Map amenity phrases into structured `work_details` whenever possible instead of leaving them as generic work notes.
+- Do not request or store AI-suggested images.
+- If AI changes are applied in the form, public/admin preview only reflects them after Save succeeds.
 
 ## Refactor Strategy
 

@@ -27,9 +27,7 @@ export type HomeSubmissionSummary = HomeWorkspaceSummary & {
 type ProfileRow = {
   first_name: string | null;
   last_name: string | null;
-  email: string | null;
   tag: string | null;
-  is_admin?: boolean | null;
 };
 
 type WorkspaceCityRelation = { name: string | null; slug: string | null } | { name: string | null; slug: string | null }[] | null;
@@ -55,6 +53,7 @@ type SubmissionRow = {
 export async function getMemberHomeData(supabase: SupabaseClient, user: User): Promise<MemberHomeData> {
   const [
     profileResult,
+    adminResult,
     savedCountResult,
     visitedCountResult,
     submittedCountResult,
@@ -64,9 +63,10 @@ export async function getMemberHomeData(supabase: SupabaseClient, user: User): P
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("first_name, last_name, email, tag, is_admin")
+      .select("first_name, last_name, tag")
       .eq("id", user.id)
       .maybeSingle(),
+    supabase.rpc("is_admin"),
     supabase
       .from("saved_workspaces")
       .select("*", { head: true, count: "exact" })
@@ -119,9 +119,9 @@ export async function getMemberHomeData(supabase: SupabaseClient, user: User): P
       profile?.first_name,
       profile?.last_name,
       profile?.tag,
-      profile?.email ?? user.email ?? null
+      user.email ?? null
     ),
-    isAdmin: Boolean(profile?.is_admin),
+    isAdmin: adminResult.data === true,
     savedCount: savedCountResult.count || 0,
     visitedCount: visitedCountResult.count || 0,
     submittedCount: submittedCountResult.count || 0,

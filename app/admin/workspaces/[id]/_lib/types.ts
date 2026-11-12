@@ -152,12 +152,36 @@ export type EditSuggestionRow = {
   admin_notes: string | null;
 };
 
+export type AiEnrichmentStatus =
+  | "queued"
+  | "researching"
+  | "extracting"
+  | "ready_for_review"
+  | "pending"
+  | "completed"
+  | "failed"
+  | "dismissed"
+  | "applied";
+
+export type AiRunMode = "full" | "no_web" | "text_only" | "details_only";
+export type AiFieldDecision = "applied" | "rejected" | "ignored";
+
+export type AiFieldEvidence = {
+  confidence: "low" | "medium" | "high";
+  basis: "confirmed" | "review_signal" | "likely" | "unknown" | "conflicting";
+  source_quality: "official" | "directory" | "review_pattern" | "submitted_data" | "model_knowledge" | "unknown";
+  evidence: string | null;
+  source: string | null;
+};
+
 export type AiEnrichmentRow = {
+  updated_at?: string | null;
   id: string;
   created_at: string;
-  status: string;
+  status: AiEnrichmentStatus | string;
   provider: string;
   model: string;
+  run_mode?: AiRunMode | string | null;
   suggested_fields: {
     core_details?: {
       name?: string | null;
@@ -181,7 +205,14 @@ export type AiEnrichmentRow = {
       remote_work_signal: string | null;
     } | null;
     work_details?: Record<string, string | number | boolean | null> | null;
+    _field_evidence?: Record<string, AiFieldEvidence> | null;
+    _unknown_fields?: string[] | null;
+    _field_decisions?: Record<string, AiFieldDecision> | null;
   } | null;
+  field_evidence?: Record<string, AiFieldEvidence> | null;
+  unknown_fields?: string[] | null;
+  field_decisions?: Record<string, AiFieldDecision> | null;
+  run_metadata?: Record<string, unknown> | null;
   field_sources: Record<string, string[]> | null;
   citations: { url?: string; title?: string | null; content?: string | null }[] | null;
   error_message: string | null;
