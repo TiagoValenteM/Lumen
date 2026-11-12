@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { createLatestRequest } from "@/lib/features/locations/latest-request";
 
 export type LocationValue = {
@@ -469,7 +470,7 @@ function getProviderLabel(provider: string | null) {
 }
 
 function getCountryCode(country: string) {
-  const normalized = country.trim().toLowerCase();
+  const normalized = normalizeCountryName(country).toLowerCase();
   const countryCodes: Record<string, string> = {
     portugal: "pt",
     "united states": "us",

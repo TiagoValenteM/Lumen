@@ -26,6 +26,7 @@ Run the [read-only rollout audit](../supabase/checks/lumen-rollout.sql) before a
 5. `20261112000400_submit_workspace_with_city_proposal.sql`.
 6. `20261112000500_verify_workspace_work_facts.sql`.
 7. `20261112000600_limit_spot_interpretation.sql`.
+8. `20261113000100_normalize_swiss_city_country.sql` corrects legacy Swiss country labels without changing city IDs or slugs. Apply it before deploying the country normalization so submissions match existing Swiss cities.
 
 Coordinate migration and deployment: prepare and verify the app build before changing production permissions. The old application cannot write profile email or AI rows after the permission change. In-flight legacy AI jobs are marked failed during the cutover and can be rerun by a moderator. Do not restore the old writable grants when rolling back an app build. Leave `FIND_A_SPOT_AI_ENABLED` off until the post-deploy checks pass.
 
@@ -46,7 +47,7 @@ After migration, admin authority comes from `lumen_private.admin_roles`, not `pr
 - Member-triggered enrichment is accepted once for a pending submission. A moderator can retry terminal runs. A database lock and unique index reject overlapping runs even across browser tabs.
 - Model work is bounded to 95 seconds inside a 120-second route. It runs after the response, not in a durable queue. If an invocation is interrupted, a stale run is marked failed on reviewer polling or retry after three minutes. A late worker cannot overwrite the failed state.
 - Applying fields stages them locally. Saving the workspace and marking the selected AI fields applied happen in one database transaction. Rejected fields cannot be applied later.
-- Geocoding permits 30 lookups per signed-in user per minute and 1,000 lookups per provider per UTC day, with a shared one-second spacing for Nominatim. The defaults can be changed in a migration to match actual provider quotas. Provider requests time out after five seconds; manual entry is still available.
+- Geocoding permits 30 provider attempts per signed-in user per minute and 1,000 per provider per UTC day, with a shared one-second spacing for Nominatim. Provider failures fall through to the next configured provider; each attempt checks the quota separately and times out after five seconds. The map pin and manual entry are still available.
 
 ## Fresh Staging Setup
 

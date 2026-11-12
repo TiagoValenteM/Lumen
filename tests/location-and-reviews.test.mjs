@@ -1,7 +1,46 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createLatestRequest } from "../lib/features/locations/latest-request.ts";
+import { normalizeCountryName } from "../lib/features/locations/country-name.ts";
+import { tryGeocodeProviders } from "../lib/features/locations/geocode-fallback.ts";
 import { submitWorkspaceReview } from "../lib/features/workspaces/submit-review.ts";
+
+test("Swiss country variants use one English label without changing other countries", () => {
+  assert.equal(normalizeCountryName(" Schweiz / Suisse / Svizzera / Svizra "), "Switzerland");
+  assert.equal(normalizeCountryName("sWITZERLAND"), "Switzerland");
+  assert.equal(normalizeCountryName("", "ch"), "Switzerland");
+  assert.equal(normalizeCountryName(" United States ", "us"), "United States");
+  assert.equal(normalizeCountryName("France/Suisse"), "France/Suisse");
+});
+
+test("geocoding falls back after provider errors and checks each provider's quota", async () => {
+  const events = [];
+  const result = await tryGeocodeProviders([
+    { provider: "geoapify", lookup: async () => { throw new Error("upstream 401"); } },
+    { provider: "photon", lookup: async () => ({ results: ["Zürich"] }) },
+  ], async (provider) => { events.push(provider); return null; }, (provider) => events.push(`failed:${provider}`));
+  assert.deepEqual(events, ["geoapify", "failed:geoapify", "photon"]);
+  assert.deepEqual(result, { kind: "success", data: { results: ["Zürich"] } });
+});
+
+test("geocoding does not bypass an authorization or quota rejection", async () => {
+  const denied = new Response(null, { status: 429, headers: { "Retry-After": "60" } });
+  const result = await tryGeocodeProviders([
+    { provider: "geoapify", lookup: async () => { throw new Error("timeout"); } },
+    { provider: "nominatim", lookup: async () => assert.fail("denied provider was called") },
+  ], async (provider) => provider === "nominatim" ? denied : null, () => {});
+  assert.deepEqual(result, { kind: "denied", response: denied });
+});
+
+test("a successful search with no matches does not spend fallback quota", async () => {
+  const checked = [];
+  const result = await tryGeocodeProviders([
+    { provider: "geoapify", lookup: async () => ({ results: [] }) },
+    { provider: "photon", lookup: async () => assert.fail("fallback was called") },
+  ], async (provider) => { checked.push(provider); return null; }, () => assert.fail("provider failed"));
+  assert.deepEqual(checked, ["geoapify"]);
+  assert.deepEqual(result, { kind: "success", data: { results: [] } });
+});
 
 test("an obsolete lookup cannot commit or clear the current lookup", async () => {
   const lookups = createLatestRequest();

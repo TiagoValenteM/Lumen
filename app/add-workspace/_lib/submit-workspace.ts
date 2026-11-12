@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { buildWorkspaceSubmissionPayload } from "./workspace-submission-mapper";
 import type { AddWorkspaceFormData } from "./types";
 
@@ -11,7 +12,7 @@ export async function submitWorkspace(
   const { data, error } = await supabase.rpc("submit_workspace_with_photos", {
     submission_uuid: submissionId,
     city_name: formData.city_name,
-    country_name: formData.country,
+    country_name: normalizeCountryName(formData.country),
     details: buildWorkspaceSubmissionPayload(formData),
     photo_urls: uploadedPhotos,
   });

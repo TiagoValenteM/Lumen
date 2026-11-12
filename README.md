@@ -57,7 +57,7 @@ SUPABASE_SECRET_KEY=server-only-secret-for-ai-and-geocoding
 
 For another machine or deployment, copy the variable names from `.env.example` and retrieve the real values from your private secret source: Vercel/hosting environment variables, Supabase project settings, or a password manager. Do not store real API keys in tracked files.
 
-Location lookups require a signed-in user and a server-side Supabase secret for shared quota checks. Provider preference is Geoapify, then LocationIQ, then Photon for search and Nominatim for reverse lookup. The pin and manual address fields remain usable without a lookup.
+Location lookups require a signed-in user and a server-side Supabase secret for shared quota checks. Set the optional `GEOAPIFY_API_KEY` (or `LOCATIONIQ_API_KEY`) on the server for each deployment environment. If configured providers are unavailable, search can use Photon and pin address lookup can use Nominatim, neither of which needs a provider key. The map and manual address fields remain usable without an address lookup.
 
 AI enrichment uses `OPENROUTER_API_KEY` on the server after a user submits a workspace. It stores AI suggestions, sources, and failures in `workspace_ai_enrichments` for admin review; it does not publish or overwrite fields automatically. By default it uses a free OpenRouter model that supports structured outputs and first tries web search, then falls back to no-web structured extraction when free server tools fail. Remove stale `OPENROUTER_PLACE_ENRICHMENT_MODEL` overrides in hosting environments unless they point to a current free structured model.
 

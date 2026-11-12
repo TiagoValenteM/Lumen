@@ -7,6 +7,7 @@ import { ArrowLeft, LocateFixed, MapPin } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { Button } from "@/components/ui/button";
+import { NativeSelect } from "@/components/ui/native-select";
 import { PageContainer } from "@/components/shared/lumen-page";
 import { applyInterpretation, parseSpotSearch, SPOT_RADII, spotSearchHref, type SpotSearch } from "@/lib/features/find-a-spot/preferences";
 import { distanceBetweenKm, hasSpotCoordinates, matchSpots } from "@/lib/features/find-a-spot/matching";
@@ -14,8 +15,6 @@ import { useSpotData } from "../_hooks/use-spot-data";
 import { SpotRequest } from "./spot-request";
 import { SpotFilters } from "./spot-filters";
 import { SpotResults } from "./spot-results";
-
-const selectStyle = "h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60";
 
 export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
   const { user } = useAuth();
@@ -57,12 +56,12 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
             <Link href={city ? `/cities/${encodeURIComponent(city.slug)}` : "/cities"} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" aria-hidden="true" /> {city ? `Browse ${city.name}` : "Browse cities"}</Link>
             <h1 className="text-3xl font-semibold sm:text-4xl">Find a Spot</h1>
           </div>
-          <label className="flex w-full min-w-0 flex-col gap-1.5 text-sm font-medium sm:w-56">
+          <label className="flex w-full min-w-0 flex-col gap-1.5 text-sm font-medium sm:w-64">
             City
-            <select value={city?.slug ?? ""} className={selectStyle} disabled={!cities?.length} onChange={(event) => updateSearch({ city: event.target.value })}>
+            <NativeSelect value={city?.slug ?? ""} disabled={!cities?.length} onChange={(event) => updateSearch({ city: event.target.value })}>
               <option value="" disabled>{cities === undefined ? "Loading cities…" : "Choose a city"}</option>
               {cities?.map((item) => <option key={item.id} value={item.slug}>{item.name}, {item.country}</option>)}
-            </select>
+            </NativeSelect>
           </label>
         </header>
         <div className="space-y-4">
@@ -78,12 +77,12 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
                 else { setUseDistance(true); requestLocation(); }
               }}><LocateFixed aria-hidden="true" /> {locating ? "Locating…" : "Near me"}</Button>
               {located && <label className="sr-only" htmlFor="spot-radius">Search radius</label>}
-              {located && <select id="spot-radius" className={selectStyle} value={search.radiusKm ?? ""} onChange={(event) => {
+              {located && <NativeSelect id="spot-radius" value={search.radiusKm ?? ""} onChange={(event) => {
                 updateSearch({ radiusKm: SPOT_RADII.find((value) => String(value) === event.target.value) ?? null });
               }}>
                 <option value="">Whole city</option>
                 {SPOT_RADII.map((radius) => <option key={radius} value={radius}>Within {radius} km</option>)}
-              </select>}
+              </NativeSelect>}
             </div>}
           </div>
           {city && <div role="status" className="text-sm text-muted-foreground empty:sr-only">

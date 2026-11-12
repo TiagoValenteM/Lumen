@@ -18,6 +18,7 @@ import { FILTER_GROUPS, FILTER_ICONS, SUPPORTED_FILTERS, MAX_ACTIVE_FILTERS } fr
 import { mapCityWorkspaceRow } from "@/lib/features/cities/city-workspace-mapper";
 import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { workspaceMapStyle } from "@/lib/features/locations/workspace-map-style";
 import {
   filterAndSortCityWorkspaces,
@@ -434,7 +435,7 @@ function CityPageContent() {
         <div className="mb-8">
           <div className="flex items-center gap-2 text-muted-foreground mb-2">
             <MapPin className="h-4 w-4" />
-            <span>{city.country}</span>
+            <span>{normalizeCountryName(city.country)}</span>
           </div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-5xl font-bold">{city.name}</h1>

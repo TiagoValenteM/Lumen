@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { fetchGeocodingProvider, guardGeocoding, parseCoordinates } from "@/lib/features/locations/geocode-guard";
+import { fetchGeocodingProvider, parseCoordinates, runGeocodeLookup } from "@/lib/features/locations/geocode-guard";
+import type { GeocodeAttempt } from "@/lib/features/locations/geocode-fallback";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 
 type GeocodeCandidate = {
   id: string;
@@ -32,7 +34,7 @@ function normalizeGeoapify(feature: Record<string, unknown>): GeocodeCandidate |
   if (typeof latitude !== "number" || typeof longitude !== "number") return null;
 
   const city = String(properties.city || properties.town || properties.village || properties.county || "");
-  const country = String(properties.country || "");
+  const country = normalizeCountryName(String(properties.country || ""), properties.country_code);
   const label = String(properties.formatted || [properties.name, city, country].filter(Boolean).join(", "));
   const rank = properties.rank as Record<string, unknown> | undefined;
 
@@ -57,7 +59,7 @@ function normalizeLocationIq(item: Record<string, unknown>): GeocodeCandidate | 
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
   const address = item.address as Record<string, unknown> | undefined;
   const city = String(address?.city || address?.town || address?.village || address?.county || "");
-  const country = String(address?.country || "");
+  const country = normalizeCountryName(String(address?.country || ""), address?.country_code);
   const label = String(item.display_name || [item.name, city, country].filter(Boolean).join(", "));
 
   return {
@@ -88,7 +90,7 @@ function normalizePhoton(feature: Record<string, unknown>): GeocodeCandidate | n
   const street = String(properties.street || "");
   const postcode = String(properties.postcode || "");
   const city = String(properties.city || properties.district || properties.county || "");
-  const country = String(properties.country || "");
+  const country = normalizeCountryName(String(properties.country || ""), properties.countrycode);
   const streetAddress = [houseNumber, street].filter(Boolean).join(" ");
   const label = [name, streetAddress, postcode, city, country].filter(Boolean).join(", ");
   const address = [streetAddress, postcode, city, country].filter(Boolean).join(", ") || label;
@@ -118,26 +120,11 @@ export async function GET(request: Request) {
 
   const coordinates = parseCoordinates(searchParams.get("lat"), searchParams.get("lng"));
   const countryCode = searchParams.get("country")?.trim().toLowerCase();
-  const geoapifyKey = process.env.GEOAPIFY_API_KEY;
-  const locationIqKey = process.env.LOCATIONIQ_API_KEY;
-  const denied = await guardGeocoding(geoapifyKey ? "geoapify" : locationIqKey ? "locationiq" : "photon");
-  if (denied) return denied;
+  const geoapifyKey = process.env.GEOAPIFY_API_KEY?.trim();
+  const locationIqKey = process.env.LOCATIONIQ_API_KEY?.trim();
+  const attempts: GeocodeAttempt<{ results: GeocodeCandidate[] }>[] = [];
 
-  try {
-    return await searchProviders(query, countryCode, coordinates, geoapifyKey, locationIqKey);
-  } catch {
-    return json({ results: [], error: "Location search failed. You can still place the pin manually." }, 502);
-  }
-}
-
-async function searchProviders(
-  query: string,
-  countryCode: string | undefined,
-  coordinates: ReturnType<typeof parseCoordinates>,
-  geoapifyKey: string | undefined,
-  locationIqKey: string | undefined,
-) {
-  if (geoapifyKey) {
+  if (geoapifyKey) attempts.push({ provider: "geoapify", lookup: async () => {
     const url = new URL("https://api.geoapify.com/v1/geocode/autocomplete");
     url.searchParams.set("text", query);
     url.searchParams.set("limit", "6");
@@ -151,15 +138,12 @@ async function searchProviders(
     }
 
     const response = await fetchGeocodingProvider(url);
-    if (!response.ok) return json({ results: [], error: "Geocoding provider failed" }, 502);
+    if (!response.ok) throw new Error("Geoapify lookup failed");
     const data = await response.json();
-    const results = ((data.features || []) as Record<string, unknown>[])
-      .map(normalizeGeoapify)
-      .filter(Boolean);
-    return json({ results });
-  }
+    return { results: (data.features as Record<string, unknown>[]).map(normalizeGeoapify).filter(isCandidate) };
+  } });
 
-  if (locationIqKey) {
+  if (locationIqKey) attempts.push({ provider: "locationiq", lookup: async () => {
     const url = new URL("https://api.locationiq.com/v1/autocomplete");
     url.searchParams.set("q", query);
     url.searchParams.set("limit", "6");
@@ -173,34 +157,35 @@ async function searchProviders(
     }
 
     const response = await fetchGeocodingProvider(url);
-    if (!response.ok) return json({ results: [], error: "Geocoding provider failed" }, 502);
+    if (!response.ok) throw new Error("LocationIQ lookup failed");
     const data = await response.json();
-    const results = (data as Record<string, unknown>[])
-      .map(normalizeLocationIq)
-      .filter(Boolean);
-    return json({ results });
-  }
+    return { results: (data as Record<string, unknown>[]).map(normalizeLocationIq).filter(isCandidate) };
+  } });
 
-  const photonBaseUrl = process.env.PHOTON_API_URL || "https://photon.komoot.io";
-  const url = new URL("/api", photonBaseUrl);
-  url.searchParams.set("q", query);
-  url.searchParams.set("limit", "6");
-  url.searchParams.set("lang", "en");
-  if (coordinates) {
-    url.searchParams.set("lat", String(coordinates.latitude));
-    url.searchParams.set("lon", String(coordinates.longitude));
-  }
+  attempts.push({ provider: "photon", lookup: async () => {
+    const photonBaseUrl = process.env.PHOTON_API_URL || "https://photon.komoot.io";
+    const url = new URL("/api", photonBaseUrl);
+    url.searchParams.set("q", query);
+    url.searchParams.set("limit", "6");
+    url.searchParams.set("lang", "en");
+    if (coordinates) {
+      url.searchParams.set("lat", String(coordinates.latitude));
+      url.searchParams.set("lon", String(coordinates.longitude));
+    }
 
-  const response = await fetchGeocodingProvider(url, {
-    Accept: "application/json",
-    Referer: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-    "User-Agent": "Lumen/1.0 (place submission search)",
-  });
-  if (!response.ok) return json({ results: [], error: "Open geocoding fallback failed" }, 502);
+    const response = await fetchGeocodingProvider(url, {
+      Accept: "application/json",
+      Referer: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+      "User-Agent": "Lumen/1.0 (place submission search)",
+    });
+    if (!response.ok) throw new Error("Photon lookup failed");
+    const data = await response.json();
+    return { results: (data.features as Record<string, unknown>[]).map(normalizePhoton).filter(isCandidate) };
+  } });
 
-  const data = await response.json();
-  const results = ((data.features || []) as Record<string, unknown>[])
-    .map(normalizePhoton)
-    .filter(Boolean);
-  return json({ results, provider: "photon" });
+  return runGeocodeLookup(attempts, "Location search is temporarily unavailable. You can still use the map pin.");
+}
+
+function isCandidate(candidate: GeocodeCandidate | null): candidate is GeocodeCandidate {
+  return candidate !== null;
 }

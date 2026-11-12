@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Star, MapPin } from "lucide-react";
 import type { WorkspaceDetail, City } from "@/lib/types";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 
 interface WorkspaceHeaderProps {
   workspace: WorkspaceDetail;
@@ -17,7 +18,7 @@ export function WorkspaceHeader({ workspace, city, priceSymbols }: WorkspaceHead
           <div className="flex items-center gap-2 text-muted-foreground">
             <MapPin className="h-4 w-4" />
             <span>
-              {city.name}, {city.country}
+              {city.name}, {normalizeCountryName(city.country)}
             </span>
           </div>
         </div>

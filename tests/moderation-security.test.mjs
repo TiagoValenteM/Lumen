@@ -120,6 +120,27 @@ test("work fact checks require a moderator and saved facts, and expire when the 
   assert.equal(await row("SELECT checked_at FROM workspace_work_fact_checks WHERE workspace_id = $1", [id]), undefined);
 });
 
+test("Swiss label correction keeps existing city links and new submissions match the same city", async () => {
+  await role("postgres");
+  const legacyName = "Schweiz/Suisse/Svizzera/Svizra";
+  const slug = "z-rich-schweiz-suisse-svizzera-svizra";
+  const city = await row("INSERT INTO cities (name, slug, country) VALUES ('Zürich', $1, $2) RETURNING id", [slug, legacyName]);
+  const draft = randomUUID();
+  await db.query("INSERT INTO workspaces (id, name, slug, status, proposed_city_name, proposed_city_country) VALUES ($1, 'Swiss draft', 'swiss-draft', 'pending', 'Bern', $2)", [draft, legacyName]);
+  await apply("20261113000100_normalize_swiss_city_country.sql");
+  assert.deepEqual(await row("SELECT id, slug, country, country_code FROM cities WHERE slug = $1", [slug]), {
+    id: city.id, slug, country: "Switzerland", country_code: "CH",
+  });
+  assert.equal((await row("SELECT proposed_city_country FROM workspaces WHERE id = $1", [draft])).proposed_city_country, "Switzerland");
+
+  await role("authenticated", member);
+  const id = randomUUID();
+  await newPlace(id, "Zürich", [uploadedPhoto(member)]);
+  assert.deepEqual(await row("SELECT city_id, proposed_city_country FROM workspaces WHERE id = $1", [id]), {
+    city_id: city.id, proposed_city_country: null,
+  });
+});
+
 test("a member can propose a city, retry without duplicates, and publish only after moderation", async () => {
   const first = randomUUID();
   const second = randomUUID();

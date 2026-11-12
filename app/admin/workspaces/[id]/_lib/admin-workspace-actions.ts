@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import type { AdminWorkspaceFormState, WorkspacePhotoRow } from "./types";
 
 export const STATUS_OPTIONS = ["pending", "under_review", "approved", "rejected"];
@@ -110,13 +111,19 @@ export async function resolveWorkspaceCity(
 
   let cityQuery = supabase
     .from("cities")
-    .select("id, slug")
-    .ilike("name", form.city_name)
-    .limit(1);
+    .select("id, slug, country")
+    .ilike("name", form.city_name);
 
-  cityQuery = form.country ? cityQuery.eq("country", form.country) : cityQuery.or("country.is.null,country.eq.Unknown");
-  const { data: existingCity, error: cityFetchError } = await cityQuery.maybeSingle();
+  const country = normalizeCountryName(form.country);
+  if (country !== "Switzerland") {
+    cityQuery = country ? cityQuery.eq("country", country) : cityQuery.or("country.is.null,country.eq.Unknown");
+  }
+  const { data: candidates, error: cityFetchError } = await cityQuery.order("id");
   if (cityFetchError) throw cityFetchError;
+  const matching = country === "Switzerland"
+    ? candidates.filter((city) => normalizeCountryName(city.country ?? "") === country)
+    : candidates;
+  const existingCity = matching.find((city) => city.id === form.city_id) ?? matching[0];
 
   if (existingCity) {
     cityId = existingCity.id;
@@ -128,8 +135,8 @@ export async function resolveWorkspaceCity(
     .from("cities")
     .insert({
       name: form.city_name,
-      slug: citySlug(form.city_name, form.country),
-      country: form.country || "Unknown",
+      slug: citySlug(form.city_name, country),
+      country: country || "Unknown",
       latitude: form.latitude,
       longitude: form.longitude,
       workspace_count: 0,

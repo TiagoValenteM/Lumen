@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Building2, Compass, Loader2, MapPin, Sparkles } from "lucide-react";
 import type { City } from "@/lib/types";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 
 export default function CitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,12 +23,12 @@ export default function CitiesPage() {
       setLoading(true);
       const { data: cityData, error: cityError } = await supabase
         .from("cities")
-        .select("id, name, slug, country, workspace_count")
+        .select("id, name, slug, country, country_code, workspace_count")
         .order("country", { ascending: true })
         .order("name", { ascending: true });
 
       if (cityData && !cityError) {
-        setCities(cityData);
+        setCities(cityData.map((city) => ({ ...city, country: normalizeCountryName(city.country, city.country_code) })));
 
         // Fetch live workspace counts grouped by city from approved workspaces
         const { data: workspaceData } = await supabase
@@ -54,21 +55,20 @@ export default function CitiesPage() {
   }, [supabase]);
 
   const groupedByCountry = useMemo(() => {
-    const groups: Record<string, City[]> = {};
+    const groups = new Map<string, City[]>();
     cities.forEach((city) => {
       // Only include cities with at least one approved workspace
       const approvedCount = workspaceCounts[city.id] ?? 0;
       if (approvedCount > 0) {
-        if (!groups[city.country]) {
-          groups[city.country] = [];
-        }
-        groups[city.country].push(city);
+        const group = groups.get(city.country);
+        if (group) group.push(city);
+        else groups.set(city.country, [city]);
       }
     });
-    return Object.entries(groups).map(([country, countryCities]) => ({
+    return Array.from(groups, ([country, countryCities]) => ({
       name: country,
       cities: countryCities,
-    }));
+    })).sort((a, b) => a.name.localeCompare(b.name));
   }, [cities, workspaceCounts]);
 
   const filteredData = useMemo(() => {

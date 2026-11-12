@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import {
   buildWorkspaceUpdatePayload,
   isMissingColumnError,
@@ -17,7 +18,7 @@ export async function saveAdminWorkspace(
 ) {
   let hasLocationMetadataColumns = includeLocationMetadata;
   const previousCityId = workspace.city_id;
-  const proposal = workspace.city_proposal ? { name: form.city_name.trim(), country: form.country.trim() } : null;
+  const proposal = workspace.city_proposal ? { name: form.city_name.trim(), country: normalizeCountryName(form.country) } : null;
   if (proposal && (!proposal.name || !proposal.country)) throw new Error("Enter the proposed city and country before saving.");
   let { cityId, citySlug } = proposal
     ? { cityId: null, citySlug: null }

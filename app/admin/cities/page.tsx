@@ -6,6 +6,7 @@ import { ArrowLeft, Building2, Loader2, Merge, Shield, Star, Trash2 } from "luci
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { deleteCityIfEmpty, mergeCityBySlug } from "@/lib/features/admin-cities/actions";
+import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -220,7 +221,7 @@ export default function AdminCitiesPage() {
                       <div className="flex flex-wrap items-center gap-2">
                         <Building2 className="h-4 w-4 text-muted-foreground" />
                         <h2 className="font-semibold">{city.name}</h2>
-                        <span className="text-sm text-muted-foreground">{city.country}</span>
+                        <span className="text-sm text-muted-foreground">{normalizeCountryName(city.country ?? "")}</span>
                         {city.featured && (
                           <Badge variant="secondary">
                             <Star className="mr-1 h-3 w-3" />
