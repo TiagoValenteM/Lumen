@@ -66,7 +66,7 @@ function parseArgs(rawArgs) {
     if (arg === "--help") {
       process.stdout.write(
         [
-          "Usage: node scripts/build-workspace-photo-import.mjs [options]",
+          "Usage: node scripts/location-imports/build-photo-candidates.mjs [options]",
           "",
           "Options:",
           "  --input data/location-leads/laptopfriendly-workspace-import-enriched.json",

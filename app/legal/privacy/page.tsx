@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const updatedAt = "November 12, 2026";
+const updatedAt = "November 13, 2026";
 
 export default function PrivacyPage() {
   return (
@@ -19,7 +19,7 @@ export default function PrivacyPage() {
             </Section>
 
             <Section title="Location data">
-              If you use location-based features, your browser may ask for permission to share your position. Find a Spot calculates distances in your browser and does not store your device coordinates. Address lookup and other location features may contact a mapping provider. You can deny or revoke location permission in your browser.
+              If you use location-based features, your browser may ask for permission to share your position. Find a Spot calculates distances in your browser and does not store your device coordinates. When you open a map, your browser requests map tiles from <Link className="underline" href="https://openfreemap.org/privacy/">OpenFreeMap</Link> for the area displayed. Address lookup may contact a separate geocoding provider. You can deny or revoke location permission in your browser.
             </Section>
 
             <Section title="Find a Spot and optional AI">

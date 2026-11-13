@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Map, Marker, StyleSpecification } from "maplibre-gl";
+import type { Map, Marker } from "maplibre-gl";
 import { CheckCircle2, Crosshair, Loader2, Pencil, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
+import { workspaceMapStyle } from "@/lib/features/locations/workspace-map-style";
 import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { createLatestRequest } from "@/lib/features/locations/latest-request";
 
@@ -40,24 +41,6 @@ type GeocodeCandidate = {
 type LocationPickerProps = {
   value: LocationValue;
   onChange: (value: LocationValue) => void;
-};
-
-const mapStyle: StyleSpecification = {
-  version: 8,
-  sources: {
-    carto: {
-      type: "raster",
-      tiles: [
-        "https://cartodb-basemaps-a.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-        "https://cartodb-basemaps-b.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-        "https://cartodb-basemaps-c.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-        "https://cartodb-basemaps-d.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png",
-      ],
-      tileSize: 256,
-      attribution: "© OpenStreetMap contributors, © CARTO",
-    },
-  },
-  layers: [{ id: "carto", type: "raster", source: "carto" }],
 };
 
 export function LocationPicker({ value, onChange }: LocationPickerProps) {
@@ -269,7 +252,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
 
       const map = new maplibregl.Map({
         container: mapContainerRef.current,
-        style: mapStyle,
+        style: workspaceMapStyle,
         center,
         zoom: valueRef.current.latitude !== null && valueRef.current.longitude !== null ? 15 : 2,
       });

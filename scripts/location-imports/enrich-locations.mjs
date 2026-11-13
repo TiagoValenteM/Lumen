@@ -75,7 +75,7 @@ function parseArgs(rawArgs) {
     if (arg === "--help") {
       process.stdout.write(
         [
-          "Usage: node scripts/enrich-workspace-import-locations.mjs [options]",
+          "Usage: node scripts/location-imports/enrich-locations.mjs [options]",
           "",
           "Options:",
           "  --input data/location-leads/laptopfriendly-workspace-import.json",

@@ -71,7 +71,7 @@ function parseArgs(rawArgs) {
     if (arg === "--help") {
       process.stdout.write(
         [
-          "Usage: node scripts/build-workspace-import-from-leads.mjs [options]",
+          "Usage: node scripts/location-imports/build-workspace-import.mjs [options]",
           "",
           "Options:",
           "  --input data/location-leads/laptopfriendly-us-leads.json",

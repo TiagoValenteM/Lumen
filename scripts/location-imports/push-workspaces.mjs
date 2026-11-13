@@ -81,7 +81,7 @@ function parseArgs(rawArgs) {
     if (arg === "--help") {
       process.stdout.write(
         [
-          "Usage: node scripts/push-workspace-import-to-supabase.mjs [options]",
+          "Usage: node scripts/location-imports/push-workspaces.mjs [options]",
           "",
           "Options:",
           "  --input data/location-leads/laptopfriendly-workspace-import.json",

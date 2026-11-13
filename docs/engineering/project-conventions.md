@@ -1,4 +1,4 @@
-# AI Project Guide
+# Project Conventions
 
 This guide is for AI/code agents working on Lumen. Use it before changing structure, data flows, or UI.
 
@@ -239,7 +239,8 @@ Before finishing a meaningful change, run:
 
 ```bash
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
+pnpm test
 pnpm build
 ```
 

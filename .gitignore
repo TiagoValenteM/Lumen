@@ -82,6 +82,7 @@ supabase/.temp/
 .cache/
 
 # Temporary files
+/data/location-leads/
 *.tmp
 *.temp
 *.log

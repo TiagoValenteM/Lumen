@@ -1,6 +1,6 @@
 # Find a Spot
 
-## Implementation status
+## Live behavior and pilot
 
 - `/find` uses approved listings and the existing work-fact checks. Guests can use all manual filters and the local ask box. A positive match requires a check within 180 days, known laptop and stay policies, and positive evidence for any requested amenity or activity. A place with a missing or defaulted activity field belongs in Details to check, not Matches.
 - Apply `20261112000500_verify_workspace_work_facts.sql` before the pilot and have reviewers check the selected city's facts. Existing listings are never automatically marked checked. The finder does not make live opening-hours or seating claims.

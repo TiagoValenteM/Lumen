@@ -2,6 +2,8 @@
 
 Lumen can use external place data as discovery leads, but imported locations should stay in an admin-review workflow until a human verifies that the place is genuinely work-friendly.
 
+The tools live in `scripts/location-imports/`. Run the `pnpm locations:*` commands from the repository root. Generated JSON and SQL stay in the local, ignored `data/location-leads/` directory; they are neither fixtures nor migrations. Keep source rights and attribution with any data shared outside your workspace.
+
 ## Current Source
 
 The first importer uses OpenStreetMap through the Overpass API:
@@ -28,16 +30,16 @@ pnpm locations:leads
 Useful options:
 
 ```bash
-pnpm locations:leads -- --cities new-york,san-francisco,austin
-pnpm locations:leads -- --cities seattle,chicago --limit-per-city 20
-pnpm locations:leads -- --output data/location-leads/us-test.json
+pnpm locations:leads --cities new-york,san-francisco,austin
+pnpm locations:leads --cities seattle,chicago --limit-per-city 20
+pnpm locations:leads --output data/location-leads/us-test.json
 ```
 
 LaptopFriendly sample:
 
 ```bash
 pnpm locations:leads:laptopfriendly
-pnpm locations:leads:laptopfriendly -- --cities new-york --limit-per-city 5
+pnpm locations:leads:laptopfriendly --cities new-york --limit-per-city 5
 ```
 
 Build Lumen-shaped import files from the latest lead JSON:
@@ -81,8 +83,8 @@ Photo candidates are inserted with `is_approved = false` so they remain in admin
 Push the generated import file to Supabase:
 
 ```bash
-pnpm locations:import:push -- --dry-run
-pnpm locations:import:push -- --status pending
+pnpm locations:import:push --dry-run
+pnpm locations:import:push --status pending
 ```
 
 This requires `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`. Do not expose that key in client code or commit it.

@@ -118,7 +118,7 @@ function parseArgs(rawArgs) {
     if (arg === "--help") {
       process.stdout.write(
         [
-          "Usage: node scripts/osm-location-leads.mjs [options]",
+          "Usage: node scripts/location-imports/discover-osm-leads.mjs [options]",
           "",
           "Options:",
           "  --cities new-york,san-francisco,austin,seattle,chicago",

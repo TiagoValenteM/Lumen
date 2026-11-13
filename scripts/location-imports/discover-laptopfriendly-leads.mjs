@@ -94,7 +94,7 @@ function parseArgs(rawArgs) {
     if (arg === "--help") {
       process.stdout.write(
         [
-          "Usage: node scripts/laptopfriendly-location-leads.mjs [options]",
+          "Usage: node scripts/location-imports/discover-laptopfriendly-leads.mjs [options]",
           "",
           "Options:",
           "  --cities new-york",

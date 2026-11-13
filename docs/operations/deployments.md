@@ -1,13 +1,15 @@
-# Security and AI rollout
+# Deploying Lumen
 
-## Resume when access is available
+Vercel deploys GitHub `main` to production. A Vercel Preview is only a staging environment if it is connected to a separate database. See [Vercel's Git deployment guide](https://vercel.com/docs/git) for how the environments are selected.
 
-- `90d94ab` is the security-only baseline; `60d22c9` adds first-place submissions, work-fact checks, and Find a Spot. They are on `codex/lumen-submission-reliability` together.
-- On November 12, 2026, the Vercel dashboard confirmed the Lumen repository and live deployment from `4cf2fba`. The LumenLLC Supabase organization showed only its production project. It finished restoring; read-only SQL confirmed the July AI workflow and legacy trigger functions are present, the November migrations are absent, and one legacy moderator is linked to an Auth account. The moderator's identity still needs confirmation. No hosting settings, database migrations, or production deployments were changed.
-- The owner chose a direct production cutover. The Free plan shows no scheduled backups, and Vercel production is missing `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY`. Do not apply migrations or push `main` until a manual backup is verified, the owner confirms the moderator, and a server-only secret for the same database is configured in Vercel. Preview should not receive the production secret.
-- Start with read-only checks: match the Vercel project to the GitHub repo and the Supabase project, record the currently live deployment, and verify backups and legitimate admins. Do not share credentials in chat or tracked files.
+## Release checklist
 
-## 1. Verify the current project
+1. Run lint, type checks, tests, and a production build. For a schema change, test it in isolated staging first.
+2. Verify the target Supabase project and its applied migrations. Back up affected production data before writes. Keep backups private; a database archive does not include uploaded Storage file bytes.
+3. Apply only the required, reviewed migrations. Keep schema changes compatible with the live app or coordinate the app and database cutover. Never run the staging bootstrap against production.
+4. Push the reviewed commit to `main`, wait for Vercel to report that exact commit ready, then check public browsing, the changed workflow, and relevant access boundaries on the live domain.
+
+## Legacy security rollout
 
 - Prefer an isolated Supabase staging project. Confirm Preview does not point to the production database before using test accounts or running the write-enabled smoke test. Back up the production database before applying permissions changes. If the owner elects a direct production cutover, first wait for any restoration to finish, verify a usable pre-change backup, and schedule a short write interruption. Do not run staging fixtures or the staging bootstrap on production.
 - In the Supabase SQL editor, run `SELECT id FROM public.profiles WHERE is_admin IS TRUE;`. Verify each ID against trusted operator accounts in Auth. Remove unrecognized legacy grants before the migration seeds the private admin table. Review access and moderation activity if any assignment is unexpected.
@@ -15,9 +17,11 @@
 - Rotate any provider credentials previously shared outside the hosting secret store. Configure `SUPABASE_SECRET_KEY` (preferred) or `SUPABASE_SERVICE_ROLE_KEY` as a server-only secret in each environment, and configure `OPENROUTER_API_KEY` where AI should run. Never use a `NEXT_PUBLIC_` prefix for secrets.
 - With no scheduled backup, use a private local [manual backup](https://supabase.com/docs/guides/platform/backups) with PostgreSQL connection credentials, not the project's public or server API key. Confirm the project reference, verify the export can be read and contains the affected schemas and data, and keep it outside the repository. A database backup is not a backup of uploaded Storage files.
 
-Run the [read-only rollout audit](../supabase/checks/lumen-rollout.sql) before and after applying migrations. It checks baseline objects and selected grants without returning user data. Its results do not replace migration-history or full policy verification. See [Supabase’s migration guide](https://supabase.com/docs/guides/deployment/database-migrations) and [Vercel’s environment guide](https://vercel.com/docs/deployments/environments).
+Run the [read-only rollout audit](../../supabase/checks/lumen-rollout.sql) before and after applying migrations. It checks baseline objects and selected grants without returning user data. Its results do not replace migration-history or full policy verification. See [Supabase's migration guide](https://supabase.com/docs/guides/deployment/database-migrations).
 
-## 2. Apply migrations in order, then deploy the app
+### Historical migration order
+
+Production already received this series. Use the list to audit a legacy environment, not as a script to rerun.
 
 1. `20260731_workspace_ai_review_workflow.sql`, if missing.
 2. `20261112000100_lock_down_moderation_permissions.sql`.
@@ -32,9 +36,9 @@ Coordinate migration and deployment: prepare and verify the app build before cha
 
 After migration, admin authority comes from `lumen_private.admin_roles`, not `profiles.is_admin`. Verify that the private table has the expected IDs. Grant or revoke access there only using trusted database operator access; legacy profile flags no longer control access. Account email is read from Supabase Auth, and workspace moderation notes are available to moderators only.
 
-## 3. Verify before production
+## Browser smoke tests
 
-- `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` run without staging credentials. The database suite exercises actual SQL privileges and RLS, using embedded PostgreSQL and local stand-ins for the Supabase Auth roles.
+- The [development guide](../engineering/development.md) covers the local checks. The database suite exercises SQL privileges and RLS in embedded PostgreSQL, without staging credentials.
 - The browser smoke test needs a running app connected to a disposable staging database with the migrations applied. Create one regular test account and one moderator test account there. Install Chromium with `pnpm exec playwright install chromium`, then run `pnpm test:e2e` with these environment variables:
   - `LUMEN_E2E_ALLOW_WRITES=staging` and `LUMEN_E2E_BASE_URL` (the staging app).
   - `LUMEN_E2E_SUPABASE_URL`, `LUMEN_E2E_SUPABASE_PUBLISHABLE_KEY`, and `LUMEN_E2E_SUPABASE_SECRET_KEY` (the same staging database).
@@ -49,10 +53,6 @@ After migration, admin authority comes from `lumen_private.admin_roles`, not `pr
 - Applying fields stages them locally. Saving the workspace and marking the selected AI fields applied happen in one database transaction. Rejected fields cannot be applied later.
 - Geocoding permits 30 provider attempts per signed-in user per minute and 1,000 per provider per UTC day, with a shared one-second spacing for Nominatim. Provider failures fall through to the next configured provider; each attempt checks the quota separately and times out after five seconds. The map pin and manual entry are still available.
 
-## Fresh Staging Setup
-
-On a new empty staging project, generate the complete SQL with `node scripts/build-staging-bootstrap.mjs`. Run it in that project's SQL Editor after checking the project name and reference. The generated script creates the schema, grants, and Storage buckets in one transaction and refuses to run over an existing Lumen schema. It is not a production migration, and it does not import live accounts or listings. Create two staging-only Auth users and grant the moderator role only to the test moderator before running Playwright.
-
 ## Find a Spot Pilot
 
-After the work-fact migration, run the [read-only pilot counts](../supabase/checks/find-a-spot-pilot.sql) to find cities with enough checked listings. Existing work facts start unchecked. Choose a pilot city and verify real laptop policies, stay limits, Wi-Fi and outlets in moderation. See the [Find a Spot plan](FIND_A_SPOT_PLAN.md) for the AI flag and pilot criteria.
+After the work-fact migration, run the [read-only pilot counts](../../supabase/checks/find-a-spot-pilot.sql) to find cities with enough checked listings. Existing work facts start unchecked. Choose a pilot city and verify real laptop policies, stay limits, Wi-Fi and outlets in moderation. See the [Find a Spot notes](../product/find-a-spot.md) for the AI flag and pilot criteria.
