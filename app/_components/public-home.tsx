@@ -1,145 +1,80 @@
+import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { ArrowRight, CheckCircle2, Coffee, MapPin, Search, ShieldCheck, Wifi, Zap } from "lucide-react";
+import { ArrowRight, Building2, Compass, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { BRAND_NAME } from "@/lib/constants/brand";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import styles from "./public-home.module.css";
 
-const featuredUseCases = ["Quiet work", "Calls", "Long stays", "Power access"];
+const library = "/cities/new-york-united-states/new-york-public-library-stephen-a-schwarzman-building-new-york";
+const photoSource = "https://commons.wikimedia.org/wiki/File:New_York_Public_Library_Main_Branch_Exterior.jpg";
 
 export function PublicHome() {
   return (
-    <div className="min-h-full bg-background">
-      <section className="px-6 py-14 md:py-20">
-        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,0.95fr)] lg:items-center">
-          <div className="space-y-7">
-            <div className="flex flex-wrap gap-2">
-              {featuredUseCases.map((label) => (
-                <Badge key={label} variant="outline">
-                  {label}
-                </Badge>
-              ))}
-            </div>
-            <div className="space-y-4">
-              <h1 className="max-w-3xl text-4xl font-bold tracking-tight md:text-6xl">
-                Find laptop-friendly places to work.
-              </h1>
-              <p className="max-w-2xl text-lg text-muted-foreground md:text-xl">
-                Browse cafes, coworking spaces, libraries, and hotel lobbies for your next work session.
-              </p>
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button size="lg" asChild>
-                <Link href="/cities">
-                  <Search className="mr-2 h-5 w-5" />
-                  Explore workspaces
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" asChild>
-                <Link href="/add-workspace">
-                  Add a place
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-border/30 bg-card/90 p-5 shadow-md shadow-black/5 dark:shadow-black/20">
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Workspace assessment</p>
-                <h2 className="mt-1 text-2xl font-semibold">What to look for</h2>
-              </div>
-              <div className="grid gap-3">
-                <SignalRow icon={<Wifi className="h-4 w-4" />} label="Reliable WiFi" value="Fast enough to work" />
-                <SignalRow icon={<Zap className="h-4 w-4" />} label="Power access" value="Outlets and stay length" />
-                <SignalRow icon={<Coffee className="h-4 w-4" />} label="Work welcome" value="Purchase policy and comfort" />
-                <SignalRow icon={<ShieldCheck className="h-4 w-4" />} label="Community trust" value="Verified details and corrections" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="px-6 py-12">
-        <div className="mx-auto grid max-w-6xl gap-4 md:grid-cols-3">
-          <ValueCard
-            icon={<MapPin className="h-5 w-5" />}
-            title="Browse by city"
-            body="Start with a city, then narrow by noise, power, long stays, and work style."
-          />
-          <ValueCard
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            title="Read workability reports"
-            body="Each place is framed around productivity, comfort, and what to know before going."
-          />
-          <ValueCard
-            icon={<ShieldCheck className="h-5 w-5" />}
-            title="Keep data fresh"
-            body="Members can submit places, suggest corrections, and help remove stale information."
-          />
-        </div>
-      </section>
-
-      <section className="border-y bg-muted/20 px-6 py-12">
-        <div className="mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold">Already know a good work spot?</h2>
-            <p className="mt-2 text-muted-foreground">
-              Add it for review and help other people find places where work feels easy.
-            </p>
-          </div>
-          <Button asChild>
-            <Link href="/add-workspace">
-              Submit a workspace
-              <ArrowRight className="ml-2 h-4 w-4" />
+    <main>
+      <section className="relative isolate flex min-h-[350px] items-end bg-[#1c2a23] text-white sm:min-h-[430px] lg:min-h-[min(60svh,580px)]">
+        <Image
+          src="/discovery/new-york-public-library.webp"
+          alt="Stone arches and entrance of the New York Public Library"
+          fill
+          preload
+          sizes="100vw"
+          className="-z-20 object-cover object-center sm:object-[center_42%]"
+        />
+        <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[#101b16]/65 sm:bg-[#101b16]/60" />
+        <div className={`${styles.heroCopy} mx-auto w-full max-w-6xl px-4 py-9 sm:px-6 sm:py-14 lg:py-16`}>
+          <h1 className="max-w-xl text-4xl leading-[1.08] font-semibold text-balance sm:text-5xl lg:text-6xl">
+            Laptop-friendly places to work
+          </h1>
+          <p className="mt-3 max-w-lg text-base text-white sm:text-lg">
+            Find a cafe, library or coworking space for your next work session.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center gap-2.5">
+            <Button asChild className="h-11 bg-[#e3f0e6] text-[#172a20] hover:bg-white [--ring:#fff]">
+              <Link href="/find"><Compass aria-hidden="true" /> Find a Spot <ArrowRight aria-hidden="true" /></Link>
+            </Button>
+            <Link href="/cities" className="keyboard-focus inline-flex min-h-11 items-center rounded-md px-2.5 text-sm font-medium underline decoration-white/60 underline-offset-4 [--ring:#fff] hover:decoration-white">
+              Browse cities
             </Link>
-          </Button>
+          </div>
         </div>
       </section>
 
-      <footer className="bg-card/40 px-6 py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-center text-sm text-muted-foreground md:flex-row md:text-left">
-          <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
-            <span>© {new Date().getFullYear()} {BRAND_NAME}</span>
-            <span className="text-xs">Proudly developed in Switzerland 🇨🇭</span>
+      <section aria-labelledby="featured-place" className="border-b border-border/60">
+        <div className="mx-auto max-w-6xl px-4 pt-5 pb-4 sm:px-6 sm:py-7">
+          <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><MapPin className="size-4" aria-hidden="true" /> New York</p>
+          <h2 id="featured-place" className="mt-1 text-xl font-semibold sm:text-2xl">
+            <Link href={library} className="keyboard-focus group inline-flex min-h-11 items-center gap-2 rounded-sm hover:underline hover:underline-offset-4">
+              New York Public Library <ArrowRight className="size-4 shrink-0 text-primary motion-safe:transition-transform motion-safe:group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+          </h2>
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><Building2 className="size-4" aria-hidden="true" /> Stephen A. Schwarzman Building · Midtown Manhattan</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="contribute" className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-5 gap-y-2 px-4 py-5 sm:px-6 sm:py-7">
+        <h2 id="contribute" className="text-lg font-semibold">Know a good work spot?</h2>
+        <Button variant="outline" asChild className="h-11">
+          <Link href="/add-workspace"><Plus aria-hidden="true" /> Add a place</Link>
+        </Button>
+      </section>
+
+      <footer className="border-t border-border/60 bg-card">
+        <div className="mx-auto max-w-6xl px-4 py-5 text-sm text-muted-foreground sm:px-6">
+          <div className="flex flex-wrap items-center justify-between gap-x-5">
+            <p>© {new Date().getFullYear()} {BRAND_NAME} · Proudly developed in Switzerland</p>
+            <div className="flex flex-wrap gap-x-4">
+              <Link href="/legal/terms" className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Terms</Link>
+              <Link href="/legal/privacy" className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Privacy</Link>
+              <a href="mailto:support@lumen.com" className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Contact</a>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link href="/legal/terms" className="transition-colors hover:text-foreground">Terms</Link>
-            <Link href="/legal/privacy" className="transition-colors hover:text-foreground">Privacy</Link>
-            <Link href="mailto:support@lumen.com" className="transition-colors hover:text-foreground">Contact</Link>
-          </div>
+          <p className="text-xs">
+            <a href={photoSource} className="keyboard-focus underline underline-offset-2">Photo: Kidfly182</a>
+            {" · "}<a href="https://creativecommons.org/licenses/by/4.0/" className="keyboard-focus underline underline-offset-2">CC BY 4.0</a>
+            {" · Cropped for layout"}
+          </p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function SignalRow({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border/30 bg-background/70 p-3 shadow-sm shadow-black/5 dark:shadow-black/20">
-      <div className="flex items-center gap-3">
-        <span className="text-primary">{icon}</span>
-        <span className="font-medium">{label}</span>
-      </div>
-      <span className="text-right text-sm text-muted-foreground">{value}</span>
-    </div>
-  );
-}
-
-function ValueCard({ body, icon, title }: { body: string; icon: ReactNode; title: string }) {
-  return (
-    <Card className="rounded-xl transition-colors hover:bg-card">
-      <CardHeader>
-        <div className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">{body}</p>
-      </CardContent>
-    </Card>
+    </main>
   );
 }

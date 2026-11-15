@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowRight, Bookmark, Building2, MapPin, MapPinCheck, Plus, Shield, UserRound } from "lucide-react";
+import { ArrowRight, Bookmark, Building2, Compass, MapPin, MapPinCheck, Plus, Shield, UserRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,33 +12,33 @@ type MemberHomeProps = {
 
 export function MemberHome({ data }: MemberHomeProps) {
   return (
-    <div className="min-h-full bg-background">
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
-        <section className="flex flex-col gap-5 border-b pb-8 md:flex-row md:items-end md:justify-between">
+    <main className="min-h-full bg-background">
+      <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 md:space-y-6 md:py-8">
+        <section className="flex flex-col gap-3 border-b pb-5 md:flex-row md:items-end md:justify-between">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="text-3xl font-bold tracking-tight md:text-5xl">{data.displayName}</h1>
-            <p className="max-w-2xl text-muted-foreground">
-              Pick up where you left off and keep track of your places.
-            </p>
+            <h1 className="text-3xl font-semibold [overflow-wrap:anywhere] md:text-4xl">{data.displayName}</h1>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Button asChild>
-              <Link href="/cities">
-                <MapPin className="mr-2 h-4 w-4" />
-                Explore
+          <div className="flex flex-wrap gap-2">
+            <Button asChild className="h-11">
+              <Link href="/find">
+                <Compass aria-hidden="true" />
+                Find a Spot
               </Link>
             </Button>
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild className="h-11">
+              <Link href="/cities"><MapPin aria-hidden="true" /> Browse cities</Link>
+            </Button>
+            <Button variant="ghost" asChild className="h-11">
               <Link href="/add-workspace">
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus aria-hidden="true" />
                 Add place
               </Link>
             </Button>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-4">
+        <section aria-label="Your places" className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-4">
           <StatCard href="/saved" icon={<Bookmark className="h-5 w-5" />} label="Saved" value={data.savedCount} />
           <StatCard href="/visited" icon={<MapPinCheck className="h-5 w-5" />} label="Visited" value={data.visitedCount} />
           <StatCard href="/profile/my-workspaces" icon={<Building2 className="h-5 w-5" />} label="Submitted" value={data.submittedCount} />
@@ -71,12 +71,7 @@ export function MemberHome({ data }: MemberHomeProps) {
           </HomeListCard>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <ActionCard
-            href="/find"
-            title="Find a Spot"
-            body="Compare places by activity, stay length, Wi-Fi, and outlets."
-          />
+        <section className="grid gap-4 md:grid-cols-2">
           <ActionCard
             href="/profile"
             title="Tune your profile"
@@ -97,20 +92,20 @@ export function MemberHome({ data }: MemberHomeProps) {
           )}
         </section>
       </div>
-    </div>
+    </main>
   );
 }
 
 function StatCard({ href, icon, label, value }: { href: string; icon: ReactNode; label: string; value: number }) {
   return (
-    <Link href={href}>
-      <Card className="h-full rounded-lg transition-colors hover:border-primary/50">
-        <CardContent className="flex items-center justify-between gap-4 py-5">
-          <div>
+    <Link href={href} className="keyboard-focus rounded-lg">
+      <Card className="h-full gap-0 py-0 transition-colors hover:border-primary/50">
+        <CardContent className="flex items-center justify-between gap-2 px-3 py-3 sm:px-5 sm:py-4">
+          <div className="min-w-0">
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">{value}</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
           </div>
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+          <span aria-hidden="true" className="inline-flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary sm:size-10">
             {icon}
           </span>
         </CardContent>
@@ -139,7 +134,7 @@ function HomeListCard({
 
   return (
     <Card className="rounded-lg">
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <CardTitle>{title}</CardTitle>
           <CardDescription>{description}</CardDescription>

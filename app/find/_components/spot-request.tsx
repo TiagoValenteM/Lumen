@@ -12,12 +12,12 @@ import {
 type RequestState = "idle" | "review" | "unrecognized" | "partial" | "unavailable" | "limited" | "private";
 
 const messages: Record<Exclude<RequestState, "idle">, string> = {
-  review: "Filters updated. Review them below.",
-  unrecognized: "That request doesn’t fit the available filters. You can set them below.",
-  partial: "Some details weren’t applied. Review the filters below.",
-  unavailable: "AI couldn’t interpret this request. You can still set the filters below.",
-  limited: "AI is at its request limit. You can still set the filters below.",
-  private: "Remove links, contact details, or coordinates, or set the filters below.",
+  review: "Filters updated.",
+  unrecognized: "That request doesn’t fit the available filters.",
+  partial: "Some details weren’t applied.",
+  unavailable: "AI couldn’t interpret this request.",
+  limited: "AI is at its request limit.",
+  private: "Remove links, contact details, or coordinates.",
 };
 
 export function SpotRequest({ canUseAi, onInterpret }: {
@@ -100,14 +100,14 @@ export function SpotRequest({ canUseAi, onInterpret }: {
   }
 
   return (
-    <div className="space-y-2.5">
-      <form onSubmit={handleLocal} className="space-y-2.5">
+    <div className="space-y-1.5">
+      <form onSubmit={handleLocal} className="space-y-1.5">
         <label htmlFor={id} className="block text-sm font-medium">What kind of spot do you need?</label>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex gap-2">
           <Input id={id} autoComplete="off" maxLength={MAX_REQUEST_LENGTH} value={text} onChange={(event) => updateText(event.target.value)}
-            placeholder="Somewhere quiet for two hours, with Wi-Fi" className="h-10 min-w-0 sm:flex-1" />
-          <Button type="submit" variant="secondary" className="h-10 shrink-0" disabled={loading || !text.trim()}>
-            Set filters <ArrowRight aria-hidden="true" />
+            placeholder="Quiet spot with Wi-Fi" className="h-11 min-w-0 flex-1" />
+          <Button type="submit" variant="secondary" aria-label="Set filters" title="Set filters" className="h-11 min-w-11 shrink-0 px-2.5 sm:px-4" disabled={loading || !text.trim()}>
+            <span className="hidden sm:inline">Set filters</span><ArrowRight aria-hidden="true" />
           </Button>
         </div>
       </form>

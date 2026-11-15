@@ -10,14 +10,15 @@ import { FACT_CHECK_MAX_AGE_MS, type SpotCandidate } from "@/lib/features/find-a
 
 const checkDate = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
-export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate; city: string; now: number }) {
+export function SpotResult({ candidate, city, now, nested }: { candidate: SpotCandidate; city: string; now: number; nested?: boolean }) {
   const { place, reasons, toCheck, distance } = candidate;
   const directions = getWorkspaceDirections(place);
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const showPhoto = place.photoUrl?.startsWith("https://") && brokenPhoto !== place.photoUrl;
   const checked = Date.parse(place.checkedAt ?? "");
+  const PlaceHeading = nested ? "h4" : "h3";
   return (
-    <li className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-4 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:gap-x-4">
+    <li className="grid min-w-0 grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 py-3 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:gap-x-4 sm:py-4">
       <div className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
         {showPhoto && place.photoUrl ? <Image unoptimized src={place.photoUrl} alt="" fill sizes="72px" referrerPolicy="no-referrer"
           className="object-cover" onError={() => setBrokenPhoto(place.photoUrl)} /> : <Building2 className="size-5" aria-hidden="true" />}
@@ -26,11 +27,11 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
         <p className="text-xs capitalize text-muted-foreground">
           {place.type.replaceAll("_", " ")}{distance !== null && ` · ${distance < 0.1 ? "< 0.1" : distance.toFixed(1)} km away`}
         </p>
-        <h3 className="font-semibold [overflow-wrap:anywhere]">
+        <PlaceHeading className="font-semibold [overflow-wrap:anywhere]">
           <Link id={`spot-${place.id}`} href={`/cities/${encodeURIComponent(city)}/${encodeURIComponent(place.slug)}`} className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
             {place.name}
           </Link>
-        </h3>
+        </PlaceHeading>
         {place.address && <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{place.address}</p>}
         {toCheck.length ? <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Check:</span> {toCheck.join(" · ")}</p> : (
           <p className="flex items-start gap-1.5 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{reasons.join(" · ")}</span></p>
@@ -39,7 +40,7 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" aria-hidden="true" /> Work facts checked {checkDate.format(checked)}</p>
         )}
       </div>
-      {directions && <Button variant="outline" size="sm" asChild className="col-start-2 min-h-9 w-fit sm:col-start-3 sm:self-start">
+      {directions && <Button variant="ghost" size="sm" asChild className="col-start-2 min-h-11 w-fit px-0 text-primary hover:bg-transparent hover:underline sm:col-start-3 sm:self-start sm:px-2.5">
         <a href={directions} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${place.name} (opens in a new tab)`}><Navigation aria-hidden="true" /> Directions</a>
       </Button>}
     </li>
