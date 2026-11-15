@@ -18,9 +18,10 @@ import {
 import { Plus, User, LogOut } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
-import { CoffeeLogo } from "@/components/shared";
+import { DeskhauntMark } from "@/components/shared/deskhaunt-mark";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDisplayName, getInitials } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/constants/brand";
 
 export default function NavBar() {
   const { user, profile, isAdmin, signOut } = useAuth();
@@ -41,18 +42,19 @@ export default function NavBar() {
   const initials = !avatarUrl ? getInitials(displayName) : undefined;
 
   return (
-    <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-border/25 bg-background/85 px-6 shadow-sm shadow-black/5 backdrop-blur-xl dark:shadow-black/20">
-      <Link href="/" className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity">
-        <CoffeeLogo className="h-6 w-6" />
-        <span>Lumen</span>
+    <nav className="sticky top-0 z-50 flex h-(--app-nav-height) items-center justify-between bg-card px-3 shadow-xs shadow-black/10 sm:px-6 dark:shadow-black/25">
+      <Link href="/" aria-label={`${BRAND_NAME} home`} className="keyboard-focus flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-1 text-sm font-semibold text-foreground hover:text-primary">
+        <DeskhauntMark />
+        <span className="truncate">{BRAND_NAME}</span>
       </Link>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button 
                 variant="ghost" 
-                size="icon" 
+                size="icon-lg"
+                className="size-11"
                 aria-label="Add workspace"
                 asChild
               >
@@ -66,13 +68,13 @@ export default function NavBar() {
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <div className="h-6 w-px bg-border" />
+        <div aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
         <ThemeToggle />
-        <div className="h-6 w-px bg-border" />
+        <div aria-hidden="true" className="hidden h-5 w-px bg-border sm:block" />
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="User menu">
+              <Button variant="ghost" size="icon-lg" className="size-11" aria-label="User menu">
                 <User className="h-6 w-6" />
               </Button>
             </DropdownMenuTrigger>
@@ -109,7 +111,7 @@ export default function NavBar() {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button variant="ghost" size="icon" asChild aria-label="Sign in">
+          <Button variant="ghost" size="icon-lg" className="size-11" asChild aria-label="Sign in">
             <Link href="/login">
               <User className="h-6 w-6" />
             </Link>

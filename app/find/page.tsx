@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import { FindSpot } from "./_components/find-spot";
+import { BRAND_NAME } from "@/lib/constants/brand";
 
-export const metadata = { title: "Find a Spot | Lumen" };
+export const metadata = { title: `Find a Spot | ${BRAND_NAME}` };
 
 export default function FindPage() {
   const aiEnabled = process.env.FIND_A_SPOT_AI_ENABLED === "true" && Boolean(process.env.OPENROUTER_API_KEY);

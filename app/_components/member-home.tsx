@@ -19,7 +19,7 @@ export function MemberHome({ data }: MemberHomeProps) {
             <p className="text-sm text-muted-foreground">Welcome back</p>
             <h1 className="text-3xl font-bold tracking-tight md:text-5xl">{data.displayName}</h1>
             <p className="max-w-2xl text-muted-foreground">
-              Pick up where you left off, keep track of your places, and help Lumen stay useful for the next remote worker.
+              Pick up where you left off and keep track of your places.
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -60,7 +60,7 @@ export function MemberHome({ data }: MemberHomeProps) {
 
           <HomeListCard
             title="Your latest submissions"
-            description="Track what you have added to Lumen."
+            description="Track the places you have submitted."
             empty="No submitted places yet."
             actionHref="/profile/my-workspaces"
             actionLabel="View submissions"

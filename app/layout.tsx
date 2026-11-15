@@ -3,9 +3,10 @@ import "./globals.css";
 import { NavBar } from "@/components/features/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { BRAND_NAME } from "@/lib/constants/brand";
 
 export const metadata: Metadata = {
-  title: "Lumen | Productive Workspaces",
+  title: `${BRAND_NAME} | Work-friendly places`,
   description: "Discover the best cities and workspaces for digital nomads and remote workers",
 };
 
@@ -24,8 +25,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
+            <a href="#root-content" className="skip-link keyboard-focus">Skip to content</a>
             <NavBar />
-            <div id="root-content">
+            <div id="root-content" tabIndex={-1}>
               {children}
             </div>
           </AuthProvider>

@@ -24,7 +24,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" aria-label="Toggle theme" disabled>
+      <Button variant="ghost" size="icon-lg" className="size-11" aria-label="Toggle theme" disabled>
         <div className="h-6 w-6" />
       </Button>
     );
@@ -40,7 +40,8 @@ export function ThemeToggle() {
         <TooltipTrigger asChild>
           <Button
             variant="ghost"
-            size="icon"
+            size="icon-lg"
+            className="size-11"
             onClick={() => setTheme(nextMode)}
             aria-label="Toggle theme"
           >

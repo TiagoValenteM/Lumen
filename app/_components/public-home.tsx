@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Coffee, MapPin, Search, ShieldCheck, Wifi, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BRAND_NAME } from "@/lib/constants/brand";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const featuredUseCases = ["Quiet work", "Calls", "Long stays", "Power access"];
@@ -25,7 +26,7 @@ export function PublicHome() {
                 Find laptop-friendly places to work.
               </h1>
               <p className="max-w-2xl text-lg text-muted-foreground md:text-xl">
-                Lumen helps remote workers discover cafes, coworking spaces, libraries, and hotel lobbies that are actually useful for focused work.
+                Browse cafes, coworking spaces, libraries, and hotel lobbies for your next work session.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -48,7 +49,7 @@ export function PublicHome() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Workspace assessment</p>
-                <h2 className="mt-1 text-2xl font-semibold">What Lumen checks</h2>
+                <h2 className="mt-1 text-2xl font-semibold">What to look for</h2>
               </div>
               <div className="grid gap-3">
                 <SignalRow icon={<Wifi className="h-4 w-4" />} label="Reliable WiFi" value="Fast enough to work" />
@@ -101,7 +102,7 @@ export function PublicHome() {
       <footer className="bg-card/40 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-center text-sm text-muted-foreground md:flex-row md:text-left">
           <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
-            <span>© {new Date().getFullYear()} Lumen</span>
+            <span>© {new Date().getFullYear()} {BRAND_NAME}</span>
             <span className="text-xs">Proudly developed in Switzerland 🇨🇭</span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4">
