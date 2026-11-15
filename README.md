@@ -1,16 +1,18 @@
-# Lumen
+# Deskhaunt
 
-Find a cafe, library, or coworking space where you can get some work done. Lumen helps you decide where to go based on laptop policies, stay limits, Wi-Fi, and outlets, and shows which details still need checking.
+Find a cafe, library, or coworking space where you can get some work done. Deskhaunt helps you compare laptop policies, stay limits, Wi-Fi, and outlets without treating missing information as a match.
 
-[Try Find a Spot](https://lumen-lime.vercel.app/find?city=new-york-united-states) · [Browse cities](https://lumen-lime.vercel.app/cities) · [Read the architecture](docs/engineering/architecture.md)
+[Open the live demo](https://lumen-lime.vercel.app/find?city=new-york-united-states) · [Interview walkthrough](docs/showcase/walkthrough.md) · [Architecture](docs/engineering/architecture.md)
 
-[![Find a Spot showing New York results, work filters, and a map](docs/showcase/find-a-spot.png)](https://lumen-lime.vercel.app/find?city=new-york-united-states)
+[![Deskhaunt's Find a Spot in New York, with editable filters, a list of places with details to check, and a map](docs/showcase/find-a-spot.png)](https://lumen-lime.vercel.app/find?city=new-york-united-states)
+
+[Mobile home](docs/showcase/home-mobile.png) · [Mobile place details](docs/showcase/place-mobile.png) · [AI review with sample data](docs/showcase/ai-review.png)
 
 ## Try it in two minutes
 
 1. Open [Find a Spot in New York](https://lumen-lime.vercel.app/find?city=new-york-united-states) and type `Somewhere quiet for two hours, with Wi-Fi`. The app turns the request into filters you can edit.
 2. Open the map or inspect a listing. If a fact is missing or out of date, the place appears under **Details to check** instead of **Matches**. Opening hours and seat availability aren't verified by the finder.
-3. Visit [Lisbon](https://lumen-lime.vercel.app/cities/lisbon) for the city directory experience, or see the [mobile view](docs/showcase/lisbon-mobile.png). Browsing needs no account; an account lets you save places, mark visits, review venues, and submit corrections or new listings.
+3. Open a place to see its work facts, when they were checked, and directions. Browsing needs no account. Members can save places, mark visits, post reviews, and submit places or corrections.
 
 ## Engineering decisions
 
@@ -20,7 +22,9 @@ Find a cafe, library, or coworking space where you can get some work done. Lumen
 
 ## Run it locally
 
-Lumen uses Next.js App Router, TypeScript, Tailwind CSS, Supabase, and MapLibre. The [development guide](docs/engineering/development.md) covers Node.js, pnpm, an isolated database, and environment variables. [GitHub Actions](https://github.com/TiagoValenteM/Lumen/actions/workflows/checks.yml) runs lint, type checks, tests, and a production build.
+Deskhaunt uses Next.js App Router, TypeScript, Tailwind CSS, Supabase, and MapLibre. The [development guide](docs/engineering/development.md) covers Node.js, pnpm, an isolated database, and environment variables. [GitHub Actions](https://github.com/TiagoValenteM/Lumen/actions/workflows/checks.yml) runs lint, type checks, tests, and a production build.
+
+Deskhaunt was previously called Lumen. The existing GitHub repository and live URLs are unchanged.
 
 [Demo walkthrough](docs/showcase/walkthrough.md) · [Documentation index](docs/index.md) · [Deployment runbook](docs/operations/deployments.md)
 

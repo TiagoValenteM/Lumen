@@ -2,6 +2,13 @@ import { MemberHome } from "@/app/_components/member-home";
 import { PublicHome } from "@/app/_components/public-home";
 import { getMemberHomeData } from "@/lib/features/home/member-home-data";
 import { createClient } from "@/lib/supabase/server";
+import type { Metadata } from "next";
+import { BRAND_OPEN_GRAPH } from "@/lib/constants/brand";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+  openGraph: { ...BRAND_OPEN_GRAPH, url: "/" },
+};
 
 export default async function Home() {
   const supabase = await createClient();

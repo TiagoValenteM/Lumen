@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Building2, Compass, MapPin, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BRAND_NAME } from "@/lib/constants/brand";
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/lib/constants/brand";
 import styles from "./public-home.module.css";
 
 const library = "/cities/new-york-united-states/new-york-public-library-stephen-a-schwarzman-building-new-york";
@@ -65,7 +65,7 @@ export function PublicHome() {
             <div className="flex flex-wrap gap-x-4">
               <Link href="/legal/terms" className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Terms</Link>
               <Link href="/legal/privacy" className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Privacy</Link>
-              <a href="mailto:support@lumen.com" className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Contact</a>
+              <a href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="keyboard-focus inline-flex min-h-11 items-center hover:text-foreground">Contact</a>
             </div>
           </div>
           <p className="text-xs">

@@ -119,7 +119,10 @@ test("AI actions reflect active, failed and reviewable runs; confirmations do no
     await page.setViewportSize({ width, height: 900 });
     await page.emulateMedia({ colorScheme: width >= 768 ? "light" : "dark" });
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
-    if (width === 390 || width === 1440) await page.screenshot({ path: info.outputPath(`editor-${width}.png`) });
+    if (width === 390 || width === 1440) await page.screenshot({
+      path: info.outputPath(`editor-${width}.png`),
+      style: "nextjs-portal { display: none !important; }",
+    });
   }
   await panel.getByRole("combobox", { name: "Filter suggestions" }).click();
   await page.getByRole("option", { name: "High confidence", exact: true }).click();

@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/lib/constants/brand";
+
+export const metadata = { title: "Privacy Policy" };
 
 const updatedAt = "November 13, 2026";
 
@@ -15,7 +18,7 @@ export default function PrivacyPage() {
           </CardHeader>
           <CardContent className="space-y-6 text-sm leading-relaxed text-muted-foreground">
             <Section title="What we collect">
-              Lumen stores account information such as your email, profile name, tag, avatar, bio, and account role. We also store product activity you choose to create, including saved workspaces, visited workspaces, submitted places, reviews, ratings, uploaded photos, and suggested corrections.
+              {BRAND_NAME} stores account information such as your email, profile name, tag, avatar, bio, and account role. We also store product activity you choose to create, including saved workspaces, visited workspaces, submitted places, reviews, ratings, uploaded photos, and suggested corrections.
             </Section>
 
             <Section title="Location data">
@@ -23,7 +26,7 @@ export default function PrivacyPage() {
             </Section>
 
             <Section title="Find a Spot and optional AI">
-              Common requests are interpreted in your browser. When you choose Try with AI, Lumen sends the text you entered to OpenRouter to suggest filters. Lumen does not attach your account details or device location, and does not save the request text. It keeps a request count tied to your account to enforce daily limits. Do not include personal information in the request.
+              Common requests are interpreted in your browser. When you choose Try with AI, {BRAND_NAME} sends the text you entered to OpenRouter to suggest filters. {BRAND_NAME} does not attach your account details or device location, and does not save the request text. It keeps a request count tied to your account to enforce daily limits. Do not include personal information in the request.
             </Section>
 
             <Section title="Workspace and moderation data">
@@ -35,7 +38,7 @@ export default function PrivacyPage() {
             </Section>
 
             <Section title="Sharing and processors">
-              We do not sell personal data. Lumen uses service providers such as Supabase for authentication, database, and file storage. Location search or reverse-geocoding features may contact external mapping/geocoding services depending on configuration.
+              We do not sell personal data. {BRAND_NAME} uses service providers such as Supabase for authentication, database, and file storage. Location search or reverse-geocoding features may contact external mapping/geocoding services depending on configuration.
             </Section>
 
             <Section title="Your choices">
@@ -44,8 +47,8 @@ export default function PrivacyPage() {
 
             <Section title="Contact">
               For privacy questions, contact{" "}
-              <Link href="mailto:support@lumen.com" className="text-primary underline">
-                support@lumen.com
+              <Link href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="text-primary underline">
+                {BRAND_SUPPORT_EMAIL}
               </Link>
               .
             </Section>

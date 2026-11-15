@@ -3,11 +3,19 @@ import "./globals.css";
 import { NavBar } from "@/components/features/navigation";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { BRAND_NAME } from "@/lib/constants/brand";
+import { BRAND_DESCRIPTION, BRAND_NAME, BRAND_OPEN_GRAPH, getSiteOrigin } from "@/lib/constants/brand";
 
 export const metadata: Metadata = {
-  title: `${BRAND_NAME} | Work-friendly places`,
-  description: "Discover the best cities and workspaces for digital nomads and remote workers",
+  metadataBase: getSiteOrigin(process.env),
+  applicationName: BRAND_NAME,
+  title: {
+    default: `${BRAND_NAME} | Work-friendly places`,
+    template: `%s | ${BRAND_NAME}`,
+  },
+  description: BRAND_DESCRIPTION,
+  openGraph: BRAND_OPEN_GRAPH,
+  twitter: { card: "summary_large_image" },
+  robots: process.env.VERCEL_ENV === "preview" ? { index: false, follow: false } : undefined,
 };
 
 export default function RootLayout({

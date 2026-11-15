@@ -1,6 +1,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BRAND_NAME, BRAND_SUPPORT_EMAIL } from "@/lib/constants/brand";
+
+export const metadata = { title: "Terms of Service" };
 
 const updatedAt = "June 5, 2026";
 
@@ -14,8 +17,8 @@ export default function TermsPage() {
             <CardDescription>Last updated {updatedAt}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 text-sm leading-relaxed text-muted-foreground">
-            <Section title="Using Lumen">
-              Lumen helps people discover and evaluate work-friendly places such as cafes, coworking spaces, libraries, restaurants, and hotel lobbies. You may browse public city and workspace pages without an account. Some features, including saving places, marking visits, submitting places, writing reviews, and suggesting corrections, require an account.
+            <Section title={`Using ${BRAND_NAME}`}>
+              {BRAND_NAME} helps people discover and evaluate work-friendly places such as cafes, coworking spaces, libraries, restaurants, and hotel lobbies. You may browse public city and workspace pages without an account. Some features, including saving places, marking visits, submitting places, writing reviews, and suggesting corrections, require an account.
             </Section>
 
             <Section title="Accounts">
@@ -23,7 +26,7 @@ export default function TermsPage() {
             </Section>
 
             <Section title="Workspace submissions and corrections">
-              If you submit a workspace, upload photos, or suggest edits, you agree that the information is accurate to the best of your knowledge and that you have the right to share it. Lumen may review, edit, approve, reject, merge, or remove submitted content to keep the directory useful and trustworthy.
+              If you submit a workspace, upload photos, or suggest edits, you agree that the information is accurate to the best of your knowledge and that you have the right to share it. {BRAND_NAME} may review, edit, approve, reject, merge, or remove submitted content to keep the directory useful and trustworthy.
             </Section>
 
             <Section title="Reviews and community content">
@@ -35,13 +38,13 @@ export default function TermsPage() {
             </Section>
 
             <Section title="Availability and changes">
-              We aim to keep Lumen reliable, but we do not guarantee uninterrupted access or error-free data. We may change, suspend, or discontinue parts of the service as the product evolves.
+              We aim to keep {BRAND_NAME} reliable, but we do not guarantee uninterrupted access or error-free data. We may change, suspend, or discontinue parts of the service as the product evolves.
             </Section>
 
             <Section title="Contact">
               Questions about these terms can be sent to{" "}
-              <Link href="mailto:support@lumen.com" className="text-primary underline">
-                support@lumen.com
+              <Link href={`mailto:${BRAND_SUPPORT_EMAIL}`} className="text-primary underline">
+                {BRAND_SUPPORT_EMAIL}
               </Link>
               .
             </Section>
