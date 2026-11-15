@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,16 +18,16 @@ type SuggestionsPanelProps = {
 
 export function SuggestionsPanel({ suggestions, savingSuggestionId, onUpdateStatus }: SuggestionsPanelProps) {
   return (
-    <div className="space-y-2">
-      <Label>Edit suggestions</Label>
+    <section id="edit-suggestions" aria-labelledby="edit-suggestions-title" className="scroll-mt-32 space-y-2 border-t border-border/60 pt-4">
+      <h2 id="edit-suggestions-title" className="text-lg font-semibold">Edit suggestions</h2>
       {suggestions.length === 0 ? (
-        <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-          No public suggestions for this workspace.
+        <p className="text-sm text-muted-foreground">
+          No edit suggestions yet.
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="divide-y divide-border/60">
           {suggestions.map((suggestion) => (
-            <div key={suggestion.id} className="min-w-0 rounded-md border p-3">
+            <div key={suggestion.id} className="min-w-0 py-3">
               <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Badge variant="outline" className="capitalize">
@@ -43,7 +42,7 @@ export function SuggestionsPanel({ suggestions, savingSuggestionId, onUpdateStat
                   onValueChange={(value) => onUpdateStatus(suggestion.id, value)}
                   disabled={savingSuggestionId === suggestion.id}
                 >
-                  <SelectTrigger className="h-8 w-[130px] text-xs">
+                  <SelectTrigger aria-label="Suggestion status" className="min-h-11 w-[130px]">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -54,11 +53,11 @@ export function SuggestionsPanel({ suggestions, savingSuggestionId, onUpdateStat
                   </SelectContent>
                 </Select>
               </div>
-              <p className="whitespace-pre-wrap break-words text-sm text-muted-foreground">{suggestion.message}</p>
+              <p className="whitespace-pre-wrap text-sm text-muted-foreground [overflow-wrap:anywhere]">{suggestion.message}</p>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

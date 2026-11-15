@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, Loader2, Shield } from "lucide-react";
+import { ArrowLeft, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
 import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccessRestricted, FeedbackState, LoadingState, PageContainer, PageShell } from "@/components/shared/lumen-page";
 import { isMissingColumnError, workspaceSelect } from "../_lib/admin-workspace-actions";
 import { toWorkspaceForm } from "../_lib/workspace-form";
 import type { AdminWorkspaceFormState, WorkspaceDetailMinimal, WorkspacePhotoRow, WorkspaceQueryRow } from "../_lib/types";
@@ -130,78 +130,39 @@ export default function AdminWorkspacePreviewPage() {
   }, [isAdmin, loadPreview]);
 
   if (loadingProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading preview...</span>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Checking access…" />;
   }
 
   if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-destructive" />
-              Access restricted
-            </CardTitle>
-            <CardDescription>You need admin access to view this preview.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/profile">Back to profile</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <AccessRestricted icon={Shield} description="You need admin access to view this preview." />;
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading preview...</span>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Loading saved preview…" />;
   }
 
   if (!workspace || !form || error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Preview unavailable</CardTitle>
-            <CardDescription>{error || "Try returning to the workspace editor."}</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <PageShell><PageContainer size="md">
+        <h1 className="text-3xl font-semibold">Preview unavailable</h1>
+        <FeedbackState description={error || "Try returning to the workspace editor."} action={
             <Button asChild variant="outline">
               <Link href={id ? `/admin/workspaces/${id}` : "/admin/workspaces"}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to editor
               </Link>
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+        } />
+      </PageContainer></PageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col gap-3 border-b border-border/30 pb-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium text-primary">Admin preview</p>
-            <h1 className="text-2xl font-semibold tracking-tight">Published page preview</h1>
-          </div>
-          <Button asChild variant="outline">
+    <PageShell>
+      <PageContainer size="xl" className="gap-4 py-5 sm:gap-5 sm:py-8">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 pb-3">
+          <p className="text-sm font-semibold">Saved admin preview</p>
+          <Button asChild variant="outline" className="min-h-11">
             <Link href={`/admin/workspaces/${workspace.id}`}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to editor
@@ -210,7 +171,7 @@ export default function AdminWorkspacePreviewPage() {
         </div>
 
         <WorkspacePublishedPreview form={form} photos={photos} workspace={workspace} />
-      </div>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

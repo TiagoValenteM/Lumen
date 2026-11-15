@@ -1,10 +1,11 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { City, Photo, WorkspaceDetail } from "@/lib/types";
-import { Eye, Info } from "lucide-react";
+import { Info } from "lucide-react";
+import { ModerationStatus } from "../../../_components/moderation-status";
+import { getWorkspaceStatusPresentation } from "../../_lib/status-presentation";
 import { WorkspaceGallery } from "@/app/cities/[slug]/[workspace]/_components/workspace-gallery";
 import { WorkspaceHeader } from "@/app/cities/[slug]/[workspace]/_components/workspace-header";
 import { WorkspaceMainDetails } from "@/app/cities/[slug]/[workspace]/_components/workspace-main-details";
@@ -20,22 +21,13 @@ export function WorkspacePublishedPreview({ form, photos, workspace }: Workspace
   const previewWorkspace = toPreviewWorkspace(workspace, form);
   const previewCity = toPreviewCity(workspace, form);
   const previewPhotos = toPreviewPhotos(photos);
+  const status = getWorkspaceStatusPresentation(workspace.status);
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 rounded-xl border border-border/30 bg-muted/15 p-4 shadow-sm shadow-black/5 dark:shadow-black/20 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex items-center gap-2 font-semibold">
-            <Eye className="h-5 w-5 text-primary" />
-            Published page preview
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Admin-only preview using the current saved moderation data. This is not a public URL.
-          </p>
-        </div>
-        <Badge variant="outline" className="w-fit capitalize">
-          {form.status}
-        </Badge>
+      <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2.5 text-sm text-muted-foreground">
+        <ModerationStatus label={status.label} tone={status.tone} />
+        <span>Saved data · Only visible to admins</span>
       </div>
 
       <WorkspaceHeader city={previewCity} workspace={previewWorkspace} />

@@ -5,13 +5,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,13 +12,14 @@ import {
   AccessRestricted,
   FeedbackState,
   LoadingState,
-  MetricButton,
   PageContainer,
   PageHeader,
   PageShell,
-  SectionPanel,
 } from "@/components/shared";
-import { Building2, Pencil, Filter, Shield, MapPin, CheckCircle, XCircle, Clock, Wrench, Globe2, Loader2 } from "lucide-react";
+import { Building2, ArrowRight, RefreshCw, Search, Shield, MapPin, Loader2 } from "lucide-react";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
+import { ModerationStatus } from "../_components/moderation-status";
+import { getAiStatusPresentation } from "./_lib/status-presentation";
 
 type AiStatus = "none" | "queued" | "researching" | "extracting" | "pending" | "ready_for_review" | "completed" | "failed" | "dismissed" | "applied";
 
@@ -66,13 +60,6 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" },
   { value: "all", label: "All" },
 ];
-
-const STATUS_META = {
-  pending: { label: "Pending", icon: Clock, color: "text-yellow-600" },
-  under_review: { label: "Needs fixes", icon: Wrench, color: "text-blue-600" },
-  approved: { label: "Approved", icon: CheckCircle, color: "text-green-600" },
-  rejected: { label: "Rejected", icon: XCircle, color: "text-red-600" },
-} as const;
 
 const AI_FILTER_OPTIONS = [
   { value: "all", label: "All AI" },
@@ -313,47 +300,16 @@ export default function AdminWorkspacesPage() {
 
   return (
     <PageShell>
-      <PageContainer>
+      <PageContainer className="gap-4 py-5 sm:gap-5 sm:py-8">
         <PageHeader
-          title="Admin · Workspaces"
-          description="Review, approve, or edit submitted workspaces."
+          title="Place moderation"
           actions={
             <>
-            <Input
-              placeholder="Search by name, city, country, or slug"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-64"
-            />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={aiFilter} onValueChange={setAiFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="AI" />
-              </SelectTrigger>
-              <SelectContent>
-                {AI_FILTER_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={() => loadWorkspaces()} className="inline-flex items-center gap-2">
-              <Filter className="h-4 w-4" />
+            <Button type="button" variant="ghost" onClick={() => loadWorkspaces()} disabled={loading} className="min-h-11">
+              <RefreshCw className={loading ? "motion-safe:animate-spin" : ""} aria-hidden="true" />
               Refresh
             </Button>
-            <Button asChild variant="outline" className="inline-flex items-center gap-2">
+            <Button asChild variant="outline" className="min-h-11">
               <Link href="/admin/cities">
                 <Building2 className="h-4 w-4" />
                 Cities
@@ -363,43 +319,40 @@ export default function AdminWorkspacesPage() {
           }
         />
 
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {STATUS_OPTIONS.map((option) => {
-            const isAll = option.value === "all";
-            const meta = isAll ? null : STATUS_META[option.value as keyof typeof STATUS_META];
-            const Icon = meta?.icon || Building2;
-            const count = statusCounts[option.value as keyof typeof statusCounts] ?? 0;
-            return (
-              <MetricButton
-                key={option.value}
-                label={option.label}
-                value={count}
-                icon={Icon}
-                iconClassName={meta?.color}
-                active={statusFilter === option.value}
-                onClick={() => setStatusFilter(option.value)}
-              />
-            );
-          })}
+        <div className="flex flex-wrap gap-1.5 border-b border-border/60 pb-3" role="group" aria-label="Filter by place status">
+          {STATUS_OPTIONS.map(({ value, label }) => (
+            <Button key={value} type="button" variant={statusFilter === value ? "secondary" : "ghost"}
+              className="min-h-11" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)}>
+              {label} <span className="tabular-nums text-muted-foreground">{statusCounts[value as keyof typeof statusCounts]}</span>
+            </Button>
+          ))}
         </div>
 
-        <SectionPanel>
-          <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Workspaces by location</CardTitle>
-              <CardDescription>
-                {filtered.length} {filtered.length === 1 ? "workspace" : "workspaces"} shown across {grouped.length} {grouped.length === 1 ? "country" : "countries"}
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <div className="flex flex-wrap gap-2">
+          <div className="relative min-w-0 flex-1 basis-40 sm:max-w-sm">
+            <Search className="pointer-events-none absolute top-3.5 left-3 size-4 text-muted-foreground" aria-hidden="true" />
+            <Input aria-label="Search places" type="search" placeholder="Name, city, country or slug"
+              value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 pl-9" />
+          </div>
+          <Select value={aiFilter} onValueChange={setAiFilter}>
+            <SelectTrigger aria-label="Filter by AI status" className="min-h-11"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {AI_FILTER_OPTIONS.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <section aria-label="Places by location" className="space-y-4">
+          {!loading && !error && <p role="status" className="text-sm text-muted-foreground">
+            {filtered.length} {filtered.length === 1 ? "place" : "places"} · {grouped.length} {grouped.length === 1 ? "country" : "countries"}
+          </p>}
             {loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Loading workspaces...</span>
+              <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+                <span>Loading places…</span>
               </div>
             )}
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <InlineFeedback error>{error}</InlineFeedback>}
             {!loading && !error && filtered.length === 0 && (
               <FeedbackState
                 icon={Building2}
@@ -409,25 +362,21 @@ export default function AdminWorkspacesPage() {
             )}
             <div className="space-y-5">
               {grouped.map((countryGroup) => (
-                <section key={countryGroup.country} className="space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <Globe2 className="h-4 w-4 text-muted-foreground" />
-                      <h2 className="truncate text-base font-semibold">{countryGroup.country}</h2>
-                    </div>
-                    <Badge variant="secondary">{countryGroup.total} places</Badge>
+                <section key={countryGroup.country} className="min-w-0 space-y-3">
+                  <div className="flex items-baseline justify-between gap-2 border-b border-border/60 pb-2">
+                    <h2 className="min-w-0 text-lg font-semibold [overflow-wrap:anywhere]">{countryGroup.country}</h2>
+                    <span className="shrink-0 text-xs text-muted-foreground">{countryGroup.total}</span>
                   </div>
 
                   <div className="space-y-4">
                     {countryGroup.cities.map((cityGroup) => (
                       <div key={`${countryGroup.country}-${cityGroup.city}`} className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          <h3 className="text-sm font-medium">{cityGroup.city}</h3>
-                          <Badge variant="outline">{cityGroup.total}</Badge>
+                          <MapPin className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                          <h3 className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{cityGroup.city}</h3>
+                          <span className="text-xs text-muted-foreground">{cityGroup.total}</span>
                         </div>
-                        <div className="overflow-hidden rounded-xl border border-border/35 bg-background/55 shadow-sm shadow-black/5">
-                          <div className="divide-y divide-border/40">
+                        <ul className="divide-y divide-border/55 border-y border-border/55">
                             {cityGroup.workspaces.map((ws) => (
                               <WorkspaceListRow
                                 key={ws.id}
@@ -436,16 +385,14 @@ export default function AdminWorkspacesPage() {
                                 onStatusChange={updateStatus}
                               />
                             ))}
-                          </div>
-                        </div>
+                        </ul>
                       </div>
                     ))}
                   </div>
                 </section>
               ))}
             </div>
-          </CardContent>
-        </SectionPanel>
+        </section>
       </PageContainer>
     </PageShell>
   );
@@ -461,32 +408,23 @@ function WorkspaceListRow({
   onStatusChange: (id: string, status: "approved" | "rejected" | "pending" | "under_review") => void;
 }) {
   const status = normalizeStatus(workspace.status);
-  const meta = STATUS_META[status];
-  const Icon = meta.icon;
+  const ai = getAiStatusPresentation(workspace.ai_status);
 
   return (
-    <div className="grid gap-3 px-3 py-3 md:grid-cols-[minmax(0,1fr)_150px_170px_44px] md:items-center">
+    <li className="grid gap-x-3 gap-y-1 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
       <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h4 className="truncate font-medium leading-tight">{workspace.name}</h4>
-          <Badge variant="outline" className="capitalize">{meta.label}</Badge>
-          <AiStatusBadge status={workspace.ai_status} />
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span className="truncate">{workspace.slug}</span>
-          {workspace.short_description && <span className="truncate md:max-w-[360px]">{workspace.short_description}</span>}
-        </div>
+        <Link href={`/admin/workspaces/${workspace.id}`} className="keyboard-focus inline-flex min-h-11 items-center gap-1.5 rounded-sm font-medium [overflow-wrap:anywhere] hover:text-primary">
+          <span className="min-w-0">{workspace.name}</span><ArrowRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Link>
       </div>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Icon className={`h-4 w-4 ${meta.color}`} />
-        <span>{meta.label}</span>
-      </div>
+      <div className="flex flex-wrap items-center gap-2 sm:contents">
+      <ModerationStatus label={`AI: ${ai.label}`} tone={ai.tone} />
       <Select
         value={status}
         onValueChange={(val) => onStatusChange(workspace.id, val as "approved" | "rejected" | "pending" | "under_review")}
         disabled={saving}
       >
-        <SelectTrigger className="h-9 w-full text-sm">
+        <SelectTrigger aria-label={`Status for ${workspace.name}`} className="min-h-11 min-w-28 text-sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -496,12 +434,8 @@ function WorkspaceListRow({
           <SelectItem value="rejected">Rejected</SelectItem>
         </SelectContent>
       </Select>
-      <Button size="sm" variant="outline" className="h-9 w-9 p-0" asChild>
-        <Link href={`/admin/workspaces/${workspace.id}`} aria-label={`Edit ${workspace.name}`}>
-          <Pencil className="h-3.5 w-3.5" />
-        </Link>
-      </Button>
-    </div>
+      </div>
+    </li>
   );
 }
 
@@ -536,15 +470,6 @@ function matchesAiFilter(workspace: WorkspaceRow, filter: string) {
   if (filter === "ready") return workspace.ai_status === "ready_for_review" || workspace.ai_status === "completed";
   if (filter === "running") return ["queued", "researching", "extracting", "pending"].includes(workspace.ai_status);
   return true;
-}
-
-function AiStatusBadge({ status }: { status: AiStatus }) {
-  if (status === "none") return null;
-  if (status === "failed") return <Badge variant="destructive">AI failed</Badge>;
-  if (status === "ready_for_review" || status === "completed") return <Badge variant="default">AI ready</Badge>;
-  if (status === "applied") return <Badge variant="secondary">AI applied</Badge>;
-  if (status === "dismissed") return <Badge variant="outline">AI hidden</Badge>;
-  return <Badge variant="secondary">AI running</Badge>;
 }
 
 function groupWorkspaces(workspaces: WorkspaceRow[]): WorkspaceGroup[] {

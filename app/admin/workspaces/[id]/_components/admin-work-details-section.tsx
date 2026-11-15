@@ -26,18 +26,8 @@ export function AdminWorkDetailsSection({ form, onChange, verification }: AdminW
   };
 
   return (
-    <section className="space-y-5 rounded-xl border border-border/30 bg-muted/10 p-4 sm:p-5">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold">Work details</h2>
-          <p className="text-sm text-muted-foreground">
-            Review AI-filled workability signals, then adjust only what needs moderation.
-          </p>
-        </div>
-        <div className="rounded-full bg-background/70 px-3 py-1 text-xs text-muted-foreground">
-          Saved after Save changes
-        </div>
-      </div>
+    <section id="work-details" aria-labelledby="work-details-title" className="scroll-mt-32 space-y-4 border-t border-border/60 pt-4">
+      <h2 id="work-details-title" className="text-lg font-semibold">Work details</h2>
 
       <FieldGroup title="Core setup">
         <WorkFactSelect label="Wi-Fi available" value={form.has_wifi} onChange={(value) => update("has_wifi", value)} />

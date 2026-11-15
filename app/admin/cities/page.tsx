@@ -9,8 +9,9 @@ import { deleteCityIfEmpty, mergeCityBySlug } from "@/lib/features/admin-cities/
 import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AccessRestricted, FeedbackState, LoadingState, PageContainer, PageHeader, PageShell } from "@/components/shared/lumen-page";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 
 type CityRow = {
   id: string;
@@ -148,74 +149,41 @@ export default function AdminCitiesPage() {
   };
 
   if (loadingProfile) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-5 w-5 animate-spin" />
-      </div>
-    );
+    return <LoadingState label="Checking access…" />;
   }
 
   if (!isAdmin) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-destructive" />
-              Access restricted
-            </CardTitle>
-            <CardDescription>You need admin access to view this page.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/profile">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to profile
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <AccessRestricted icon={Shield} description="You need admin access to view this page." />;
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl space-y-6 px-4 py-10">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Admin · Cities</h1>
-            <p className="text-sm text-muted-foreground">Review city health, merge duplicates, and remove empty cities.</p>
-          </div>
-          <div className="flex gap-2">
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search cities" />
-            <Button asChild variant="outline">
+    <PageShell>
+      <PageContainer className="gap-4 py-5 sm:gap-5 sm:py-8">
+        <PageHeader title="City management" actions={
+            <Button asChild variant="outline" className="min-h-11">
               <Link href="/admin/workspaces">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Workspaces
+                Place moderation
               </Link>
             </Button>
-          </div>
-        </div>
+        } />
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Cities</CardTitle>
-            <CardDescription>{filtered.length} cities shown</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <Input type="search" aria-label="Search cities" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search cities" className="h-11 max-w-sm" />
+        {error && <InlineFeedback error>{error}</InlineFeedback>}
+        <section aria-label="Cities">
             {loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading cities...
+              <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden="true" />
+                Loading cities…
               </div>
             )}
+            {!loading && !error && !filtered.length && <FeedbackState title="No cities found" />}
+            {!loading && Boolean(filtered.length) && <p role="status" className="pb-2 text-sm text-muted-foreground">{filtered.length} {filtered.length === 1 ? "city" : "cities"}</p>}
+            <div className="divide-y divide-border/60 border-y border-border/60">
             {filtered.map((city) => {
               const counts = cityCounts(city);
               return (
-                <div key={city.id} className="rounded-md border p-4">
+                <div key={city.id} className="py-3">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
@@ -236,12 +204,13 @@ export default function AdminCitiesPage() {
                         <Badge variant="outline">slug: {city.slug}</Badge>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-2 md:flex-row">
+                    <div className="flex min-w-0 flex-wrap gap-2">
                       <Input
                         value={mergeTargets[city.id] || ""}
                         onChange={(event) => setMergeTargets((prev) => ({ ...prev, [city.id]: event.target.value }))}
                         placeholder="Merge into city slug"
-                        className="md:w-48"
+                        aria-label={`Merge target for ${city.name}`}
+                        className="h-11 w-full sm:w-48"
                       />
                       <Button variant="outline" disabled={savingId === city.id} onClick={() => mergeCity(city)}>
                         <Merge className="mr-2 h-4 w-4" />
@@ -251,7 +220,7 @@ export default function AdminCitiesPage() {
                         <Star className="mr-2 h-4 w-4" />
                         {city.featured ? "Unfeature" : "Feature"}
                       </Button>
-                      <Button variant="outline" disabled={savingId === city.id || counts.total > 0} onClick={() => deleteEmptyCity(city.id)}>
+                      <Button variant="ghost" className="text-destructive" disabled={savingId === city.id || counts.total > 0} onClick={() => deleteEmptyCity(city.id)}>
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete empty
                       </Button>
@@ -260,9 +229,9 @@ export default function AdminCitiesPage() {
                 </div>
               );
             })}
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+            </div>
+        </section>
+      </PageContainer>
+    </PageShell>
   );
 }

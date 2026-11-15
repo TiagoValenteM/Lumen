@@ -7,13 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils/error";
 import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -35,7 +28,10 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Eye, Loader2, Shield, ArrowLeft, Save, Trash2 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AccessRestricted, FeedbackState, LoadingState, PageContainer, PageShell } from "@/components/shared/lumen-page";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
+import { ModerationStatus } from "../../_components/moderation-status";
+import { getWorkspaceStatusPresentation } from "../_lib/status-presentation";
 import { AdminWorkDetailsSection } from "./_components/admin-work-details-section";
 import { WorkFactVerification } from "./_components/work-fact-verification";
 import { AiEnrichmentPanel } from "./_components/ai-enrichment-panel";
@@ -102,7 +98,7 @@ export default function AdminWorkspaceDetailPage() {
   const [deleteWorkspaceDialogOpen, setDeleteWorkspaceDialogOpen] = useState(false);
   const [deletingWorkspace, setDeletingWorkspace] = useState(false);
 
-  const statusBadge = useMemo(() => workspace?.status || "pending", [workspace]);
+  const savedStatus = getWorkspaceStatusPresentation(workspace?.status);
   const approvalNeedsLocation = form.status === "approved" && (form.latitude === null || form.longitude === null);
   const latestAiStatus = aiEnrichments[0]?.status;
   const latestAiUpdate = aiEnrichments[0]?.updated_at ?? aiEnrichments[0]?.created_at;
@@ -515,107 +511,73 @@ export default function AdminWorkspaceDetailPage() {
   };
 
   if (loadingProfile) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Checking access...</span>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Checking access…" />;
   }
 
   if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-destructive" />
-              Access restricted
-            </CardTitle>
-            <CardDescription>You need admin access to view this page.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline">
-              <Link href="/profile">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to profile
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <AccessRestricted icon={Shield} description="You need admin access to view this page." />;
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading workspace...</span>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Loading place…" />;
   }
 
   if (!workspace) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
-          <CardHeader>
-            <CardTitle>Workspace not found</CardTitle>
-            <CardDescription>Try returning to the admin list.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <PageShell><PageContainer size="md">
+        <h1 className="text-3xl font-semibold">Place unavailable</h1>
+        <FeedbackState description={error || "This place could not be found."} action={
             <Button asChild variant="outline">
               <Link href="/admin/workspaces">
                 <ArrowLeft className="h-4 w-4 mr-2" />
-                Back to admin list
+                Back to moderation
               </Link>
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+        } />
+      </PageContainer></PageShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold">Edit workspace</h1>
-            <p className="text-muted-foreground text-sm">Admin-only edit for submitted workspaces.</p>
+    <PageShell>
+      <PageContainer className="gap-5 py-5 sm:py-8">
+        <header className="space-y-2">
+          <Link href="/admin/workspaces" className="keyboard-focus inline-flex min-h-11 items-center gap-2 rounded-sm text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="size-4" aria-hidden="true" /> Place moderation
+          </Link>
+          <h1 className="text-3xl font-semibold [overflow-wrap:anywhere]">{workspace.name}</h1>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <span className="[overflow-wrap:anywhere]">{[workspace.city_name, workspace.country].filter(Boolean).join(", ") || "Unspecified location"}</span>
+            <ModerationStatus label={savedStatus.label} tone={savedStatus.tone} />
+            <SavedPublicViewButton
+              citySlug={workspace.city_slug}
+              hasStagedChanges={hasStagedAiChanges}
+              isPublic={workspace.status === "approved" && Boolean(workspace.city_slug)}
+              workspaceSlug={workspace.slug}
+            />
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button
+        </header>
+        <div className="sticky top-(--app-nav-height) z-30 flex flex-wrap items-center gap-2 border-y border-border/60 bg-background py-2">
+            <Button type="button"
               onClick={handleSave}
               disabled={saving || rejectingAiFields || discardingAiEnrichment}
-              className="inline-flex items-center gap-2"
+              className="min-h-11 min-w-34"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save changes
+              {saving ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : <Save aria-hidden="true" />}
+              {saving ? "Saving…" : "Save changes"}
             </Button>
             <SavedPreviewButton workspaceId={workspace.id} disabled={hasStagedAiChanges} />
-            <Button asChild variant="outline">
-              <Link href="/admin/workspaces">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Link>
-            </Button>
-          </div>
         </div>
 
-        {error && (
-          <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {error}
-          </p>
-        )}
+        {error && <InlineFeedback error>{error}</InlineFeedback>}
+        {validationError && <InlineFeedback error>{validationError}</InlineFeedback>}
+        <nav aria-label="Editor sections" className="flex flex-wrap gap-x-4 text-sm text-muted-foreground">
+          {[["ai-review", "AI review"], ["place-details", "Place details"], ["work-details", "Work details"],
+            ["place-location", "Location"], ["submitted-photos", "Photos"], ["edit-suggestions", "Suggestions"]].map(([anchor, label]) => (
+              <a key={anchor} href={`#${anchor}`} className="keyboard-focus inline-flex min-h-11 items-center rounded-sm hover:text-foreground hover:underline">{label}</a>
+          ))}
+        </nav>
 
-        <Card className="border-primary/20 bg-card/95 py-5 shadow-sm shadow-black/5">
-          <CardContent className="px-5">
             <AiEnrichmentPanel
               enrichments={aiEnrichments}
               currentValues={form}
@@ -630,40 +592,25 @@ export default function AdminWorkspaceDetailPage() {
               stagedPaths={stagedAiReview?.paths ?? []}
               reviewBusy={saving || rejectingAiFields || discardingAiEnrichment}
             />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                {workspace.name}
-                <Badge variant="outline" className="capitalize">
-                  {statusBadge}
-                </Badge>
-              </CardTitle>
-              <CardDescription>
-                {workspace.city_name || "Unspecified city"} · Slug: {workspace.slug}
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <section id="place-details" aria-labelledby="place-details-title" className="scroll-mt-32 space-y-4 border-t border-border/60 pt-4">
+            <h2 id="place-details-title" className="text-lg font-semibold">Place details</h2>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Name</label>
+                <Label htmlFor="place-name">Name</Label>
                 <Input
+                  id="place-name"
                   value={form.name}
                   onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="Workspace name"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Type</label>
+                <Label htmlFor="place-type">Type</Label>
                 <Select
                   value={form.type}
                   onValueChange={(val) => setForm((prev) => ({ ...prev, type: val }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="place-type" className="w-full">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -676,7 +623,7 @@ export default function AdminWorkspaceDetailPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Status</label>
+                <Label htmlFor="workspace-status">Moderation status</Label>
                 <Select
                   value={form.status}
                   onValueChange={(val) => {
@@ -684,22 +631,24 @@ export default function AdminWorkspaceDetailPage() {
                     if (val !== "approved") setValidationError(null);
                   }}
                 >
-                  <SelectTrigger aria-label="Workspace status">
+                  <SelectTrigger id="workspace-status" aria-label="Workspace status" className="w-full">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
                     {STATUS_OPTIONS.map((s) => (
                       <SelectItem key={s} value={s}>
-                        {s}
+                        {getWorkspaceStatusPresentation(s).label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {form.status !== (workspace.status || "pending") && <p className="text-xs text-muted-foreground">Status changes when saved.</p>}
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Short description</Label>
+              <Label htmlFor="short-description">Short description</Label>
               <Textarea
+                id="short-description"
                 value={form.short_description}
                 onChange={(e) => setForm((prev) => ({ ...prev, short_description: e.target.value }))}
                 placeholder="A concise summary for this workspace"
@@ -707,8 +656,9 @@ export default function AdminWorkspaceDetailPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Full description</Label>
+              <Label htmlFor="full-description">Full description</Label>
               <Textarea
+                id="full-description"
                 value={form.description}
                 onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                 placeholder="Longer public description for the workspace page"
@@ -717,16 +667,18 @@ export default function AdminWorkspaceDetailPage() {
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Website</Label>
+                <Label htmlFor="place-website">Website</Label>
                 <Input
+                  id="place-website"
                   value={form.website}
                   onChange={(e) => setForm((prev) => ({ ...prev, website: e.target.value }))}
                   placeholder="https://..."
                 />
               </div>
               <div className="space-y-2">
-                <Label>Phone</Label>
+                <Label htmlFor="place-phone">Phone</Label>
                 <Input
+                  id="place-phone"
                   value={form.phone}
                   onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
                   placeholder="+351 123 456 789"
@@ -735,8 +687,9 @@ export default function AdminWorkspaceDetailPage() {
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Reason shown to submitter</Label>
+                <Label htmlFor="review-reason">Reason shown to submitter</Label>
                 <Textarea
+                  id="review-reason"
                   value={form.rejection_reason}
                   onChange={(e) => setForm((prev) => ({ ...prev, rejection_reason: e.target.value }))}
                   placeholder="Explain what needs to change before approval"
@@ -744,8 +697,9 @@ export default function AdminWorkspaceDetailPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Internal admin notes</Label>
+                <Label htmlFor="admin-notes">Internal admin notes</Label>
                 <Textarea
+                  id="admin-notes"
                   value={form.admin_notes}
                   onChange={(e) => setForm((prev) => ({ ...prev, admin_notes: e.target.value }))}
                   placeholder="Private moderation notes"
@@ -753,20 +707,11 @@ export default function AdminWorkspaceDetailPage() {
                 />
               </div>
             </div>
-            {validationError && (
-              <p className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-                {validationError}
-              </p>
-            )}
+            </section>
             <AdminWorkDetailsSection form={form} onChange={setForm}
               verification={<WorkFactVerification supabase={supabase} workspace={workspace} form={form}
                 busy={saving || hasStagedAiChanges} />} />
-            {hasStagedAiChanges && (
-              <p className="rounded-md border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
-                AI suggestions are staged in this form. Save changes before opening the saved preview or public page.
-              </p>
-            )}
-            <LocationSection
+            <section id="place-location" aria-label="Location" className="scroll-mt-32"><LocationSection
               form={form}
               onChange={(updater) => {
                 setForm((prev) => {
@@ -776,7 +721,7 @@ export default function AdminWorkspaceDetailPage() {
                 });
               }}
               error={approvalNeedsLocation ? validationError : null}
-            />
+            /></section>
             <PhotoModeration
               photos={photos}
               workspaceId={workspace.id}
@@ -794,43 +739,27 @@ export default function AdminWorkspaceDetailPage() {
               savingSuggestionId={savingSuggestionId}
               onUpdateStatus={updateSuggestionStatus}
             />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                onClick={handleSave}
-                disabled={saving || rejectingAiFields || discardingAiEnrichment}
-                className="inline-flex items-center gap-2"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save changes
-              </Button>
-              <SavedPublicViewButton
-                citySlug={workspace.city_slug}
-                hasStagedChanges={hasStagedAiChanges}
-                isPublic={workspace.status === "approved" && Boolean(workspace.city_slug)}
-                workspaceSlug={workspace.slug}
-              />
-              <SavedPreviewButton workspaceId={workspace.id} disabled={hasStagedAiChanges} />
+            <section className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-4" aria-labelledby="danger-title">
+              <h2 id="danger-title" className="text-base font-semibold">Danger zone</h2>
               <Button
                 type="button"
-                variant="destructive"
-                className="sm:ml-auto"
+                variant="outline"
+                className="min-h-11 text-destructive"
                 onClick={() => setDeleteWorkspaceDialogOpen(true)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete place
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </section>
         <Dialog open={deleteWorkspaceDialogOpen} onOpenChange={setDeleteWorkspaceDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Delete this place?</DialogTitle>
               <DialogDescription>
-                This permanently removes {workspace.name} and its related photos, suggestions, saves, visits, and reviews from Lumen.
+                This permanently removes the place and its related photos, suggestions, saves, visits, and reviews.
               </DialogDescription>
             </DialogHeader>
-            <div className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-muted-foreground">
+            <div className="rounded-lg bg-muted p-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
               <p className="font-medium text-foreground">{workspace.name}</p>
               <p>{workspace.address || "No address"}</p>
             </div>
@@ -847,8 +776,8 @@ export default function AdminWorkspaceDetailPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }
 
@@ -858,6 +787,7 @@ function SavedPreviewButton({ disabled, workspaceId }: { disabled: boolean; work
       <Button
         type="button"
         variant="outline"
+        className="min-h-11"
         disabled
         title="Save AI-applied changes before opening the saved preview."
       >
@@ -868,7 +798,7 @@ function SavedPreviewButton({ disabled, workspaceId }: { disabled: boolean; work
   }
 
   return (
-    <Button variant="outline" asChild>
+    <Button variant="outline" className="min-h-11" asChild>
       <Link href={`/admin/workspaces/${workspaceId}/preview`} target="_blank">
         <Eye className="h-4 w-4 mr-2" />
         Admin preview
@@ -892,7 +822,8 @@ function SavedPublicViewButton({
     return (
       <Button
         type="button"
-        variant="outline"
+        variant="ghost"
+        className="min-h-11"
         disabled
         title={
           hasStagedChanges
@@ -906,7 +837,7 @@ function SavedPublicViewButton({
   }
 
   return (
-    <Button variant="outline" asChild>
+    <Button variant="ghost" className="min-h-11" asChild>
       <Link href={`/cities/${citySlug ?? ""}/${workspaceSlug}`} target="_blank">
         Public view
       </Link>
