@@ -16,9 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import type { WorkspaceSuggestionKind } from "@/lib/features/workspace-suggestions/actions";
 import { getStayLimitLabel } from "@/lib/features/workspaces/work-facts";
-import { getWorkspaceDirections } from "@/lib/features/locations/directions";
 import type { WorkspaceDetail } from "@/lib/types";
-import { Bookmark, BookmarkCheck, Clock, DollarSign, Globe, Loader2, MapPin, MapPinCheck, MessageSquare, Phone, Users } from "lucide-react";
+import { Bookmark, BookmarkCheck, Clock, DollarSign, Globe, Loader2, MapPin, MapPinCheck, Phone, Users } from "lucide-react";
 
 type WorkspaceSidebarProps = {
   workspace: WorkspaceDetail;
@@ -32,7 +31,6 @@ type WorkspaceSidebarProps = {
   submittingSuggestion: boolean;
   onToggleVisited: () => void;
   onToggleSaved: () => void;
-  onWriteReview: () => void;
   onSuggestionOpenChange: (open: boolean) => void;
   onSuggestionKindChange: (kind: WorkspaceSuggestionKind) => void;
   onSuggestionMessageChange: (message: string) => void;
@@ -51,33 +49,28 @@ export function WorkspaceSidebar({
   submittingSuggestion,
   onToggleVisited,
   onToggleSaved,
-  onWriteReview,
   onSuggestionOpenChange,
   onSuggestionKindChange,
   onSuggestionMessageChange,
   onSubmitSuggestion,
 }: WorkspaceSidebarProps) {
   return (
-    <div className="space-y-6 lg:sticky lg:top-20">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>Plan your visit</CardTitle>
+          <CardTitle>Your visit</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-3">
-            <Button variant={hasVisited ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleVisited}>
+          <div className="flex flex-wrap gap-2">
+            <Button variant={hasVisited ? "secondary" : "outline"} aria-pressed={hasVisited} className="min-h-11 flex-1" onClick={onToggleVisited}>
               <MapPinCheck className="h-5 w-5" />
               {hasVisited ? "Been Here" : "Mark as Visited"}
             </Button>
-            <Button variant={isSaved ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleSaved}>
+            <Button variant={isSaved ? "secondary" : "outline"} aria-pressed={isSaved} className="min-h-11 flex-1" onClick={onToggleSaved}>
               {isSaved ? <BookmarkCheck className="h-5 w-5" /> : <Bookmark className="h-5 w-5" />}
               {isSaved ? "Saved" : "Save Place"}
             </Button>
           </div>
-          <Button variant="outline" size="lg" className="w-full gap-2" onClick={onWriteReview}>
-            <MessageSquare className="h-5 w-5" />
-            Write Review
-          </Button>
 
           <Dialog open={suggestionOpen} onOpenChange={onSuggestionOpenChange}>
             <DialogTrigger asChild>
@@ -93,9 +86,9 @@ export function WorkspaceSidebar({
               </DialogHeader>
               <div className="min-w-0 space-y-4">
                 <div className="space-y-2">
-                  <Label>What should we check?</Label>
+                  <Label htmlFor="workspace-suggestion-kind">What should we check?</Label>
                   <Select value={suggestionKind} onValueChange={(value) => onSuggestionKindChange(value as WorkspaceSuggestionKind)}>
-                    <SelectTrigger>
+                    <SelectTrigger id="workspace-suggestion-kind">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -109,18 +102,20 @@ export function WorkspaceSidebar({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Details</Label>
+                  <Label htmlFor="workspace-suggestion-details">Details</Label>
                   <Textarea
+                    id="workspace-suggestion-details"
                     value={suggestionMessage}
                     onChange={(event) => onSuggestionMessageChange(event.target.value)}
                     placeholder="Tell us what looks wrong and what the correct information should be."
                     className="break-words [overflow-wrap:anywhere]"
                     aria-invalid={Boolean(suggestionError)}
+                    aria-describedby={suggestionError ? "workspace-suggestion-error" : undefined}
                     rows={5}
                     maxLength={800}
                   />
                   <div className="flex items-start justify-between gap-3 text-xs">
-                    <p className="min-h-4 min-w-0 break-words text-destructive [overflow-wrap:anywhere]">
+                    <p id="workspace-suggestion-error" role={suggestionError ? "alert" : undefined} className="min-h-4 min-w-0 break-words text-destructive [overflow-wrap:anywhere]">
                       {suggestionError}
                     </p>
                     <span className="shrink-0 text-muted-foreground">
@@ -150,7 +145,7 @@ export function WorkspaceSidebar({
 }
 
 function ContactCard({ workspace }: { workspace: WorkspaceDetail }) {
-  const directions = getWorkspaceDirections(workspace);
+  if (!workspace.website && !workspace.phone) return null;
   return (
     <Card>
       <CardHeader>
@@ -167,17 +162,6 @@ function ContactCard({ workspace }: { workspace: WorkspaceDetail }) {
           <a href={`tel:${workspace.phone}`} className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
             <Phone className="h-4 w-4" />
             <span className="text-sm">{workspace.phone}</span>
-          </a>
-        )}
-        {directions && (
-          <a
-            href={directions}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-primary hover:underline"
-          >
-            <MapPin className="h-4 w-4" />
-            <span className="text-sm">Get directions</span>
           </a>
         )}
       </CardContent>

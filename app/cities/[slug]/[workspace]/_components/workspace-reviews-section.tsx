@@ -13,6 +13,7 @@ type WorkspaceReviewsSectionProps = {
   showReviewForm: boolean;
   userSignedIn: boolean;
   submittingReview: boolean;
+  reviewError: string | null;
   maxCommentLength: number;
   onSubmitReview: (rating: number, comment: string) => Promise<boolean>;
   onCancelReview: () => void;
@@ -26,6 +27,7 @@ export function WorkspaceReviewsSection({
   showReviewForm,
   userSignedIn,
   submittingReview,
+  reviewError,
   maxCommentLength,
   onSubmitReview,
   onCancelReview,
@@ -38,7 +40,7 @@ export function WorkspaceReviewsSection({
           <MessageSquare className="h-5 w-5" />
           Reviews ({reviews.length})
         </CardTitle>
-        {!showReviewForm && (
+        {!showReviewForm && reviews.length > 0 && (
           <Button variant="outline" size="sm" onClick={onWriteReview}>
             Write review
           </Button>
@@ -46,20 +48,21 @@ export function WorkspaceReviewsSection({
       </CardHeader>
       <CardContent>
         {showReviewForm && userSignedIn && (
+          <div id="write-review" tabIndex={-1} aria-label="Write a review">
           <ReviewForm
             onSubmit={onSubmitReview}
             onCancel={onCancelReview}
             isSubmitting={submittingReview}
+            error={reviewError}
             maxCommentLength={maxCommentLength}
           />
+          </div>
         )}
 
         {reviews.length === 0 ? (
-          <div className="text-center py-12">
-            <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <h3 className="text-lg font-semibold mb-2">No reviews yet</h3>
-            <p className="text-muted-foreground mb-6">Be the first to share your experience at {workspaceName}</p>
-            <Button onClick={onWriteReview}>Write the First Review</Button>
+          !showReviewForm && <div className="space-y-3 py-2">
+            <p className="break-words text-sm text-muted-foreground">No reviews for {workspaceName} yet.</p>
+            <Button variant="outline" className="min-h-11" onClick={onWriteReview}>Write the first review</Button>
           </div>
         ) : (
           <ReviewsList reviews={reviews} profilesById={profilesById} />

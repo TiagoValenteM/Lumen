@@ -1,8 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { BRAND_NAME } from "@/lib/constants/brand";
 import { getWorkabilityReport } from "@/lib/features/workspaces/workability-report";
 import { getAvailabilityLabel, getStayLimitLabel } from "@/lib/features/workspaces/work-facts";
 import type { WorkspaceDetail } from "@/lib/types";
@@ -30,29 +30,30 @@ import {
 
 type WorkspaceMainDetailsProps = {
   workspace: WorkspaceDetail;
+  children?: ReactNode;
 };
 
-export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
+export function WorkspaceMainDetails({ workspace, children }: WorkspaceMainDetailsProps) {
   const workability = getWorkabilityReport(workspace);
   const checkedAt = workspace.work_facts_checked_at;
+  const description = workspace.description || workspace.short_description;
+  const hasProductivity = workspace.seating_capacity || workspace.noise_level || workspace.good_for_calls;
+  const hasAmenities = workspace.has_coffee || workspace.has_food || workspace.has_veg || workspace.has_natural_light
+    || workspace.has_air_conditioning || workspace.has_parking || workspace.has_bike_parking || workspace.is_accessible || workspace.allows_pets;
 
   return (
     <>
-      <Card className="rounded-xl">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-primary" />
-            <CardTitle>Work facts</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <section aria-labelledby="workspace-work-facts" className="space-y-3">
+          <h2 id="workspace-work-facts" className="flex items-center gap-2 text-xl font-semibold">
+            <ShieldCheck className="size-5 text-primary" aria-hidden="true" /> Work facts
+          </h2>
           <p className="text-sm text-muted-foreground">
             {checkedAt ? (
-              <>Known facts checked by a Lumen moderator on{" "}
+              <>Known facts checked by a {BRAND_NAME} moderator on{" "}
                 <time dateTime={checkedAt}>{new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(checkedAt))}</time>.</>
-            ) : "Listed facts have not been checked by Lumen."}
+            ) : `Listed facts have not been checked by ${BRAND_NAME}.`}
           </p>
-          <dl className="grid grid-cols-1 gap-x-5 divide-y border-y sm:grid-cols-2 sm:divide-y-0">
+          <dl className="grid grid-cols-1 gap-x-5 divide-y divide-border/60 border-y border-border/60 min-[360px]:grid-cols-2 min-[360px]:divide-y-0">
             <Fact label="Laptops" icon={<Laptop className="size-4" />}
               value={getAvailabilityLabel(workspace.laptop_friendly, "Welcome", "Not allowed")} />
             <Fact label="Stay limit" icon={<Clock className="size-4" />}
@@ -94,25 +95,18 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </section>
 
-      {workspace.description && (
-        <Card className="rounded-xl">
-          <CardHeader>
-            <CardTitle>About</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground whitespace-pre-line">{workspace.description}</p>
-          </CardContent>
-        </Card>
+      {children}
+
+      {description && (
+        <DetailSection title="About">
+          <p className="whitespace-pre-line text-muted-foreground [overflow-wrap:anywhere]">{description}</p>
+        </DetailSection>
       )}
 
-      <Card className="rounded-xl">
-        <CardHeader>
-          <CardTitle>Productivity</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-4">
+      {Boolean(hasProductivity) && <DetailSection title="Productivity">
+        <div className="grid grid-cols-2 gap-4">
           {workspace.seating_capacity && (
             <div className="flex items-center gap-3">
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -140,14 +134,10 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </DetailSection>}
 
-      <Card className="rounded-xl">
-        <CardHeader>
-          <CardTitle>Amenities</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {hasAmenities && <DetailSection title="Amenities">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {workspace.has_coffee && <AmenityItem icon={<Coffee className="h-4 w-4 text-primary" />} label="Coffee" />}
             {workspace.has_food && <AmenityItem icon={<Utensils className="h-4 w-4 text-primary" />} label="Food" />}
@@ -159,17 +149,23 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
             {workspace.is_accessible && <AmenityItem icon={<Accessibility className="h-4 w-4 text-primary" />} label="Accessible" />}
             {workspace.allows_pets && <AmenityItem icon={<PawPrint className="h-4 w-4 text-primary" />} label="Pet Friendly" />}
           </div>
-        </CardContent>
-      </Card>
+      </DetailSection>}
     </>
   );
+}
+
+function DetailSection({ title, children }: { title: string; children: ReactNode }) {
+  return <section aria-label={title} className="space-y-3 border-t border-border/60 pt-4">
+    <h2 className="text-xl font-semibold">{title}</h2>
+    {children}
+  </section>;
 }
 
 function AmenityItem({ icon, label }: { icon: ReactNode; label: string }) {
   return (
     <div className="flex items-center gap-2">
-      {icon}
-      <span className="text-sm">{label}</span>
+      <span className="shrink-0" aria-hidden="true">{icon}</span>
+      <span className="min-w-0 text-sm [overflow-wrap:anywhere]">{label}</span>
     </div>
   );
 }

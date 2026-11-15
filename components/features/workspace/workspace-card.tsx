@@ -48,7 +48,7 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
             fill
             className="object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3">
+          <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-between gap-2 p-3">
             <Badge
               variant="outline"
               className="border-border/30 bg-background/90 capitalize text-foreground shadow-sm shadow-black/10 backdrop-blur-sm dark:bg-background/80 dark:shadow-black/30"
@@ -66,7 +66,7 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
 
         <CardHeader className="space-y-3 px-5 pb-3 pt-5">
           <div className="space-y-1">
-            <CardTitle className="line-clamp-1">{workspace.name}</CardTitle>
+            <CardTitle className="line-clamp-2 [overflow-wrap:anywhere]">{workspace.name}</CardTitle>
             {workspace.address && (
               <CardDescription className="flex items-center gap-1 text-xs">
                 <MapPin className="h-3 w-3 shrink-0" />
@@ -75,13 +75,13 @@ export function WorkspaceCard({ workspace, citySlug }: WorkspaceCardProps) {
             )}
           </div>
 
-          <div className="flex min-h-6 flex-nowrap gap-1.5 overflow-hidden">
+          <div className="flex min-h-6 flex-wrap gap-1.5">
             {vibeLabels.length > 0 ? (
               vibeLabels.map((label) => (
                 <Badge
                   key={label}
-                  variant="outline"
-                  className="shrink-0 border-primary/20 bg-background/70 text-[11px] text-foreground shadow-none dark:border-primary/30 dark:bg-muted/50"
+                  variant="secondary"
+                  className="text-[11px] text-foreground shadow-none"
                 >
                   {label}
                 </Badge>

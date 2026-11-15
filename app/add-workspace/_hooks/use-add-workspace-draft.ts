@@ -26,8 +26,10 @@ type UseAddWorkspaceDraftParams = {
 };
 
 export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos, uploadedPhotos, userId }: UseAddWorkspaceDraftParams) {
-  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const draftLoaded = Boolean(userId && loadedFor === userId);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
+  const [draftUnavailable, setDraftUnavailable] = useState(false);
   const skipNextSaveRef = useRef(false);
   const submissionIdRef = useRef<{ userId: string; id: string } | null>(null);
 
@@ -36,14 +38,15 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
 
     const timer = window.setTimeout(() => {
       const draftStorageKey = getDraftStorageKey(userId);
-      window.localStorage.removeItem(legacyDraftStorageKey);
-      const rawDraft = window.localStorage.getItem(draftStorageKey);
-      if (!rawDraft) {
-        setDraftLoaded(true);
-        return;
-      }
-
+      setDraftSavedAt(null);
+      setDraftUnavailable(false);
+      setFormData(defaultAddWorkspaceFormData);
+      setUploadedPhotos([]);
+      skipNextSaveRef.current = false;
       try {
+        window.localStorage.removeItem(legacyDraftStorageKey);
+        const rawDraft = window.localStorage.getItem(draftStorageKey);
+        if (!rawDraft) return;
         const draft = JSON.parse(rawDraft) as Partial<AddWorkspaceDraft>;
         if (draft.formData) {
           const restored = { ...defaultAddWorkspaceFormData, ...draft.formData };
@@ -67,10 +70,15 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
         }
         setDraftSavedAt(typeof draft.savedAt === "string" ? draft.savedAt : null);
         skipNextSaveRef.current = true;
-      } catch {
-        window.localStorage.removeItem(draftStorageKey);
+      } catch (error) {
+        if (error instanceof SyntaxError) {
+          try { window.localStorage.removeItem(draftStorageKey); }
+          catch { setDraftUnavailable(true); }
+        } else {
+          setDraftUnavailable(true);
+        }
       } finally {
-        setDraftLoaded(true);
+        setLoadedFor(userId);
       }
     }, 0);
 
@@ -92,20 +100,20 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
         formData.latitude !== null ||
         uploadedPhotos.length > 0;
 
-      if (!hasMeaningfulDraft) {
-        window.localStorage.removeItem(draftStorageKey);
-        window.localStorage.removeItem(getSubmissionStorageKey(userId));
-        setDraftSavedAt(null);
-        return;
-      }
-
       try {
+        if (!hasMeaningfulDraft) {
+          window.localStorage.removeItem(draftStorageKey);
+          window.localStorage.removeItem(getSubmissionStorageKey(userId));
+          setDraftSavedAt(null);
+          return;
+        }
         const savedAt = new Date().toISOString();
         const draft: AddWorkspaceDraft = { formData, uploadedPhotos, savedAt, workFactsVersion: 1 };
         window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
         setDraftSavedAt(savedAt);
-      } catch (error) {
-        console.error("Failed to save add-place draft:", error);
+        setDraftUnavailable(false);
+      } catch {
+        setDraftUnavailable(true);
       }
     }, 600);
 
@@ -145,5 +153,6 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
     getSubmissionId,
     draftLoaded,
     draftSavedAt,
+    draftUnavailable,
   };
 }

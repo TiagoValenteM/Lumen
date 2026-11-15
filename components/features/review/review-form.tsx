@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 import { Star } from "lucide-react";
 
 interface ReviewFormProps {
@@ -9,6 +10,7 @@ interface ReviewFormProps {
   onCancel: () => void;
   isSubmitting: boolean;
   maxCommentLength?: number;
+  error?: string | null;
 }
 
 export function ReviewForm({
@@ -16,6 +18,7 @@ export function ReviewForm({
   onCancel,
   isSubmitting,
   maxCommentLength = 500,
+  error,
 }: ReviewFormProps) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -30,22 +33,25 @@ export function ReviewForm({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card/60 p-6 mb-6">
+    <div className="mb-5 rounded-lg bg-muted/50 p-3 sm:p-5">
       <h3 className="text-lg font-semibold mb-4">Write a Review</h3>
       <div className="space-y-4">
-        <div>
-          <Label>Rating</Label>
-          <div className="flex gap-2 mt-2">
+        <fieldset>
+          <legend className="text-sm font-medium">Rating</legend>
+          <div className="mt-1 flex flex-wrap gap-1">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
                 key={star}
                 type="button"
                 onClick={() => setRating(star)}
-                className="transition-transform hover:scale-110"
+                aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
+                aria-pressed={star === rating}
+                className="keyboard-focus grid size-11 place-items-center rounded-md hover:bg-muted"
                 disabled={isSubmitting}
               >
                 <Star
-                  className={`h-8 w-8 ${
+                  aria-hidden="true"
+                  className={`size-6 ${
                     star <= rating
                       ? "fill-primary text-primary"
                       : "text-muted-foreground hover:text-primary"
@@ -54,7 +60,7 @@ export function ReviewForm({
               </button>
             ))}
           </div>
-        </div>
+        </fieldset>
         <div>
           <Label htmlFor="review-comment">Your Review (Optional)</Label>
           <Textarea
@@ -77,11 +83,12 @@ export function ReviewForm({
               : `${remainingChars} characters remaining (max ${maxCommentLength})`}
           </div>
         </div>
-        <div className="flex gap-3">
-          <Button onClick={handleSubmit} disabled={isSubmitting || rating === 0}>
+        {error && <InlineFeedback error>{error}</InlineFeedback>}
+        <div className="flex flex-wrap gap-2">
+          <Button className="min-h-11" onClick={handleSubmit} disabled={isSubmitting || rating === 0}>
             {isSubmitting ? "Submitting..." : "Submit Review"}
           </Button>
-          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          <Button className="min-h-11" variant="outline" onClick={onCancel} disabled={isSubmitting}>
             Cancel
           </Button>
         </div>

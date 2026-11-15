@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -16,7 +16,8 @@ import { submitWorkspaceSuggestion, type WorkspaceSuggestionKind } from "@/lib/f
 import type { City, WorkspaceDetail, Photo, Review, ProfileSummary } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Toast } from "@/components/ui/toast";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { FeedbackState, LoadingState, PageContainer, PageShell } from "@/components/shared/lumen-page";
 import { WorkspaceGallery } from "./_components/workspace-gallery";
 import { WorkspaceHeader } from "./_components/workspace-header";
 import { WorkspaceMainDetails } from "./_components/workspace-main-details";
@@ -25,9 +26,10 @@ import { WorkspaceSidebar } from "./_components/workspace-sidebar";
 
 export default function WorkspacePage() {
   const params = useParams();
+  const router = useRouter();
   const citySlug = params.slug as string;
   const workspaceSlug = params.workspace as string;
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   const [city, setCity] = useState<City | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
@@ -37,6 +39,7 @@ export default function WorkspacePage() {
   const [loading, setLoading] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [suggestionKind, setSuggestionKind] = useState<WorkspaceSuggestionKind>("wrong_location");
   const [suggestionMessage, setSuggestionMessage] = useState("");
@@ -140,12 +143,13 @@ export default function WorkspacePage() {
 
   const handleSubmitReview = async (rating: number, comment: string) => {
     if (!user || !workspace) return false;
+    setReviewError(null);
     if (rating === 0) {
-      showError("Please select a rating");
+      setReviewError("Select a rating.");
       return false;
     }
     if (comment.trim().length > MAX_COMMENT_LENGTH) {
-      showError(`Comment is too long. Please keep it under ${MAX_COMMENT_LENGTH} characters.`);
+      setReviewError(`Keep your review under ${MAX_COMMENT_LENGTH} characters.`);
       return false;
     }
 
@@ -160,7 +164,7 @@ export default function WorkspacePage() {
       return true;
     } catch (error: unknown) {
       console.error('Error submitting review:', error);
-      showError("Could not save your review. Please try again.", 4000);
+      setReviewError("Could not save your review. Please try again.");
       return false;
     } finally {
       setSubmittingReview(false);
@@ -204,76 +208,77 @@ export default function WorkspacePage() {
     }
   };
 
-  const scrollToReviews = useCallback(() => {
+  const scrollToReviews = useCallback((focusForm = false) => {
     requestAnimationFrame(() => {
-      reviewsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      reviewsSectionRef.current?.focus({ preventScroll: true });
+      const section = reviewsSectionRef.current;
+      section?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+      const target = focusForm ? section?.querySelector<HTMLElement>("#write-review") ?? section : section;
+      target?.focus({ preventScroll: true });
     });
   }, []);
 
   const openReviewForm = useCallback(() => {
+    if (authLoading) return;
     if (!user) {
-      showError("Please sign in to write a review");
+      const redirect = `/cities/${encodeURIComponent(citySlug)}/${encodeURIComponent(workspaceSlug)}#write-review`;
+      router.push(`/login?redirect=${encodeURIComponent(redirect)}`);
       return;
     }
 
     setShowReviewForm(true);
-    scrollToReviews();
-  }, [scrollToReviews, showError, user]);
+    scrollToReviews(true);
+  }, [authLoading, citySlug, router, scrollToReviews, user, workspaceSlug]);
+
+  useEffect(() => {
+    if (workspace && user && window.location.hash === "#write-review") {
+      const frame = requestAnimationFrame(() => {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        openReviewForm();
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [openReviewForm, user, workspace]);
 
   if (loading) {
-    return (
-      <div className="min-h-full bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-muted-foreground">Loading workspace...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState label="Loading place…" />;
   }
 
   if (!workspace || !city) {
     return (
-      <div className="min-h-full bg-background flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">Workspace Not Found</h1>
-          <p className="text-muted-foreground mb-6">
-            The workspace you&apos;re looking for doesn&apos;t exist.
-          </p>
-          <Button asChild>
+      <PageShell><PageContainer size="md">
+        <h1 className="text-3xl font-semibold">Place not found</h1>
+        <FeedbackState description="This place may have moved or may not be published." action={
+          <Button asChild variant="outline">
             <Link href="/cities">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Cities
             </Link>
-          </Button>
-        </div>
-      </div>
+          </Button>} />
+      </PageContainer></PageShell>
     );
   }
 
   return (
-    <div className="min-h-full bg-background">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <WorkspaceHeader city={city} workspace={workspace} onReviewsClick={scrollToReviews} />
+    <PageShell>
+      <PageContainer size="xl" className="gap-4 py-4 sm:gap-6 sm:py-7">
+        <WorkspaceHeader city={city} workspace={workspace} onReviewsClick={() => scrollToReviews()} onWriteReview={openReviewForm} />
 
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="space-y-8">
-            <WorkspaceMainDetails workspace={workspace} />
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-x-10">
+          <div className="min-w-0 space-y-6 lg:col-start-1">
+            <WorkspaceMainDetails workspace={workspace}>
             {photos.length > 0 && (
               <section className="space-y-4" aria-labelledby="workspace-photos">
                 <div>
-                  <h2 id="workspace-photos" className="text-2xl font-semibold">
+                  <h2 id="workspace-photos" className="text-xl font-semibold">
                     Photos
                   </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    A quick look at the space before you decide to work there.
-                  </p>
                 </div>
                 <WorkspaceGallery photos={photos} workspaceName={workspace.name} />
               </section>
             )}
+            </WorkspaceMainDetails>
 
-            <div ref={reviewsSectionRef} id="reviews" tabIndex={-1} className="scroll-mt-24 outline-none">
+            <div ref={reviewsSectionRef} id="reviews" tabIndex={-1} className="scroll-mt-20 outline-none">
               <WorkspaceReviewsSection
                 workspaceName={workspace.name}
                 reviews={reviews}
@@ -281,14 +286,16 @@ export default function WorkspacePage() {
                 showReviewForm={showReviewForm}
                 userSignedIn={Boolean(user)}
                 submittingReview={submittingReview}
+                reviewError={reviewError}
                 maxCommentLength={MAX_COMMENT_LENGTH}
                 onSubmitReview={handleSubmitReview}
-                onCancelReview={() => setShowReviewForm(false)}
+                onCancelReview={() => { setShowReviewForm(false); setReviewError(null); scrollToReviews(); }}
                 onWriteReview={openReviewForm}
               />
             </div>
           </div>
 
+          <aside className="min-w-0 lg:sticky lg:top-20 lg:col-start-2 lg:row-start-1">
           <WorkspaceSidebar
             workspace={workspace}
             userSignedIn={Boolean(user)}
@@ -323,7 +330,6 @@ export default function WorkspacePage() {
                 showError("Failed to save workspace");
               }
             }}
-            onWriteReview={openReviewForm}
             onSuggestionOpenChange={(open) => {
               setSuggestionOpen(open);
               if (!open) setSuggestionError(null);
@@ -335,10 +341,11 @@ export default function WorkspacePage() {
             }}
             onSubmitSuggestion={submitSuggestion}
           />
+          </aside>
         </div>
-      </div>
+      </PageContainer>
 
       {toast && <Toast message={toast.message} type={toast.type} />}
-    </div>
+    </PageShell>
   );
 }

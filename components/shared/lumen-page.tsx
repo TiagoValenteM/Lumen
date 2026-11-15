@@ -3,7 +3,7 @@ import type * as React from "react";
 import type { LucideIcon } from "lucide-react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils/cn";
 
 type PageShellProps = {
@@ -115,8 +115,8 @@ export function FeedbackState({ title, description, icon: Icon, action, classNam
 export function LoadingState({ label = "Loading...", className }: LoadingStateProps) {
   return (
     <PageShell className={cn("flex items-center justify-center", className)}>
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" />
+      <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-5 motion-safe:animate-spin" aria-hidden="true" />
         <span>{label}</span>
       </div>
     </PageShell>
@@ -134,10 +134,10 @@ export function AccessRestricted({
     <PageShell className="flex items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
             {Icon && <Icon className="size-5 text-destructive" />}
             {title}
-          </CardTitle>
+          </h1>
           <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>

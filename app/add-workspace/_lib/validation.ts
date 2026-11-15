@@ -24,20 +24,14 @@ export function isAddWorkspaceStepValid(step: number, formData: AddWorkspaceForm
   }
 }
 
-export function getAddWorkspaceValidationMessage(step: number, formData: AddWorkspaceFormData, uploadedPhotos: string[] = []) {
-  if (step === 1) {
-    if (!formData.name.trim()) return "Add the place name before continuing.";
-    if (!formData.type) return "Choose what type of place this is before continuing.";
-    if (formData.latitude === null || formData.longitude === null) return "Select a location before continuing.";
-    if (!hasCity(formData)) return "Enter the city and country before continuing.";
+export function getAddWorkspaceValidationIssue(step: number, formData: AddWorkspaceFormData, uploadedPhotos: string[] = []) {
+  if (step === 1 || step === 6) {
+    if (formData.latitude === null || formData.longitude === null) return { field: "place-location", message: "Select a search result or place a pin on the map." };
+    if (!formData.name.trim()) return { field: "name", message: "Enter the place name." };
+    if (!formData.type) return { field: "type", message: "Choose a place type." };
+    if (!formData.city_name.trim()) return { field: "place-city", message: "Enter the city." };
+    if (!formData.country.trim()) return { field: "place-country", message: "Enter the country." };
   }
-  if (step === 5 && uploadedPhotos.length === 0) return "Add at least one photo before reviewing your submission.";
-  if (step === 6) {
-    if (!formData.name.trim()) return "Add the place name before submitting.";
-    if (!formData.type) return "Choose what type of place this is before submitting.";
-    if (formData.latitude === null || formData.longitude === null) return "Select a location before submitting.";
-    if (!hasCity(formData)) return "Enter the city and country in Basics before submitting.";
-    if (uploadedPhotos.length === 0) return "Add at least one photo before submitting.";
-  }
+  if ((step === 5 || step === 6) && uploadedPhotos.length === 0) return { field: "place-photos", message: "Add at least one photo." };
   return null;
 }

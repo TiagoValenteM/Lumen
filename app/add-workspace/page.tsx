@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowLeft, Clock, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Clock, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { AmbianceAmenitiesStep } from "./_components/ambiance-amenities-step";
 import { BasicInformationStep } from "./_components/basic-information-step";
@@ -15,7 +15,8 @@ import { PhotosStep } from "./_components/photos-step";
 import { ProgressSteps } from "./_components/progress-steps";
 import { ProductivityStep } from "./_components/productivity-step";
 import { ReviewStep } from "./_components/review-step";
-import { ValidationMessage } from "./_components/validation-message";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
+import { LoadingState, PageContainer, PageShell } from "@/components/shared/lumen-page";
 import { Button } from "@/components/ui/button";
 import { useAddWorkspaceDraft } from "./_hooks/use-add-workspace-draft";
 import { useAddWorkspaceForm } from "./_hooks/use-add-workspace-form";
@@ -44,7 +45,7 @@ export default function AddWorkspacePage() {
     uploadedPhotos,
   } = useWorkspacePhotos(user?.id);
   const { canCheckDuplicates, checkingDuplicates, duplicateCandidates, duplicateCheckError } = useDuplicateWorkspaceCheck(supabase, formData);
-  const { clearDraft, draftLoaded, draftSavedAt, getSubmissionId } = useAddWorkspaceDraft({
+  const { clearDraft, draftLoaded, draftSavedAt, draftUnavailable, getSubmissionId } = useAddWorkspaceDraft({
     formData,
     setFormData,
     setUploadedPhotos,
@@ -58,20 +59,7 @@ export default function AddWorkspacePage() {
     }
   }, [user, authLoading, router]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-full bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+  if (authLoading || !user || !draftLoaded) return <LoadingState label={user ? "Loading your draft…" : "Checking session…"} />;
 
   const markStepAttempted = (step: number) => {
     setAttemptedSteps((prev) => {
@@ -84,17 +72,27 @@ export default function AddWorkspacePage() {
   const handleNext = () => {
     if (!canProceedToNext) {
       markStepAttempted(currentStep);
+      requestAnimationFrame(() => {
+        if (validationIssue) document.getElementById(validationIssue.field)?.focus();
+      });
       return;
     }
 
-    setCurrentStep((prev) => Math.min(totalAddWorkspaceSteps, prev + 1));
+    goToStep(currentStep + 1);
+  };
+
+  const goToStep = (step: number) => {
+    setCurrentStep(step);
+    requestAnimationFrame(() => document.getElementById("add-place-progress")?.focus());
   };
 
   const handleSubmit = async () => {
     if (!user || submitting) return;
     setSubmissionError(null);
     if (!canSubmit) {
-      markStepAttempted(currentStep);
+      const needsPhotos = validationIssue?.field === "place-photos";
+      markStepAttempted(needsPhotos ? 5 : 1);
+      goToStep(needsPhotos ? 5 : 1);
       return;
     }
     setSubmitting(true);
@@ -120,8 +118,8 @@ export default function AddWorkspacePage() {
     }
   };
 
-  const { canProceedToNext, canSubmit, validationMessage } = getStepState(uploadedPhotos);
-  const visibleValidationMessage = attemptedSteps.has(currentStep) ? validationMessage : null;
+  const { canProceedToNext, canSubmit, validationIssue } = getStepState(uploadedPhotos);
+  const visibleIssue = attemptedSteps.has(currentStep) ? validationIssue : null;
   const handleClearDraft = async () => {
     setSubmissionError(null);
     clearDraft();
@@ -131,30 +129,25 @@ export default function AddWorkspacePage() {
   };
 
   return (
-    <div className="min-h-full bg-background">
-      <div className="mx-auto max-w-4xl px-4 py-5 pb-28 sm:px-6 sm:py-8 sm:pb-8">
-        <Link href="/" className="mb-5 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground sm:mb-6">
+    <PageShell>
+      <PageContainer size="md" className="gap-4 py-4 pb-24 sm:gap-6 sm:py-8">
+        <Link href="/" className="keyboard-focus inline-flex min-h-11 w-fit items-center gap-2 rounded-sm text-sm text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-4 w-4" />
           Back to Home
         </Link>
 
-        <div className="mb-6">
-          <p className="mb-2 text-sm font-medium text-primary">Step {currentStep} of {totalAddWorkspaceSteps}</p>
-          <h1 className="mb-2 text-3xl font-bold tracking-tight sm:text-4xl">Add a place</h1>
-          <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-            Start with the essentials. Details can be lightweight; admins review submissions before they go public.
-          </p>
-        </div>
+        <h1 className="text-3xl font-semibold sm:text-4xl">Add a place</h1>
 
         <ProgressSteps currentStep={currentStep} steps={addWorkspaceStepLabels} />
 
-        {draftLoaded && draftSavedAt && (
-          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-border/30 bg-muted/15 p-4 text-sm shadow-sm shadow-black/5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
+        {draftUnavailable && <InlineFeedback>Your draft can’t be saved in this browser. Keep this tab open until you submit.</InlineFeedback>}
+        {!draftUnavailable && draftSavedAt && (
+          <div className="flex flex-wrap items-center justify-between gap-x-3 rounded-lg bg-muted px-3 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground" role="status">
+              <Clock className="h-4 w-4" aria-hidden="true" />
               Draft saved {formatDraftTime(draftSavedAt)}
             </div>
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearDraft} disabled={submitting}>
+            <Button type="button" variant="ghost" className="min-h-11" onClick={handleClearDraft} disabled={submitting}>
               <Trash2 className="h-4 w-4" />
               Clear draft
             </Button>
@@ -164,7 +157,7 @@ export default function AddWorkspacePage() {
         {/* Step 1: Basic Information */}
         {currentStep === 1 && (
           <div className="space-y-6">
-            <BasicInformationStep formData={formData} setFormData={setFormData} updateField={updateField} />
+            <BasicInformationStep formData={formData} setFormData={setFormData} updateField={updateField} issue={visibleIssue} />
             <DuplicateCandidates
               candidates={canCheckDuplicates ? duplicateCandidates : []}
               loading={canCheckDuplicates && checkingDuplicates}
@@ -191,6 +184,7 @@ export default function AddWorkspacePage() {
         {/* Step 5: Photos */}
         {currentStep === 5 && (
           <PhotosStep
+            error={visibleIssue?.message}
             uploadedPhotos={uploadedPhotos}
             onPhotoMoved={moveUploadedPhoto}
             onPhotoUploaded={handlePhotoUploaded}
@@ -199,21 +193,21 @@ export default function AddWorkspacePage() {
         )}
 
         {currentStep === 6 && (
-          <ReviewStep formData={formData} uploadedPhotos={uploadedPhotos} onEditStep={setCurrentStep} />
+          <ReviewStep formData={formData} uploadedPhotos={uploadedPhotos} onEditStep={goToStep} />
         )}
 
-        <ValidationMessage message={visibleValidationMessage ?? (currentStep === 6 ? submissionError : null)} />
+        {currentStep === 6 && submissionError && <InlineFeedback error>{submissionError}</InlineFeedback>}
 
         <FormNavigation
           currentStep={currentStep}
           totalSteps={totalAddWorkspaceSteps}
           submitting={submitting}
-          onPrevious={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
+          onPrevious={() => goToStep(currentStep - 1)}
           onNext={handleNext}
           onSubmit={handleSubmit}
         />
-      </div>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }
 

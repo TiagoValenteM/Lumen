@@ -1,9 +1,9 @@
 "use client";
 
 import type { Dispatch, SetStateAction } from "react";
-import { CheckCircle2, MapPin } from "lucide-react";
+import { ChevronDown, MapPin } from "lucide-react";
 import { LocationPicker, type LocationValue } from "@/components/shared";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,27 +14,18 @@ type BasicInformationStepProps = {
   formData: AddWorkspaceFormData;
   setFormData: Dispatch<SetStateAction<AddWorkspaceFormData>>;
   updateField: (field: keyof AddWorkspaceFormData, value: string | number | boolean | null) => void;
+  issue: { field: string; message: string } | null;
 };
 
-export function BasicInformationStep({ formData, setFormData, updateField }: BasicInformationStepProps) {
+export function BasicInformationStep({ formData, setFormData, updateField, issue }: BasicInformationStepProps) {
+  const errorId = (field: string) => issue?.field === field ? `${field}-error` : undefined;
+  const feedback = (field: string) => issue?.field === field ? <InlineFeedback id={errorId(field)} error>{issue.message}</InlineFeedback> : null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Basics</CardTitle>
-        <CardDescription>Find the place first, then add the few details reviewers need.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5 sm:space-y-6">
+      <section aria-label="Basics" className="space-y-5 sm:space-y-6">
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <Label>Location *</Label>
-            {formData.latitude !== null && formData.longitude !== null && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                Pin selected
-              </span>
-            )}
-          </div>
           <LocationPicker
+            searchId="place-location"
+            validationId={errorId("place-location")}
             value={{
               latitude: formData.latitude,
               longitude: formData.longitude,
@@ -63,6 +54,7 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
               }));
             }}
           />
+          {feedback("place-location")}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
@@ -70,18 +62,22 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
             <Label htmlFor="name">Place name *</Label>
             <Input
               id="name"
+              className="h-11"
+              aria-invalid={Boolean(errorId("name"))}
+              aria-describedby={errorId("name")}
               maxLength={255}
               value={formData.name}
               onChange={(e) => updateField("name", e.target.value)}
               placeholder="e.g., Café Malea"
               required
             />
+            {feedback("name")}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="type">Type *</Label>
             <Select value={formData.type} onValueChange={(value) => updateField("type", value)}>
-              <SelectTrigger>
+              <SelectTrigger id="type" className="min-h-11 w-full" aria-invalid={Boolean(errorId("type"))} aria-describedby={errorId("type")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -93,6 +89,7 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
                 <SelectItem value="other">Other</SelectItem>
               </SelectContent>
             </Select>
+            {feedback("type")}
           </div>
         </div>
 
@@ -105,7 +102,7 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
               value={formData.address}
               onChange={(e) => updateField("address", e.target.value)}
               placeholder="Street address"
-              className="pl-9"
+              className="h-11 pl-9"
             />
           </div>
         </div>
@@ -113,23 +110,25 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="place-city">City *</Label>
-            <Input id="place-city" value={formData.city_name} maxLength={255} required
+            <Input id="place-city" className="h-11" value={formData.city_name} maxLength={255} required aria-invalid={Boolean(errorId("place-city"))} aria-describedby={errorId("place-city")}
               onChange={(event) => updateField("city_name", event.target.value)} />
+            {feedback("place-city")}
           </div>
           <div className="space-y-2">
             <Label htmlFor="place-country">Country *</Label>
-            <Input id="place-country" value={formData.country} maxLength={100} required
+            <Input id="place-country" className="h-11" value={formData.country} maxLength={100} required aria-invalid={Boolean(errorId("place-country"))} aria-describedby={errorId("place-country")}
               onChange={(event) => updateField("country", event.target.value)} />
+            {feedback("place-country")}
           </div>
         </div>
 
-        <details className="group rounded-xl border border-border/30 bg-muted/10 p-4">
-          <summary className="cursor-pointer list-none text-sm font-medium outline-none">
+        <details className="group rounded-lg border border-border/60">
+          <summary className="keyboard-focus flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
             Optional details
-            <span className="ml-2 text-muted-foreground group-open:hidden">Add description, website, or phone</span>
+            <ChevronDown className="size-4 group-open:rotate-180" aria-hidden="true" />
           </summary>
 
-          <div className="mt-4 space-y-4">
+          <div className="space-y-4 border-t border-border/60 p-3">
             <div className="space-y-2">
               <Label htmlFor="short_description">Short description</Label>
               <Input
@@ -176,7 +175,6 @@ export function BasicInformationStep({ formData, setFormData, updateField }: Bas
             </div>
           </div>
         </details>
-      </CardContent>
-    </Card>
+      </section>
   );
 }

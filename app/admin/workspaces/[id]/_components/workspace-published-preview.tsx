@@ -42,7 +42,7 @@ export function WorkspacePublishedPreview({ form, photos, workspace }: Workspace
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-8">
-          <WorkspaceMainDetails workspace={previewWorkspace} />
+          <WorkspaceMainDetails workspace={previewWorkspace}>
           {previewPhotos.length > 0 ? (
             <section className="space-y-4" aria-labelledby="admin-preview-photos">
               <div>
@@ -60,6 +60,7 @@ export function WorkspacePublishedPreview({ form, photos, workspace }: Workspace
               No photos are available yet. The public page would show the details without a gallery.
             </div>
           )}
+          </WorkspaceMainDetails>
         </div>
 
         <aside className="space-y-4">
@@ -73,9 +74,6 @@ export function WorkspacePublishedPreview({ form, photos, workspace }: Workspace
               </Button>
               <Button type="button" variant="outline" size="lg" className="w-full" disabled>
                 Save place
-              </Button>
-              <Button type="button" variant="outline" size="lg" className="w-full" disabled>
-                Write review
               </Button>
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />

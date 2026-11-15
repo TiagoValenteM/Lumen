@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AccessRestricted, LoadingState, PageContainer, PageShell } from "@/components/shared/lumen-page";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,13 +23,15 @@ const MAX_BIO_LENGTH = 500;
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2MB
 
 export default function EditProfilePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const supabase = createClient();
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [bio, setBio] = useState("");
   const { toast, showSuccess, showError } = useToast();
@@ -51,7 +55,7 @@ export default function EditProfilePage() {
         .maybeSingle();
 
       if (error) {
-        console.error("Failed to fetch profile", error);
+        setLoadError("Could not load your profile. Refresh the page to try again.");
       } else if (user) {
         setProfile({
           id: user.id,
@@ -91,6 +95,7 @@ export default function EditProfilePage() {
   const handleSave = async () => {
     if (!user || !profile) return;
     setSaving(true);
+    setSaveError(null);
     try {
       let newAvatarUrl = profile.avatar_url;
       if (avatarFile) {
@@ -121,44 +126,29 @@ export default function EditProfilePage() {
       setTimeout(() => router.push("/profile"), 1000);
     } catch (error: unknown) {
       console.error("Error saving profile:", error);
-      showError((error as Error)?.message || "Failed to save profile", 4000);
+      setSaveError(error instanceof Error ? error.message : "Could not save your profile.");
     } finally {
       setSaving(false);
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to edit your profile.</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading profile...</span>
-        </div>
-      </div>
-    );
-  }
+  if (authLoading || (user && loading)) return <LoadingState label="Loading profile…" />;
+  if (!user) return <AccessRestricted title="Edit profile" description="Sign in to edit your profile." backHref="/login" backLabel="Sign in" />;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-3xl mx-auto px-4 py-10">
-        <Button variant="ghost" size="sm" asChild className="mb-6">
+    <PageShell>
+      <PageContainer size="md" className="max-w-3xl gap-4 py-5 sm:py-8">
+        <Button variant="ghost" asChild className="min-h-11 self-start">
           <Link href="/profile">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Profile
           </Link>
         </Button>
 
-        <Card>
+        <h1 className="text-3xl font-semibold">Edit profile</h1>
+        {loadError ? <InlineFeedback error>{loadError}</InlineFeedback> : <Card>
           <CardHeader>
-            <CardTitle>Edit Profile</CardTitle>
+            <CardTitle>Personal details</CardTitle>
             <CardDescription>Update your personal details and preferences</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -245,12 +235,14 @@ export default function EditProfilePage() {
               </p>
             </div>
 
-            <div className="flex justify-end gap-3">
+            {saveError && <InlineFeedback error>{saveError}</InlineFeedback>}
+            <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => router.push("/profile")}
                 disabled={saving}
+                className="min-h-11"
               >
                 Cancel
               </Button>
@@ -258,17 +250,17 @@ export default function EditProfilePage() {
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-2"
+                className="min-h-11"
               >
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save changes
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         {toast && <Toast message={toast.message} type={toast.type} />}
-      </div>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

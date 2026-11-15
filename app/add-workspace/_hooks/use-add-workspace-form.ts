@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { defaultAddWorkspaceFormData } from "../_lib/defaults";
 import type { AddWorkspaceFieldValue, AddWorkspaceFormData, UpdateAddWorkspaceField } from "../_lib/types";
-import { getAddWorkspaceValidationMessage, isAddWorkspaceStepValid, totalAddWorkspaceSteps } from "../_lib/validation";
+import { getAddWorkspaceValidationIssue, isAddWorkspaceStepValid, totalAddWorkspaceSteps } from "../_lib/validation";
 
 export function useAddWorkspaceForm() {
   const [currentStep, setCurrentStep] = useState(1);
@@ -16,11 +16,11 @@ export function useAddWorkspaceForm() {
   const getStepState = (uploadedPhotos: string[]) => {
     const canProceedToNext = isAddWorkspaceStepValid(currentStep, formData, uploadedPhotos);
     const canSubmit = isAddWorkspaceStepValid(totalAddWorkspaceSteps, formData, uploadedPhotos);
-    const validationMessage = !canProceedToNext
-      ? getAddWorkspaceValidationMessage(currentStep, formData, uploadedPhotos)
+    const validationIssue = !canProceedToNext
+      ? getAddWorkspaceValidationIssue(currentStep, formData, uploadedPhotos)
       : null;
 
-    return { canProceedToNext, canSubmit, validationMessage };
+    return { canProceedToNext, canSubmit, validationIssue };
   };
 
   const resetForm = () => {

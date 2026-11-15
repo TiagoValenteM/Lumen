@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { BRAND_NAME } from "../../lib/constants/brand";
 
 const settings = {
   baseUrl: process.env.LUMEN_E2E_BASE_URL,
@@ -89,7 +90,7 @@ test("the first place in a new city stays private until a moderator publishes it
       const publicPage = await visitor.newPage();
       await publicPage.goto(publicPath);
       await expect(publicPage.getByText(suggestion, { exact: true }).first()).toBeVisible();
-      await expect(publicPage.getByText(/Known facts checked by a Lumen moderator/)).toBeVisible();
+      await expect(publicPage.getByText(`Known facts checked by a ${BRAND_NAME} moderator`, { exact: false })).toBeVisible();
       await expect(publicPage.getByText("Unknown", { exact: true })).toHaveCount(3);
 
       await publicPage.goto(`/find?city=${citySlug}`);

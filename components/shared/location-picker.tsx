@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { Map, Marker } from "maplibre-gl";
-import { CheckCircle2, Crosshair, Loader2, Pencil, Search, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Crosshair, Loader2, MapPin, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { InlineFeedback } from "./inline-feedback";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
 import { workspaceMapStyle } from "@/lib/features/locations/workspace-map-style";
 import { normalizeCountryName } from "@/lib/features/locations/country-name";
@@ -41,9 +42,13 @@ type GeocodeCandidate = {
 type LocationPickerProps = {
   value: LocationValue;
   onChange: (value: LocationValue) => void;
+  searchId?: string;
+  validationId?: string;
 };
 
-export function LocationPicker({ value, onChange }: LocationPickerProps) {
+export function LocationPicker({ value, onChange, searchId, validationId }: LocationPickerProps) {
+  const id = useId();
+  const inputId = searchId ?? `${id}-search`;
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapSectionRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
@@ -58,13 +63,14 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapFailed, setMapFailed] = useState(false);
+  const [mapAttempt, setMapAttempt] = useState(0);
   const [reverseSearching, setReverseSearching] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
   const [mapExpanded, setMapExpanded] = useState(false);
 
   const { latitude, longitude } = value;
   const hasCoordinates = latitude !== null && longitude !== null;
-  const shouldShowMap = !hasCoordinates || mapExpanded || manualMode;
+  const shouldShowMap = mapExpanded;
   const selectedTitle = getSelectedTitle(value);
 
   useEffect(() => {
@@ -93,26 +99,26 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
 
   const focusMap = () => {
     window.requestAnimationFrame(() => {
-      mapSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      mapSectionRef.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
+      mapSectionRef.current?.focus({ preventScroll: true });
       resizeMap(mapRef.current);
     });
   };
 
   const openMapForPin = () => {
-    setManualMode(true);
+    setMapFailed(false);
     setMapExpanded(true);
     focusMap();
   };
 
   const toggleMap = () => {
     if (shouldShowMap) {
-      setManualMode(false);
       setMapExpanded(false);
+      document.getElementById(`${id}-map-toggle`)?.focus();
       return;
     }
 
-    setMapExpanded(true);
-    focusMap();
+    openMapForPin();
   };
 
   const reverseLookup = useCallback(async (latitude: number, longitude: number) => {
@@ -138,6 +144,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       const current = valueRef.current;
       if (current.latitude !== latitude || current.longitude !== longitude || current.source !== "pin") return;
       if (!response.ok) throw new Error(data.error || "Address lookup failed.");
+      if (!data.address) setError("Pin saved. Enter the address manually if it is missing.");
       updateLocation({
         address: current.address === pinned.address ? data.address || current.address : current.address,
         city: current.city === pinned.city ? data.city || current.city : current.city,
@@ -198,8 +205,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     reverseRequest.cancel();
     setReverseSearching(false);
     setQuery(candidate.label);
-    setManualMode(false);
-    setMapExpanded(true);
+    setMapExpanded(false);
     setError(null);
     updateLocation({
       latitude: candidate.latitude,
@@ -213,6 +219,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       confidence: candidate.confidence,
       raw: candidate.raw,
     });
+    requestAnimationFrame(() => document.getElementById(`${id}-map-toggle`)?.focus({ preventScroll: true }));
   };
 
   const clearSelection = () => {
@@ -221,7 +228,8 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
     setReverseSearching(false);
     setQuery("");
     setError(null);
-    setManualMode(false);
+    setMapExpanded(false);
+    document.getElementById(inputId)?.focus();
     updateLocation({
       latitude: null,
       longitude: null,
@@ -240,6 +248,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
 
   useEffect(() => {
     let cancelled = false;
+    let loadTimer: number | undefined;
     async function setupMap() {
       if (!shouldShowMap || !mapContainerRef.current || mapRef.current) return;
       const maplibregl = await importMapLibre();
@@ -257,18 +266,24 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         zoom: valueRef.current.latitude !== null && valueRef.current.longitude !== null ? 15 : 2,
       });
       mapRef.current = map;
-      map.on("load", () => setMapReady(true));
+      loadTimer = window.setTimeout(() => setMapFailed(true), 12000);
+      map.once("load", () => {
+        window.clearTimeout(loadTimer);
+        setMapFailed(false);
+        setMapReady(true);
+      });
       map.on("click", async (event) => {
-        setManualMode(true);
-        setMapExpanded(true);
         await reverseLookup(event.lngLat.lat, event.lngLat.lng);
       });
     }
 
-    void setupMap();
+    void setupMap().catch(() => {
+      if (!cancelled) setMapFailed(true);
+    });
 
     return () => {
       cancelled = true;
+      window.clearTimeout(loadTimer);
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -276,7 +291,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
         setMapReady(false);
       }
     };
-  }, [shouldShowMap, reverseLookup]);
+  }, [shouldShowMap, reverseLookup, mapAttempt]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -294,7 +309,7 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       } else {
         markerRef.current.setLngLat([longitude, latitude]);
       }
-      map.flyTo({ center: [longitude, latitude], zoom: 16, essential: true });
+      map.flyTo({ center: [longitude, latitude], zoom: 16 });
     });
     return () => { cancelled = true; };
   }, [mapReady, latitude, longitude, reverseLookup]);
@@ -312,24 +327,14 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-border/35 bg-card/80 p-3 shadow-sm shadow-black/5">
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-medium">Find the place</p>
-            <p className="text-xs text-muted-foreground">Search first. Use the map only to confirm or correct the pin.</p>
-          </div>
-          {hasCoordinates && (
-            <Badge variant="secondary" className="w-fit gap-1">
-              <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
-              Location set
-            </Badge>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="space-y-2">
+        <Label htmlFor={inputId}>Find the place</Label>
+        <div className="flex gap-2">
+          <div className="relative min-w-0 flex-1">
             <Input
+              id={inputId}
+              aria-invalid={Boolean(validationId)}
+              aria-describedby={[validationId, error && `${id}-lookup-error`].filter(Boolean).join(" ") || undefined}
               value={query}
               onChange={(event) => changeQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -338,67 +343,59 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
                   searchLocations();
                 }
               }}
-              placeholder="Search place name or full address"
-              className="pl-9"
+              placeholder="Place name or full address"
+              className="h-11"
             />
           </div>
-          <Button type="button" variant="outline" onClick={() => searchLocations()} disabled={searching}>
-            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : "Search"}
+          <Button type="button" variant="outline" size="icon" className="size-11 shrink-0"
+            aria-label={searching ? "Searching locations" : "Search locations"} title="Search locations"
+            onClick={() => searchLocations()} disabled={searching}>
+            {searching ? <Loader2 className="motion-safe:animate-spin" aria-hidden="true" /> : <Search aria-hidden="true" />}
           </Button>
         </div>
 
         {results.length > 0 && (
-          <div className="mt-3 max-h-72 overflow-y-auto rounded-lg border bg-background">
+          <ul aria-label="Location results" className="max-h-64 divide-y divide-border/60 overflow-y-auto rounded-lg border bg-background">
             {results.map((candidate) => (
-              <button
-                key={candidate.id}
+              <li key={candidate.id}><button
                 type="button"
                 onClick={() => chooseCandidate(candidate)}
-                className="block w-full border-b px-3 py-3 text-left last:border-b-0 hover:bg-muted/60"
+                className="keyboard-focus block min-h-11 w-full px-3 py-2.5 text-left [overflow-wrap:anywhere] hover:bg-muted"
               >
                 <span className="line-clamp-2 text-sm font-medium">{candidate.label}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">
                   {[candidate.city, candidate.country, getProviderLabel(candidate.provider)].filter(Boolean).join(" · ")}
                 </span>
-              </button>
+              </button></li>
             ))}
-          </div>
+          </ul>
         )}
 
-        <div className="mt-3 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-          {error ? <p className="text-muted-foreground">{error}</p> : <p className="text-muted-foreground">Can’t find it? Place the pin manually.</p>}
-          <Button type="button" variant="ghost" size="sm" className="w-fit gap-2" onClick={openMapForPin}>
-            <Crosshair className="h-4 w-4" />
-            Use map pin
-          </Button>
-        </div>
+        {searching && <p role="status" className="sr-only">Searching locations…</p>}
+        {error && <InlineFeedback id={`${id}-lookup-error`} error>{error}</InlineFeedback>}
+        {!hasCoordinates && <Button id={`${id}-map-toggle`} type="button" variant="ghost" className="min-h-11"
+          aria-expanded={shouldShowMap} aria-controls={shouldShowMap ? `${id}-map` : undefined}
+          onClick={shouldShowMap ? toggleMap : openMapForPin}>
+          <Crosshair aria-hidden="true" />{shouldShowMap ? "Hide map" : "Use map pin"}
+        </Button>}
       </div>
 
       {hasCoordinates && (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium">Selected place</p>
-                <Badge variant="outline" className="capitalize">{value.source}</Badge>
-                {providerLabel && <Badge variant="secondary">{providerLabel}</Badge>}
-              </div>
-              <p className="break-words text-sm text-foreground">{selectedTitle}</p>
-              <p className="break-words text-xs text-muted-foreground">
-                {value.address || [value.city, value.country].filter(Boolean).join(", ") || "Address not found yet"}
-              </p>
+        <div className="rounded-lg bg-muted px-3 py-2.5">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div className="min-w-0 flex-1 space-y-1 [overflow-wrap:anywhere]" role="status">
+              <p className="flex items-start gap-1.5 text-sm font-medium"><MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{selectedTitle}</span></p>
               <p className="text-xs text-muted-foreground">
-                {value.latitude?.toFixed(6)}, {value.longitude?.toFixed(6)}
+                {[value.address !== selectedTitle ? value.address : "", [value.city, value.country].filter(Boolean).join(", "), providerLabel].filter(Boolean).join(" · ")}
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={toggleMap}>
-                <Pencil className="mr-2 h-4 w-4" />
+              <Button id={`${id}-map-toggle`} type="button" variant="outline" className="min-h-11" onClick={toggleMap}
+                aria-expanded={shouldShowMap} aria-controls={shouldShowMap ? `${id}-map` : undefined}>
                 {shouldShowMap ? "Hide map" : "Adjust pin"}
               </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
-                <X className="mr-2 h-4 w-4" />
-                Clear
+              <Button type="button" variant="ghost" size="icon" className="size-11" aria-label="Clear location" title="Clear location" onClick={clearSelection}>
+                <X aria-hidden="true" />
               </Button>
             </div>
           </div>
@@ -406,24 +403,25 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       )}
 
       {shouldShowMap && (
-        <div ref={mapSectionRef} className="space-y-2">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium">Confirm on map</p>
-            <p className="text-xs text-muted-foreground">
-              {reverseSearching ? "Finding address..." : "Click or drag the pin to correct the exact entrance."}
-            </p>
-          </div>
-          <div className="relative h-72 overflow-hidden rounded-xl border border-border/35 bg-muted sm:h-80">
+        <div ref={mapSectionRef} id={`${id}-map`} tabIndex={-1} className="scroll-mt-20 space-y-2">
+          <p className="text-sm font-medium">Place the pin at the entrance</p>
+          {reverseSearching && <p role="status" className="text-sm text-muted-foreground">Looking up the address…</p>}
+          <div className="relative h-56 overflow-hidden rounded-lg bg-muted sm:h-80">
             <div ref={mapContainerRef} className="h-full w-full" />
-            {!mapReady && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/70">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            {!mapReady && !mapFailed && (
+              <div role="status" className="pointer-events-none absolute inset-0 grid place-items-center bg-background/70 text-sm text-muted-foreground">
+                Loading map…
               </div>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Open data can be approximate. For Lumen, the pin should match the place entrance or building.
-          </p>
+          {mapReady && <Button type="button" variant="outline" className="min-h-11" onClick={() => {
+            const point = mapRef.current?.getCenter();
+            if (point) void reverseLookup(point.lat, point.lng);
+          }}><Crosshair aria-hidden="true" /> Use map centre</Button>}
+          {mapFailed && <>
+            <InlineFeedback error>The map could not load. You can still select a location from search.</InlineFeedback>
+            <Button type="button" variant="outline" onClick={() => { setMapFailed(false); setMapAttempt((attempt) => attempt + 1); }}>Retry map</Button>
+          </>}
         </div>
       )}
     </div>

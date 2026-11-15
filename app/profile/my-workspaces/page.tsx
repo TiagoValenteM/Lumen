@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import type { UserWorkspaceSummary } from "@/lib/types/profile";
 import { LEVELS, LEVEL_ICONS, MEDAL_ICON_URL, getLevel } from "@/lib/constants/profileLevels";
 import { Progress } from "@/components/ui/progress";
+import { AccessRestricted, FeedbackState, LoadingState, PageContainer, PageHeader, PageShell } from "@/components/shared/lumen-page";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 
 type MyWorkspaceRow = {
   id: string;
@@ -29,7 +31,7 @@ type MyWorkspaceRow = {
 };
 
 export default function MyWorkspacesPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
 
   const [items, setItems] = useState<UserWorkspaceSummary[]>([]);
@@ -55,23 +57,23 @@ export default function MyWorkspacesPage() {
       case "approved":
         return {
           label: "Live",
-          description: "Approved and visible in Lumen.",
+          description: "Approved and visible to everyone.",
           icon: CheckCircle2,
-          className: "border-green-200 bg-green-50 text-green-700",
+          className: "border-primary/30 bg-primary/10 text-primary",
         };
       case "rejected":
         return {
           label: "Rejected",
           description: "Not published. Review the reason and submit a corrected place.",
           icon: XCircle,
-          className: "border-red-200 bg-red-50 text-red-700",
+          className: "border-destructive/30 bg-destructive/10 text-destructive",
         };
       case "under_review":
         return {
           label: "Needs fixes",
           description: "An admin requested changes before approval.",
           icon: Wrench,
-          className: "border-blue-200 bg-blue-50 text-blue-700",
+          className: "border-blue-300/50 bg-blue-500/10 text-blue-800 dark:text-blue-200",
         };
       default:
         return {
@@ -180,23 +182,20 @@ export default function MyWorkspacesPage() {
     load();
   }, [supabase, user]);
 
+  if (authLoading) return <LoadingState label="Checking session…" />;
+  if (!user) return <AccessRestricted title="Your added places" description="Sign in to see your submissions." backHref="/login" backLabel="Sign in" />;
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-12 space-y-8">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold">Your added places</h1>
-            <p className="text-muted-foreground text-sm">
-              All workspaces you&apos;ve submitted. Status and quick links included.
-            </p>
-          </div>
+    <PageShell>
+      <PageContainer className="max-w-5xl py-5 sm:py-8">
+        <PageHeader title="Your added places" actions={
           <Button asChild variant="outline" size="sm">
             <Link href="/profile">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to profile
             </Link>
           </Button>
-        </div>
+        } />
 
         <Card>
           <CardHeader className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
@@ -284,29 +283,17 @@ export default function MyWorkspacesPage() {
           </CardHeader>
           <CardContent className="space-y-5">
             {loading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Loading your places...</span>
               </div>
             )}
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <InlineFeedback error>{error}</InlineFeedback>}
             {!loading && !error && items.length === 0 && (
-              <Card className="border-dashed">
-                <CardContent className="py-8 flex flex-col items-center justify-center text-center space-y-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 text-primary inline-flex items-center justify-center">
-                    <Plus className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium">No places added yet</p>
-                    <p className="text-sm text-muted-foreground">
-                      Share your favorite work-friendly spots and track their status here.
-                    </p>
-                  </div>
-                  <Button asChild>
+              <FeedbackState title="No places added yet" action={
+                  <Button asChild variant="outline">
                     <Link href="/add-workspace">Add your first place</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                  </Button>} />
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {items.map((ws) => {
@@ -317,13 +304,13 @@ export default function MyWorkspacesPage() {
                 return (
                   <Card key={ws.id} className="border-border/35 shadow-sm shadow-black/5 transition-colors hover:border-primary/30 dark:shadow-black/20">
                     <CardContent className="pt-5 pb-5 space-y-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1 basis-36 space-y-2 [overflow-wrap:anywhere]">
                           <div className="flex items-center gap-3">
-                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                               <MapPin className="h-4 w-4" />
                             </span>
-                            <div>
+                            <div className="min-w-0">
                               <h3 className="font-semibold leading-tight">{ws.name}</h3>
                               <p className="text-xs text-muted-foreground">{cityName}</p>
                             </div>
@@ -338,7 +325,7 @@ export default function MyWorkspacesPage() {
                       <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
                         <div className="flex items-start gap-2">
                           <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                          <div className="space-y-1">
+                          <div className="min-w-0 space-y-1 [overflow-wrap:anywhere]">
                             <p className="font-medium text-foreground">{meta.description}</p>
                             {ws.rejection_reason && <p>{ws.rejection_reason}</p>}
                             {ws.latitude === null || ws.longitude === null ? <p>Location pin is missing.</p> : null}
@@ -363,8 +350,8 @@ export default function MyWorkspacesPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }
 

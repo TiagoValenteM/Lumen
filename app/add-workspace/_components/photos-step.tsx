@@ -5,20 +5,22 @@ import { ArrowLeft, ArrowRight, X } from "lucide-react";
 import { ImageUpload } from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 
 type PhotosStepProps = {
   uploadedPhotos: string[];
+  error?: string;
   onPhotoUploaded: (url: string) => void;
   onPhotoMoved: (fromIndex: number, toIndex: number) => void;
   onPhotoRemoved: (index: number) => void;
 };
 
-export function PhotosStep({ uploadedPhotos, onPhotoMoved, onPhotoUploaded, onPhotoRemoved }: PhotosStepProps) {
+export function PhotosStep({ uploadedPhotos, error, onPhotoMoved, onPhotoUploaded, onPhotoRemoved }: PhotosStepProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Photos</CardTitle>
-        <CardDescription>Add one clear photo now. More can be added if they help reviewers understand the place.</CardDescription>
+        <CardTitle><span id="place-photos" tabIndex={-1}>Photos</span></CardTitle>
+        <CardDescription>At least one photo is required.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <ImageUpload
@@ -27,6 +29,7 @@ export function PhotosStep({ uploadedPhotos, onPhotoMoved, onPhotoUploaded, onPh
           onUploadComplete={onPhotoUploaded}
           onUploadError={(error) => console.error(error)}
         />
+        {error && <InlineFeedback error>{error}</InlineFeedback>}
 
         {uploadedPhotos.length > 0 && (
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
@@ -79,7 +82,6 @@ export function PhotosStep({ uploadedPhotos, onPhotoMoved, onPhotoUploaded, onPh
           </div>
         )}
 
-        {uploadedPhotos.length === 0 && <p className="text-sm text-muted-foreground">No photos uploaded yet. At least one photo is recommended.</p>}
       </CardContent>
     </Card>
   );

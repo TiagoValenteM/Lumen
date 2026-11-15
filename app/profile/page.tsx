@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { AccessRestricted, FeedbackState, LoadingState, PageContainer, PageShell } from "@/components/shared/lumen-page";
+import { InlineFeedback } from "@/components/shared/inline-feedback";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +69,7 @@ export default function ProfilePage() {
 }
 
 function ProfilePageContent() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const supabase = useMemo(() => createClient(), []);
   const { latitude, longitude, loading: geoLoading, error: geoError, requestLocation } = useLocation();
 
@@ -393,28 +395,12 @@ function ProfilePageContent() {
     syncBadges();
   }, [user, supabase, myWorkspacesCount, visitedCount]);
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Please sign in to view your profile.</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          <span>Loading profile...</span>
-        </div>
-      </div>
-    );
-  }
+  if (authLoading || (user && loading)) return <LoadingState label="Loading profile…" />;
+  if (!user) return <AccessRestricted title="Your profile" description="Sign in to view your profile." backHref="/login" backLabel="Sign in" />;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto px-4 py-10 space-y-6">
+    <PageShell>
+      <PageContainer className="max-w-5xl py-5 sm:py-8">
         {/* User Header */}
         <Card>
           <CardContent className="py-6">
@@ -424,10 +410,10 @@ function ProfilePageContent() {
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
               
-              <div className="flex-1 space-y-3">
+              <div className="min-w-0 flex-1 space-y-3 [overflow-wrap:anywhere]">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <h1 className="text-3xl font-bold">{displayName}</h1>
+                    <h1 className="text-3xl font-semibold">{displayName}</h1>
                     {profile?.tag && (
                       <div className="flex items-center gap-2 mt-1">
                         <AtSign className="h-4 w-4 text-muted-foreground" />
@@ -628,7 +614,7 @@ function ProfilePageContent() {
               </div>
             )}
             {nearbyError && (
-              <div className="text-sm text-destructive">{nearbyError}</div>
+              <InlineFeedback error>{nearbyError}</InlineFeedback>
             )}
             {!nearbyLoading && nearby.length === 0 && latitude !== null && longitude !== null && !nearbyError && (
               <p className="text-sm text-muted-foreground">
@@ -707,11 +693,9 @@ function ProfilePageContent() {
                 <span>Loading your places...</span>
               </div>
             )}
-            {myWorkspacesError && <p className="text-sm text-destructive">{myWorkspacesError}</p>}
+            {myWorkspacesError && <InlineFeedback error>{myWorkspacesError}</InlineFeedback>}
             {!myWorkspacesLoading && !myWorkspacesError && myWorkspaces.length === 0 && (
-              <p className="text-sm text-muted-foreground">
-                You haven&apos;t added any places yet. Share your favorites with the community!
-              </p>
+              <FeedbackState title="No places added yet" action={<Button asChild variant="outline"><Link href="/add-workspace">Add your first place</Link></Button>} />
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {myWorkspaces.map((ws) => {
@@ -746,7 +730,7 @@ function ProfilePageContent() {
           </CardContent>
         </Card>
 
-      </div>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }
