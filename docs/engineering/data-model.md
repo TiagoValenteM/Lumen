@@ -7,9 +7,10 @@ The [Supabase migrations](../../supabase/migrations) define the schema and permi
 | `cities`, `workspaces` | Cities group published places. A first-place submission carries a city proposal; approval links it to an existing city or creates the city in the same transaction. |
 | `workspace_photos`, `reviews` | Photos are moderated separately from places. Reviews store user ratings and comments; the app calculates its workability display from place facts. |
 | `profiles`, `saved_workspaces`, `visited_workspaces` | Public profile fields are separate from Auth email. Saved and visited places belong to the account that created them. |
-| `workspace_edit_suggestions` | Members can report corrections. Moderator notes are not part of the public or member-facing result. |
+| `workspace_edit_suggestions` | Member corrections and structured visit observations go to moderation. Moderator notes and the review queue are not public. |
 | `workspace_ai_enrichments` | Server-side research runs, proposed fields, evidence, and reviewer decisions. Saving an accepted patch and recording the decisions happen together. |
 | `workspace_work_fact_checks` | Stores when a moderator checked the work facts. Public reads can see the date for published places but not who checked it. Changes to covered facts invalidate the check. |
+| `workspace_session_hours` | Separates private research drafts from published opening and laptop schedules. Public access is limited to current evidence for approved places. Date exceptions and the venue timezone determine session eligibility. |
 | `lumen_private.*` | Moderator roles, internal place notes, and quota counters. Client roles have no direct access to the schema. |
 
 ## State and access
