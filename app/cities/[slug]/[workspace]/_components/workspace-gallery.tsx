@@ -31,7 +31,8 @@ export function WorkspaceGallery({ photos, workspaceName }: WorkspaceGalleryProp
   return (
     <div className="overflow-hidden rounded-xl border border-border/30 bg-card/70 shadow-md shadow-black/5 dark:shadow-black/20">
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
-        <WorkspaceImage src={selectedPhoto.url} alt={selectedPhoto.caption || workspaceName} fill className="object-cover" priority />
+        <WorkspaceImage src={selectedPhoto.url} alt={selectedPhoto.caption || workspaceName} fill
+          className={credit?.display === "contain" ? "object-contain" : "object-cover"} priority />
 
         {orderedPhotos.length > 1 && (
           <>
@@ -72,7 +73,7 @@ export function WorkspaceGallery({ photos, workspaceName }: WorkspaceGalleryProp
           {credit && <p className="text-xs text-muted-foreground">
             Photo: {credit.author}. <a className="underline underline-offset-2" href={credit.source}>Wikimedia Commons</a>
             {" · "}<a className="underline underline-offset-2" href={credit.licenseUrl}>{credit.license}</a>
-            {" · Resized; cropped to fit."}
+            {credit.display === "contain" ? " · Resized." : " · Resized; cropped to fit."}
           </p>}
 
           {orderedPhotos.length > 1 && (

@@ -488,7 +488,8 @@ test("Zurich café and coworking evidence separates ordinary hours from date-spe
       saturday_draft: [[600,1080]], christmas: null, day_pass: null, photo: "/images/zurich-bullingerplatz-roland-fischer.jpg" },
     ...["westhive-hardturm-zurich","westhive-paradeplatz-zurich"].map((slug) => ({
       slug, type: "coworking", laptop_friendly: true, has_wifi: true,
-      saturday_draft: null, christmas: [], day_pass: 750, photo: null,
+      saturday_draft: null, christmas: [], day_pass: 750,
+      photo: slug === "westhive-hardturm-zurich" ? "/images/zurich-hardturmstrasse-161-tschubby.jpg" : null,
     })),
   ]);
 });

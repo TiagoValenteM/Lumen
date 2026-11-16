@@ -69,6 +69,11 @@ BEGIN
       schedule := jsonb_build_object('timeZone','Europe/Zurich','opening',opening,'laptopAccess',laptops,
         'note','Book a paid day pass online. Hours are for day-pass visitors, not members. A desk is subject to availability.');
       INSERT INTO public.workspace_session_hours (workspace_id,published,checked_at) VALUES (place_id,schedule,observed_at);
+      IF venue.slug = 'westhive-hardturm-zurich' THEN
+        INSERT INTO public.workspace_photos (workspace_id,url,caption,is_primary,is_approved)
+        VALUES (place_id,'/images/zurich-hardturmstrasse-161-tschubby.jpg',
+          'Street entrance to Hardturmstrasse 161, photographed in 2020.',true,true);
+      END IF;
     END IF;
   END LOOP;
 END $$;
