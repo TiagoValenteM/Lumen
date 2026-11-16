@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { resolveAvatarUrl } from "@/lib/utils";
 import { submitWorkspaceReview } from "@/lib/features/workspaces/submit-review";
 import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
+import { authHref, workspaceReviewPath, WRITE_REVIEW_HASH } from "@/lib/features/auth/return-path";
 import { useToast } from "@/hooks/useToast";
 import { useSavedWorkspace } from "@/hooks/useSavedWorkspace";
 import { useVisitedWorkspace } from "@/hooks/useVisitedWorkspace";
@@ -27,7 +28,8 @@ export default function WorkspacePage() {
   const params = useParams();
   const citySlug = params.slug as string;
   const workspaceSlug = params.workspace as string;
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   
   const [city, setCity] = useState<City | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(null);
@@ -36,6 +38,7 @@ export default function WorkspacePage() {
   const [profilesById, setProfilesById] = useState<Record<string, ProfileSummary>>({});
   const [loading, setLoading] = useState(true);
   const [showReviewForm, setShowReviewForm] = useState(false);
+  const reviewFormVisible = showReviewForm && Boolean(user);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [suggestionOpen, setSuggestionOpen] = useState(false);
   const [suggestionKind, setSuggestionKind] = useState<WorkspaceSuggestionKind>("wrong_location");
@@ -204,22 +207,38 @@ export default function WorkspacePage() {
     }
   };
 
-  const scrollToReviews = useCallback(() => {
+  const scrollToReviews = useCallback((form = false) => {
     requestAnimationFrame(() => {
-      reviewsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      reviewsSectionRef.current?.focus({ preventScroll: true });
+      const section = reviewsSectionRef.current;
+      const target = (form && section?.querySelector<HTMLElement>(WRITE_REVIEW_HASH)) || section;
+      target?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+      target?.focus({ preventScroll: true });
     });
   }, []);
 
   const openReviewForm = useCallback(() => {
+    if (authLoading) return;
     if (!user) {
-      showError("Please sign in to write a review");
+      router.push(authHref("/login", workspaceReviewPath(citySlug, workspaceSlug)));
       return;
     }
 
-    setShowReviewForm(true);
-    scrollToReviews();
-  }, [scrollToReviews, showError, user]);
+    if (reviewFormVisible) scrollToReviews(true);
+    else setShowReviewForm(true);
+  }, [authLoading, citySlug, reviewFormVisible, router, scrollToReviews, user, workspaceSlug]);
+
+  useEffect(() => {
+    if (reviewFormVisible) scrollToReviews(true);
+  }, [reviewFormVisible, scrollToReviews]);
+
+  useEffect(() => {
+    if (!user || authLoading || loading || !workspace || window.location.hash !== WRITE_REVIEW_HASH) return;
+    const frame = requestAnimationFrame(() => {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      openReviewForm();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [authLoading, loading, openReviewForm, user, workspace]);
 
   if (loading) {
     return (
@@ -254,7 +273,7 @@ export default function WorkspacePage() {
   return (
     <div className="min-h-full bg-background">
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <WorkspaceHeader city={city} workspace={workspace} onReviewsClick={scrollToReviews} />
+        <WorkspaceHeader city={city} workspace={workspace} onReviewsClick={() => scrollToReviews()} />
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
           <div className="space-y-8">
@@ -278,7 +297,8 @@ export default function WorkspacePage() {
                 workspaceName={workspace.name}
                 reviews={reviews}
                 profilesById={profilesById}
-                showReviewForm={showReviewForm}
+                showReviewForm={reviewFormVisible}
+                reviewDraftKey={user ? `lumen:review-draft:v1:${user.id}:${workspace.id}` : undefined}
                 userSignedIn={Boolean(user)}
                 submittingReview={submittingReview}
                 maxCommentLength={MAX_COMMENT_LENGTH}

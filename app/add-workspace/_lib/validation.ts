@@ -2,6 +2,12 @@ import type { AddWorkspaceFormData } from "./types";
 
 export const totalAddWorkspaceSteps = 6;
 
+export function getResumableStep(step: unknown, form: AddWorkspaceFormData, photos: string[]) {
+  if (typeof step !== "number" || !Number.isInteger(step) || step < 2 || step > totalAddWorkspaceSteps) return 1;
+  if (!isAddWorkspaceStepValid(1, form, photos)) return 1;
+  return step === totalAddWorkspaceSteps && !isAddWorkspaceStepValid(5, form, photos) ? 5 : step;
+}
+
 function hasCity(formData: AddWorkspaceFormData) {
   return Boolean(formData.city_name.trim() && formData.country.trim());
 }

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authHref, getAuthReturnPath } from "@/lib/features/auth/return-path";
 
 export default function SignupPage() {
   const [firstName, setFirstName] = useState("");
@@ -24,16 +25,20 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [returnTo, setReturnTo] = useState("/");
+  const [needsConfirmation, setNeedsConfirmation] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function checkSession() {
       const { data } = await supabase.auth.getSession();
+      const path = getAuthReturnPath(new URLSearchParams(window.location.search).get("redirect"));
       if (data.session) {
-        router.replace("/");
+        router.replace(path);
         return;
       }
+      setReturnTo(path);
       setCheckingSession(false);
     }
     checkSession();
@@ -56,6 +61,10 @@ export default function SignupPage() {
         },
       });
       if (error) throw error;
+      if (!data.session) {
+        setNeedsConfirmation(true);
+        return;
+      }
 
       // Ensure profile row exists for the new user (needed for reviews display)
       if (data?.user && data.session) {
@@ -72,7 +81,7 @@ export default function SignupPage() {
         if (profileError) throw profileError;
       }
 
-      router.push("/");
+      router.replace(returnTo);
       router.refresh();
     } catch (error) {
       setError(getErrorMessage(error, "Could not create your account"));
@@ -86,16 +95,16 @@ export default function SignupPage() {
       <div className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
       <Card className="relative z-10 mx-auto w-full max-w-md shadow-lg shadow-black/10 dark:shadow-black/30">
         <CardHeader className="space-y-0.5 text-center pb-4">
-          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+          <CardTitle className="text-2xl font-bold">{needsConfirmation ? "Check your email" : "Create your account"}</CardTitle>
           <CardDescription className="text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="underline">
+            <Link href={authHref("/login", returnTo)} className="underline">
               Sign in
             </Link>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form onSubmit={handleSignup} className="grid gap-4">
+          {needsConfirmation ? <p role="status" className="text-sm text-muted-foreground">Confirm your email, then <Link href={authHref("/login", returnTo)} className="underline">sign in to continue</Link>.</p> : <form onSubmit={handleSignup} className="grid gap-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="first-name">First name</Label>
@@ -148,14 +157,13 @@ export default function SignupPage() {
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Creating account..." : "Create account"}
             </Button>
-          </form>
+          </form>}
           <p className="text-center text-xs text-muted-foreground">
-            By continuing you agree to our{" "}
-            <Link href="#" className="underline">
+            By creating an account, you agree to the{" "}
+            <Link href="/legal/terms" className="underline">
               Terms
-            </Link>{" "}
-            and{" "}
-            <Link href="#" className="underline">
+            </Link>. Read our{" "}
+            <Link href="/legal/privacy" className="underline">
               Privacy Policy
             </Link>
             .

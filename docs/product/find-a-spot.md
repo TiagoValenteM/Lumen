@@ -7,6 +7,14 @@
 - To test optional AI in Preview, apply `20261112000600_limit_spot_interpretation.sql`, then set `FIND_A_SPOT_AI_ENABLED=true` with the existing server-only `OPENROUTER_API_KEY` and `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`). AI is off by default, only available to signed-in users, and requires a separate click before sending text. There are four requests per account and 15 total per UTC day; the lower shared cap leaves capacity for moderation. Only counters are stored. AI output is shown for confirmation before updating the controls.
 - For the staged pilot, measure whether reviewed listings are sufficient in the chosen city and whether people can find a useful result. Structured hours and date exceptions, post-visit reporting, and aggregate pilot measurement remain follow-ups; don’t advertise a venue as open until that data is dependable.
 
+## Session hours: release gate
+
+The [session evaluator](../../lib/features/find-a-spot/session-availability.ts) and matcher distinguish covered, incompatible and unknown sessions. No public filter is enabled. Do not use legacy `opening_hours`, free-text AI notes, a city timezone guess or an empty exceptions list as verified evidence.
+
+- Record the venue's named timezone and two independent schedules: public opening hours and laptop access. Keep a source, verification timestamp and the last local date through which exceptions were checked for each. An unknown day is omitted; an explicitly closed or restricted day uses an empty set of allowed windows.
+- Use half-open windows in local minutes (0 to 1440). Split overnight windows at midnight, and let each local date's exceptions replace its weekly windows. Check the full elapsed session, including daylight-saving transitions and any break between windows. The evaluator treats checks older than 30 days or dates outside the exception coverage as unknown.
+- Before wiring the public control, provide a reviewer-only way to record and expire evidence. Verify enough places in one pilot city, including a weekend or holiday exception and a laptop-only restriction. Test fixed start times and shareable links with those records. Unknown schedules must stay in **Places to check**; no hours result guarantees a free seat.
+
 ## 1. Ship the decision flow without AI
 
 **Job:** "Where can I work for two hours, and why would I choose this place?"

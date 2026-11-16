@@ -9,6 +9,19 @@ interface ReviewFormProps {
   onCancel: () => void;
   isSubmitting: boolean;
   maxCommentLength?: number;
+  draftKey?: string;
+}
+
+function readDraft(key?: string) {
+  const empty = { rating: 0, comment: "" };
+  if (!key || typeof window === "undefined") return empty;
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem(key) ?? "null");
+    if (!Number.isInteger(value?.rating) || value.rating < 0 || value.rating > 5 || typeof value.comment !== "string") return empty;
+    return { rating: value.rating as number, comment: value.comment as string };
+  } catch {
+    return empty;
+  }
 }
 
 export function ReviewForm({
@@ -16,17 +29,29 @@ export function ReviewForm({
   onCancel,
   isSubmitting,
   maxCommentLength = 500,
+  draftKey,
 }: ReviewFormProps) {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
+  const [{ rating, comment }, setDraft] = useState(() => {
+    const draft = readDraft(draftKey);
+    return { ...draft, comment: draft.comment.slice(0, maxCommentLength) };
+  });
   const remainingChars = maxCommentLength - comment.length;
+
+  function updateDraft(nextRating: number, nextComment: string) {
+    setDraft({ rating: nextRating, comment: nextComment });
+    if (!draftKey) return;
+    try {
+      if (nextRating || nextComment) window.sessionStorage.setItem(draftKey, JSON.stringify({ rating: nextRating, comment: nextComment }));
+      else window.sessionStorage.removeItem(draftKey);
+    } catch {
+      // The review still works when browser storage is unavailable.
+    }
+  }
 
   const handleSubmit = async () => {
     const didSubmit = await onSubmit(rating, comment);
     if (!didSubmit) return;
-    // Reset form after successful submission
-    setRating(0);
-    setComment("");
+    updateDraft(0, "");
   };
 
   return (
@@ -40,7 +65,9 @@ export function ReviewForm({
               <button
                 key={star}
                 type="button"
-                onClick={() => setRating(star)}
+                onClick={() => updateDraft(star, comment)}
+                aria-label={`${star} ${star === 1 ? "star" : "stars"}`}
+                aria-pressed={rating === star}
                 className="transition-transform hover:scale-110"
                 disabled={isSubmitting}
               >
@@ -61,7 +88,7 @@ export function ReviewForm({
             id="review-comment"
             placeholder="Share your experience..."
             value={comment}
-            onChange={(e) => setComment(e.target.value)}
+            onChange={(e) => updateDraft(rating, e.target.value)}
             rows={4}
             className="mt-2"
             maxLength={maxCommentLength}
@@ -81,7 +108,7 @@ export function ReviewForm({
           <Button onClick={handleSubmit} disabled={isSubmitting || rating === 0}>
             {isSubmitting ? "Submitting..." : "Submit Review"}
           </Button>
-          <Button variant="outline" onClick={onCancel} disabled={isSubmitting}>
+          <Button variant="outline" onClick={() => { updateDraft(0, ""); onCancel(); }} disabled={isSubmitting}>
             Cancel
           </Button>
         </div>

@@ -1,66 +1,36 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LegalPage, LegalSection, legalLinkClass } from "../_components/legal-page";
 
-const updatedAt = "November 13, 2026";
+export const metadata: Metadata = {
+  title: "Privacy Policy | Lumen",
+  description: "What Lumen processes when you browse, use location features or contribute to the directory.",
+};
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-4xl px-6 py-12">
-        <Card className="rounded-lg">
-          <CardHeader>
-            <CardTitle>Privacy Policy</CardTitle>
-            <CardDescription>Last updated {updatedAt}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6 text-sm leading-relaxed text-muted-foreground">
-            <Section title="What we collect">
-              Lumen stores account information such as your email, profile name, tag, avatar, bio, and account role. We also store product activity you choose to create, including saved workspaces, visited workspaces, submitted places, reviews, ratings, uploaded photos, and suggested corrections.
-            </Section>
-
-            <Section title="Location data">
-              If you use location-based features, your browser may ask for permission to share your position. Find a Spot calculates distances in your browser and does not store your device coordinates. When you open a map, your browser requests map tiles from <Link className="underline" href="https://openfreemap.org/privacy/">OpenFreeMap</Link> for the area displayed. Address lookup may contact a separate geocoding provider. You can deny or revoke location permission in your browser.
-            </Section>
-
-            <Section title="Find a Spot and optional AI">
-              Common requests are interpreted in your browser. When you choose Try with AI, Lumen sends the text you entered to OpenRouter to suggest filters. Lumen does not attach your account details or device location, and does not save the request text. It keeps a request count tied to your account to enforce daily limits. Do not include personal information in the request.
-            </Section>
-
-            <Section title="Workspace and moderation data">
-              Workspace submissions may include names, addresses, coordinates, photos, amenities, notes, and moderation status. Admins can review submissions, edit location details, approve or reject content, merge cities, and remove unused city records.
-            </Section>
-
-            <Section title="How we use data">
-              We use data to operate your account, personalize the signed-in homepage, show saved and visited places, review submitted content, improve discovery quality, and protect the service from spam or misuse.
-            </Section>
-
-            <Section title="Sharing and processors">
-              We do not sell personal data. Lumen uses service providers such as Supabase for authentication, database, and file storage. Location search or reverse-geocoding features may contact external mapping/geocoding services depending on configuration.
-            </Section>
-
-            <Section title="Your choices">
-              You can update your profile, remove saved or visited places, and contact us to request access or deletion of your account data. Some public contributions may be retained or anonymized when needed to preserve directory integrity.
-            </Section>
-
-            <Section title="Contact">
-              For privacy questions, contact{" "}
-              <Link href="mailto:support@lumen.com" className="text-primary underline">
-                support@lumen.com
-              </Link>
-              .
-            </Section>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function Section({ children, title }: { children: ReactNode; title: string }) {
-  return (
-    <section className="space-y-2">
-      <h2 className="text-base font-semibold text-foreground">{title}</h2>
-      <p>{children}</p>
-    </section>
+    <LegalPage title="Privacy Policy" summary="What Lumen processes, what other people can see, and how to make a privacy request.">
+      <LegalSection title="Accounts and contributions">
+        <p>We use your email and account details to sign you in and manage your account. If you use them, we store profile details, saved places and visits, as well as the places, reviews, photos and corrections you submit.</p>
+        <p>Approved listings and photos, published reviews, and profile details shown alongside your public activity can be visible to anyone. Your account email, saves and visits are not displayed in the public directory. Reviewers can see submissions and corrections while handling them.</p>
+        <p>When you upload a photo, the file is sent to storage before you submit the place. Anyone with a direct photo URL may be able to open it, even if it is not yet shown in the directory. Do not upload images you need to keep private.</p>
+      </LegalSection>
+      <LegalSection title="Maps, location and address search">
+        <p>When you grant location permission, Find a Spot uses your device position in your browser to calculate distances and does not save those coordinates. Your browser requests tiles for the area on screen from OpenFreeMap. When you search for an address or look up a pin, the query or pin coordinates go to a geocoding provider, such as Geoapify, LocationIQ, Photon or Nominatim, depending on configuration and availability. The venue address and map pin are part of a submitted listing.</p>
+      </LegalSection>
+      <LegalSection title="Optional AI and moderation">
+        <p>Find a Spot handles common requests in your browser. Where available, Try with AI sends the text you enter to OpenRouter only when you choose that option. Lumen does not attach your account details or device coordinates to that request or save the text; it keeps a count linked to your account to enforce usage limits. Do not include personal information in your request.</p>
+        <p>When AI assistance is used for moderation, OpenRouter receives venue details such as the name, address, business contact information and listing descriptions to suggest improvements. A reviewer decides whether to use those suggestions.</p>
+      </LegalSection>
+      <LegalSection title="Cookies and browser storage">
+        <p>We use session cookies to keep you signed in. Browser storage can remember your appearance preference and keep an unfinished place or review draft on the same browser. Clearing site data removes local drafts and preferences, not records already submitted to Lumen.</p>
+      </LegalSection>
+      <LegalSection title="Service providers">
+        <p>Vercel hosts Lumen. Supabase provides authentication, the database and file storage. The mapping, address lookup and AI providers above receive the data needed to answer those requests. We do not sell personal data.</p>
+      </LegalSection>
+      <LegalSection title="Your choices and requests">
+        <p>You can edit your profile, remove saved places and visits, and change location permission in your browser. To ask for access, correction or deletion, or to raise a privacy concern, use the private email on the <Link href="/legal/contact" className={legalLinkClass}>Contact page</Link>. We may need to verify that a request relates to your account.</p>
+      </LegalSection>
+    </LegalPage>
   );
 }

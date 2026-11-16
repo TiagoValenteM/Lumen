@@ -107,7 +107,7 @@ export function PublicHome() {
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link href="/legal/terms" className="transition-colors hover:text-foreground">Terms</Link>
             <Link href="/legal/privacy" className="transition-colors hover:text-foreground">Privacy</Link>
-            <Link href="mailto:support@lumen.com" className="transition-colors hover:text-foreground">Contact</Link>
+            <Link href="/legal/contact" className="transition-colors hover:text-foreground">Contact</Link>
           </div>
         </div>
       </footer>

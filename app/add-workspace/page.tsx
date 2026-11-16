@@ -23,6 +23,7 @@ import { useDuplicateWorkspaceCheck } from "./_hooks/use-duplicate-workspace-che
 import { useWorkspacePhotos } from "./_hooks/use-workspace-photos";
 import { submitWorkspace } from "./_lib/submit-workspace";
 import { totalAddWorkspaceSteps } from "./_lib/validation";
+import { ADD_PLACE_PATH, authHref } from "@/lib/features/auth/return-path";
 
 const addWorkspaceStepLabels = ["Basics", "Work setup", "Ambiance", "Policies", "Photos", "Review"];
 
@@ -45,7 +46,9 @@ export default function AddWorkspacePage() {
   } = useWorkspacePhotos(user?.id);
   const { canCheckDuplicates, checkingDuplicates, duplicateCandidates, duplicateCheckError } = useDuplicateWorkspaceCheck(supabase, formData);
   const { clearDraft, draftLoaded, draftSavedAt, getSubmissionId } = useAddWorkspaceDraft({
+    currentStep,
     formData,
+    setCurrentStep,
     setFormData,
     setUploadedPhotos,
     uploadedPhotos,
@@ -54,11 +57,11 @@ export default function AddWorkspacePage() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push('/login?redirect=/add-workspace');
+      router.replace(authHref("/login", ADD_PLACE_PATH));
     }
   }, [user, authLoading, router]);
 
-  if (authLoading) {
+  if (authLoading || (user && !draftLoaded)) {
     return (
       <div className="min-h-full bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

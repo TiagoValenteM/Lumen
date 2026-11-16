@@ -1,4 +1,5 @@
 import type { SpotPreferences } from "./preferences";
+import type { SessionAvailability } from "./session-availability";
 
 export type SpotPlace = {
   id: string;
@@ -36,6 +37,7 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
   now: number;
   radiusKm?: number;
   distanceKm?: (place: SpotPlace) => number | null;
+  sessionAvailability?: (place: SpotPlace) => SessionAvailability;
 }) {
   const matches: SpotCandidate[] = [];
   const details: SpotCandidate[] = [];
@@ -50,6 +52,8 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
     const computedDistance = options.distanceKm?.(place);
     const distance = typeof computedDistance === "number" && Number.isFinite(computedDistance) && computedDistance >= 0 ? computedDistance : null;
     if (options.radiusKm !== undefined && distance !== null && distance > options.radiusKm) continue;
+    const availability = options.sessionAvailability?.(place);
+    if (availability === "does_not_fit") continue;
 
     const reasons: string[] = [];
     const toCheck: string[] = [];
@@ -77,6 +81,8 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
       else toCheck.push("Call suitability");
     }
     if (options.radiusKm !== undefined && distance === null) toCheck.push("Distance");
+    if (availability === "fits") reasons.push("Hours and laptop access cover this session");
+    if (availability === "unknown") toCheck.push("Opening hours and laptop access for this session");
 
     (toCheck.length ? details : matches).push({ place, reasons, toCheck, distance });
   }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { defaultAddWorkspaceFormData } from "../_lib/defaults";
 import type { AddWorkspaceFormData } from "../_lib/types";
+import { getResumableStep } from "../_lib/validation";
 
 const legacyDraftStorageKey = "lumen:add-place-draft:v1";
 
@@ -15,67 +16,76 @@ type AddWorkspaceDraft = {
   uploadedPhotos: string[];
   savedAt: string;
   workFactsVersion: 1;
+  currentStep: number;
 };
 
 type UseAddWorkspaceDraftParams = {
   formData: AddWorkspaceFormData;
+  currentStep: number;
+  setCurrentStep: Dispatch<SetStateAction<number>>;
   setFormData: Dispatch<SetStateAction<AddWorkspaceFormData>>;
   setUploadedPhotos: Dispatch<SetStateAction<string[]>>;
   uploadedPhotos: string[];
   userId: string | undefined;
 };
 
-export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos, uploadedPhotos, userId }: UseAddWorkspaceDraftParams) {
-  const [draftLoaded, setDraftLoaded] = useState(false);
+export function useAddWorkspaceDraft({ formData, currentStep, setCurrentStep, setFormData, setUploadedPhotos, uploadedPhotos, userId }: UseAddWorkspaceDraftParams) {
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const draftLoaded = userId !== undefined && loadedFor === userId;
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(null);
   const skipNextSaveRef = useRef(false);
   const submissionIdRef = useRef<{ userId: string; id: string } | null>(null);
+  const saveGeneration = useRef(0);
 
   useEffect(() => {
     if (!userId) return;
 
     const timer = window.setTimeout(() => {
       const draftStorageKey = getDraftStorageKey(userId);
-      window.localStorage.removeItem(legacyDraftStorageKey);
-      const rawDraft = window.localStorage.getItem(draftStorageKey);
-      if (!rawDraft) {
-        setDraftLoaded(true);
-        return;
-      }
-
+      skipNextSaveRef.current = false;
+      let restored = defaultAddWorkspaceFormData;
+      let photos: string[] = [];
+      let step = 1;
+      let savedAt: string | null = null;
       try {
+        window.localStorage.removeItem(legacyDraftStorageKey);
+        const rawDraft = window.localStorage.getItem(draftStorageKey);
+        if (!rawDraft) return;
         const draft = JSON.parse(rawDraft) as Partial<AddWorkspaceDraft>;
         if (draft.formData) {
-          const restored = { ...defaultAddWorkspaceFormData, ...draft.formData };
+          const candidate = { ...defaultAddWorkspaceFormData, ...draft.formData };
           if (!draft.workFactsVersion) {
             // Legacy drafts could not distinguish these defaults from deliberate answers.
-            if (restored.has_wifi === true && restored.wifi_speed === "moderate") {
-              restored.has_wifi = null;
-              restored.wifi_speed = "";
+            if (candidate.has_wifi === true && candidate.wifi_speed === "moderate") {
+              candidate.has_wifi = null;
+              candidate.wifi_speed = "";
             }
-            if (restored.has_power_outlets === true && restored.power_outlet_availability === 3) {
-              restored.has_power_outlets = null;
-              restored.power_outlet_availability = 0;
+            if (candidate.has_power_outlets === true && candidate.power_outlet_availability === 3) {
+              candidate.has_power_outlets = null;
+              candidate.power_outlet_availability = 0;
             }
-            if (restored.laptop_friendly === true) restored.laptop_friendly = null;
-            if (restored.time_limit_hours === 0) restored.time_limit_hours = null;
+            if (candidate.laptop_friendly === true) candidate.laptop_friendly = null;
+            if (candidate.time_limit_hours === 0) candidate.time_limit_hours = null;
           }
-          setFormData(restored);
+          photos = Array.isArray(draft.uploadedPhotos) ? draft.uploadedPhotos.filter((photo): photo is string => typeof photo === "string") : [];
+          step = getResumableStep(draft.currentStep, candidate, photos);
+          restored = candidate;
         }
-        if (Array.isArray(draft.uploadedPhotos)) {
-          setUploadedPhotos(draft.uploadedPhotos.filter((photo): photo is string => typeof photo === "string"));
-        }
-        setDraftSavedAt(typeof draft.savedAt === "string" ? draft.savedAt : null);
+        savedAt = typeof draft.savedAt === "string" ? draft.savedAt : null;
         skipNextSaveRef.current = true;
       } catch {
-        window.localStorage.removeItem(draftStorageKey);
+        // Browser storage can be unavailable; the new form still works.
       } finally {
-        setDraftLoaded(true);
+        setFormData(restored);
+        setUploadedPhotos(photos);
+        setCurrentStep(step);
+        setDraftSavedAt(savedAt);
+        setLoadedFor(userId);
       }
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [setFormData, setUploadedPhotos, userId]);
+  }, [setCurrentStep, setFormData, setUploadedPhotos, userId]);
 
   useEffect(() => {
     if (!draftLoaded || !userId) return;
@@ -84,7 +94,11 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
       return;
     }
 
-    const timer = window.setTimeout(() => {
+    const generation = saveGeneration.current;
+    let persisted = false;
+    const save = () => {
+      if (persisted || generation !== saveGeneration.current) return;
+      persisted = true;
       const draftStorageKey = getDraftStorageKey(userId);
       const hasMeaningfulDraft =
         formData.name.trim() ||
@@ -92,27 +106,32 @@ export function useAddWorkspaceDraft({ formData, setFormData, setUploadedPhotos,
         formData.latitude !== null ||
         uploadedPhotos.length > 0;
 
-      if (!hasMeaningfulDraft) {
-        window.localStorage.removeItem(draftStorageKey);
-        window.localStorage.removeItem(getSubmissionStorageKey(userId));
-        setDraftSavedAt(null);
-        return;
-      }
-
       try {
+        if (!hasMeaningfulDraft) {
+          window.localStorage.removeItem(draftStorageKey);
+          window.localStorage.removeItem(getSubmissionStorageKey(userId));
+          setDraftSavedAt(null);
+          return;
+        }
         const savedAt = new Date().toISOString();
-        const draft: AddWorkspaceDraft = { formData, uploadedPhotos, savedAt, workFactsVersion: 1 };
+        const draft: AddWorkspaceDraft = { formData, uploadedPhotos, savedAt, currentStep, workFactsVersion: 1 };
         window.localStorage.setItem(draftStorageKey, JSON.stringify(draft));
         setDraftSavedAt(savedAt);
       } catch (error) {
         console.error("Failed to save add-place draft:", error);
       }
-    }, 600);
+    };
+    const timer = window.setTimeout(save, 0);
+    window.addEventListener("pagehide", save);
 
-    return () => window.clearTimeout(timer);
-  }, [draftLoaded, formData, uploadedPhotos, userId]);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pagehide", save);
+    };
+  }, [currentStep, draftLoaded, formData, uploadedPhotos, userId]);
 
   const clearDraft = () => {
+    saveGeneration.current += 1;
     if (userId) {
       try {
         window.localStorage.removeItem(getDraftStorageKey(userId));

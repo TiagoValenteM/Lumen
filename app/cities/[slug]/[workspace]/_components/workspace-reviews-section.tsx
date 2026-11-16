@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReviewForm, ReviewsList } from "@/components/features/review";
 import type { ProfileSummary, Review } from "@/lib/types";
 import { MessageSquare } from "lucide-react";
+import { WRITE_REVIEW_HASH } from "@/lib/features/auth/return-path";
 
 type WorkspaceReviewsSectionProps = {
   workspaceName: string;
   reviews: Review[];
   profilesById: Record<string, ProfileSummary>;
   showReviewForm: boolean;
+  reviewDraftKey?: string;
   userSignedIn: boolean;
   submittingReview: boolean;
   maxCommentLength: number;
@@ -24,6 +26,7 @@ export function WorkspaceReviewsSection({
   reviews,
   profilesById,
   showReviewForm,
+  reviewDraftKey,
   userSignedIn,
   submittingReview,
   maxCommentLength,
@@ -46,12 +49,16 @@ export function WorkspaceReviewsSection({
       </CardHeader>
       <CardContent>
         {showReviewForm && userSignedIn && (
-          <ReviewForm
-            onSubmit={onSubmitReview}
-            onCancel={onCancelReview}
-            isSubmitting={submittingReview}
-            maxCommentLength={maxCommentLength}
-          />
+          <div id={WRITE_REVIEW_HASH.slice(1)} tabIndex={-1} className="scroll-mt-24">
+            <ReviewForm
+              key={reviewDraftKey}
+              draftKey={reviewDraftKey}
+              onSubmit={onSubmitReview}
+              onCancel={onCancelReview}
+              isSubmitting={submittingReview}
+              maxCommentLength={maxCommentLength}
+            />
+          </div>
         )}
 
         {reviews.length === 0 ? (

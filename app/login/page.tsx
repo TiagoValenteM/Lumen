@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authHref, getAuthReturnPath } from "@/lib/features/auth/return-path";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -22,16 +23,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [returnTo, setReturnTo] = useState("/");
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     async function checkSession() {
       const { data } = await supabase.auth.getSession();
+      const path = getAuthReturnPath(new URLSearchParams(window.location.search).get("redirect"));
       if (data.session) {
-        router.replace("/");
+        router.replace(path);
         return;
       }
+      setReturnTo(path);
       setCheckingSession(false);
     }
     checkSession();
@@ -48,7 +52,7 @@ export default function LoginPage() {
         password,
       });
       if (error) throw error;
-      router.push("/");
+      router.replace(returnTo);
       router.refresh();
     } catch (error) {
       setError(getErrorMessage(error, "Could not sign in"));
@@ -66,7 +70,7 @@ export default function LoginPage() {
           <CardTitle className="text-2xl font-bold">Welcome back</CardTitle>
           <CardDescription className="text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="underline">
+              <Link href={authHref("/signup", returnTo)} className="underline">
               Sign up
             </Link>
           </CardDescription>
@@ -107,12 +111,12 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="text-center text-xs text-muted-foreground">
-            By continuing you agree to our{" "}
-            <Link href="#" className="underline">
+            See our{" "}
+            <Link href="/legal/terms" className="underline">
               Terms
             </Link>{" "}
             and{" "}
-            <Link href="#" className="underline">
+            <Link href="/legal/privacy" className="underline">
               Privacy Policy
             </Link>
             .
