@@ -108,7 +108,7 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
         </Card>
       )}
 
-      <Card className="rounded-xl">
+      {(workspace.seating_capacity || workspace.noise_level || workspace.good_for_calls) ? <Card className="rounded-xl">
         <CardHeader>
           <CardTitle>Productivity</CardTitle>
         </CardHeader>
@@ -141,9 +141,11 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card> : null}
 
-      <Card className="rounded-xl">
+      {(workspace.has_coffee || workspace.has_food || workspace.has_veg || workspace.has_natural_light ||
+        workspace.has_air_conditioning || workspace.has_parking || workspace.has_bike_parking ||
+        workspace.is_accessible || workspace.allows_pets) ? <Card className="rounded-xl">
         <CardHeader>
           <CardTitle>Amenities</CardTitle>
         </CardHeader>
@@ -160,7 +162,7 @@ export function WorkspaceMainDetails({ workspace }: WorkspaceMainDetailsProps) {
             {workspace.allows_pets && <AmenityItem icon={<PawPrint className="h-4 w-4 text-primary" />} label="Pet Friendly" />}
           </div>
         </CardContent>
-      </Card>
+      </Card> : null}
     </>
   );
 }

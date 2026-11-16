@@ -13,7 +13,8 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
   const { place, reasons, toCheck, distance, sessionEvidence } = candidate;
   const directions = getWorkspaceDirections(place);
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
-  const showPhoto = place.photoUrl?.startsWith("https://") && brokenPhoto !== place.photoUrl;
+  const showPhoto = place.photoUrl && brokenPhoto !== place.photoUrl &&
+    (place.photoUrl.startsWith("https://") || /^\/images\/[a-z\d-]+\.(?:avif|jpeg|jpg|png|webp)$/i.test(place.photoUrl));
   const checked = Date.parse(place.checkedAt ?? "");
   const website = place.website && /^https?:\/\//i.test(place.website) ? place.website : null;
   const phone = place.phone && /^\+?[\d ().-]{6,26}$/.test(place.phone) ? place.phone : null;

@@ -2,13 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type WorkspaceCityProposal = { name: string; country: string };
 
-export async function readWorkspaceCityProposals(supabase: SupabaseClient, workspaceIds: string[]) {
+export async function readWorkspaceCityProposals(supabase: SupabaseClient, workspaceIds: string[], signal?: AbortSignal) {
   const proposals = new Map<string, WorkspaceCityProposal>();
   if (!workspaceIds.length) return proposals;
 
-  const { data, error } = await supabase.from("workspaces")
+  const query = supabase.from("workspaces")
     .select("id, proposed_city_name, proposed_city_country")
     .in("id", workspaceIds);
+  const { data, error } = await (signal ? query.abortSignal(signal) : query);
   if (error) {
     // The earlier security rollout can run without this feature migration.
     if (error.code === "42703" || error.code === "PGRST204") return proposals;
