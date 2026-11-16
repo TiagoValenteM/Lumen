@@ -38,6 +38,7 @@ After migration, admin authority comes from `lumen_private.admin_roles`, not `pr
 
 ## Browser smoke tests
 
+- GitHub checks run the fixture-based browser suite against the compiled app with a local server and no production credentials. The session-hours test runs the real migration in a disposable PostgreSQL database and covers draft visibility, concurrent edits, holiday closure, and withdrawal.
 - The [development guide](../engineering/development.md) covers the local checks. The database suite exercises SQL privileges and RLS in embedded PostgreSQL, without staging credentials.
 - The browser smoke test needs a running app connected to a disposable staging database with the migrations applied. Create one regular test account and one moderator test account there. Install Chromium with `pnpm exec playwright install chromium`, then run `pnpm test:e2e` with these environment variables:
   - `LUMEN_E2E_ALLOW_WRITES=staging` and `LUMEN_E2E_BASE_URL` (the staging app).

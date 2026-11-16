@@ -35,29 +35,35 @@ test("moderator draft, verified exception and withdrawal reach the guest finder 
       [place.id, place.slug, place.name, place.address, city.id, place.latitude, place.longitude]);
     await db.exec(await readFile("supabase/migrations/20261116000100_manage_workspace_session_hours.sql", "utf8"));
 
-    await page.route("**/auth/v1/token?**", (route) => {
+    await page.context().route("**/auth/v1/token?**", (route) => {
       const expiry = Math.floor(Date.now() / 1000) + 3600;
       const encoded = Buffer.from(JSON.stringify({ exp: expiry, sub: moderator.id })).toString("base64url");
       return route.fulfill({ json: { access_token: `eyJhbGciOiJIUzI1NiJ9.${encoded}.fixture`, refresh_token: "fixture",
         token_type: "bearer", expires_in: 3600, expires_at: expiry, user: moderator } });
     });
-    await page.route("**/rest/v1/**", async (route) => {
+    await page.context().route("**/rest/v1/**", async (route) => {
       const table = new URL(route.request().url()).pathname.split("/").at(-1);
       if (table === "is_admin") return route.fulfill({ json: true });
       if (table === "profiles" || table === "get_workspace_admin_notes") return route.fulfill({ json: null });
       if (table === "workspaces") return route.fulfill({ json: place });
       if (table === "read_workspace_session_hours" || table === "update_workspace_session_hours") {
         const body = route.request().postDataJSON();
-        const result = await db.transaction(async (tx) => {
-          await tx.exec("SET LOCAL ROLE authenticated");
-          await tx.query("SELECT set_config('request.jwt.claim.sub',$1,true)", [moderator.id]);
-          const { rows } = table === "read_workspace_session_hours"
-            ? await tx.query<{ value: unknown }>("SELECT public.read_workspace_session_hours($1) AS value", [body.workspace_uuid])
-            : await tx.query<{ value: unknown }>("SELECT public.update_workspace_session_hours($1,$2,$3,$4,$5) AS value",
-              [body.workspace_uuid, body.expected_revision, body.expected_place, body.action, body.schedule]);
-          return rows[0].value;
-        });
-        return route.fulfill({ json: result });
+        try {
+          const result = await db.transaction(async (tx) => {
+            await tx.exec("SET LOCAL ROLE authenticated");
+            await tx.query("SELECT set_config('request.jwt.claim.sub',$1,true)", [moderator.id]);
+            const { rows } = table === "read_workspace_session_hours"
+              ? await tx.query<{ value: unknown }>("SELECT public.read_workspace_session_hours($1) AS value", [body.workspace_uuid])
+              : await tx.query<{ value: unknown }>("SELECT public.update_workspace_session_hours($1,$2,$3,$4,$5) AS value",
+                [body.workspace_uuid, body.expected_revision, body.expected_place, body.action, body.schedule]);
+            return rows[0].value;
+          });
+          return route.fulfill({ json: result });
+        } catch (error) {
+          if (!(error instanceof Error) || !("code" in error)) throw error;
+          const status = error.code === "40001" ? 500 : error.code === "42501" ? 403 : 400;
+          return route.fulfill({ status, json: { code: error.code, message: error.message } });
+        }
       }
       return route.fulfill({ json: [] });
     });
@@ -92,6 +98,9 @@ test("moderator draft, verified exception and withdrawal reach the guest finder 
     const placeLink = guest.getByRole("link", { name: place.name, exact: true });
     await editor.getByLabel("Venue timezone").fill("UTC");
     await editor.getByLabel("Public note").fill("A purchase is required.");
+    await editor.getByRole("button", { name: "Hide hours editor" }).click();
+    await editor.getByRole("button", { name: "Edit hours" }).click();
+    await expect(editor.getByLabel("Public note")).toHaveValue("A purchase is required.");
     for (const label of ["Opening hours", "Laptop access"]) {
       const panel = editor.locator("details").filter({ hasText: label });
       await panel.locator("summary").click();
@@ -121,6 +130,25 @@ test("moderator draft, verified exception and withdrawal reach the guest finder 
     await guest.goto(covered(future(2)));
     await expect(guest.getByRole("heading", { name: "No matches", exact: true })).toBeVisible();
     await expect(placeLink).toHaveCount(0);
+
+    const second = await page.context().newPage();
+    await second.goto(`/admin/workspaces/${place.id}`);
+    const otherEditor = second.getByRole("region", { name: "Session hours" });
+    await otherEditor.getByRole("button", { name: "Edit hours" }).click();
+    await expect(otherEditor.getByLabel("Public note")).toHaveValue("A purchase is required.");
+    await editor.getByLabel("Public note").fill("A newer draft policy.");
+    await editor.getByRole("button", { name: "Save hours draft" }).click();
+    await expect(editor.getByText("Draft saved. Public hours were not changed.")).toBeVisible();
+    await otherEditor.getByLabel("Public note").fill("An older edit.");
+    await otherEditor.getByRole("button", { name: "Save hours draft" }).click();
+    await expect(otherEditor.getByRole("alert")).toContainText("The hours changed. Reload before saving.");
+    await expect(otherEditor.getByLabel("Public note")).toHaveValue("An older edit.");
+    await otherEditor.getByRole("button", { name: "Reload saved hours" }).click();
+    await expect(otherEditor.getByLabel("Public note")).toHaveValue("A newer draft policy.");
+    await guest.goto(covered(future(1)));
+    await expect(match.getByText("A purchase is required.", { exact: false })).toBeVisible();
+    await expect(match.getByText("A newer draft policy.", { exact: false })).toHaveCount(0);
+    await second.close();
 
     await editor.getByRole("button", { name: "Withdraw verification" }).click();
     await expect(editor.getByText("Public verification withdrawn.")).toBeVisible();

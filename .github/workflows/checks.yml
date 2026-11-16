@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 15
     env:
       NEXT_TELEMETRY_DISABLED: 1
-      NEXT_PUBLIC_SUPABASE_URL: https://lumen-ci.supabase.co
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:3172
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ci-placeholder-not-a-secret
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,3 +35,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - run: pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Browser regression tests (isolated fixtures)
+        run: pnpm test:e2e --workers=1 --browser=chromium
+        env:
+          LUMEN_E2E_BASE_URL: http://127.0.0.1:3171
+          LUMEN_E2E_START_SERVER: '1'

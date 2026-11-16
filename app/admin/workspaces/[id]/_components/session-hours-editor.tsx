@@ -22,18 +22,19 @@ function message(error: unknown) {
 }
 
 export function SessionHoursEditor(props: Props) {
-  const [expanded, setExpanded] = useState(false);
+  const [visibility, setVisibility] = useState<"unopened" | "open" | "collapsed">("unopened");
   const [reload, setReload] = useState(0);
+  const expanded = visibility === "open";
   const { workspaceId, place } = props;
   return (
     <section aria-labelledby="session-hours-title" className="space-y-3 border-y border-border/60 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="session-hours-title" className="flex items-center gap-2 font-semibold"><Clock3 aria-hidden="true" className="size-4" /> Session hours</h2>
         <Button type="button" size="sm" variant="outline" aria-expanded={expanded} aria-controls={expanded ? "session-hours-editor" : undefined}
-          onClick={() => setExpanded(!expanded)}>{expanded ? "Hide hours editor" : "Edit hours"}</Button>
+          onClick={() => setVisibility(expanded ? "collapsed" : "open")}>{expanded ? "Hide hours editor" : "Edit hours"}</Button>
       </div>
       <div id="session-hours-editor" hidden={!expanded}>
-        {expanded && <Editor key={JSON.stringify([workspaceId, place, props.isApproved, reload])}
+        {visibility !== "unopened" && <Editor key={JSON.stringify([workspaceId, place, props.isApproved, reload])}
           {...props} onReload={() => setReload((value) => value + 1)} />}
       </div>
     </section>

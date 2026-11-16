@@ -72,14 +72,16 @@ const AI_REVIEWABLE_STATUSES = new Set(["ready_for_review", "completed"]);
 const AI_ENRICHMENT_SELECT = "id, created_at, updated_at, status, provider, model, run_mode, suggested_fields, field_evidence, unknown_fields, field_decisions, run_metadata, field_sources, citations, error_message";
 
 export default function AdminWorkspaceDetailPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const userId = user?.id ?? null;
   const params = useParams();
   const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : null;
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [access, setAccess] = useState<{ userId: string; allowed: boolean } | null>(null);
+  const loadingProfile = authLoading || (userId !== null && access?.userId !== userId);
+  const isAdmin = userId !== null && access?.userId === userId && access.allowed;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,22 +110,8 @@ export default function AdminWorkspaceDetailPage() {
   const latestAiStatus = aiEnrichments[0]?.status;
   const latestAiUpdate = aiEnrichments[0]?.updated_at ?? aiEnrichments[0]?.created_at;
 
-  const loadProfile = useCallback(async () => {
-    if (!user) {
-      setLoadingProfile(false);
-      return;
-    }
-    setLoadingProfile(true);
-    const { data, error: profileError } = await supabase.rpc("is_admin");
-    setIsAdmin(data === true);
-    if (profileError) {
-      console.error("Failed to load profile", profileError);
-    }
-    setLoadingProfile(false);
-  }, [supabase, user]);
-
   const loadWorkspace = useCallback(async () => {
-    if (!user || !isAdmin || !id) return;
+    if (!userId || !isAdmin || !id) return;
     setLoading(true);
     setError(null);
     try {
@@ -221,7 +209,7 @@ export default function AdminWorkspaceDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [user, isAdmin, id, supabase]);
+  }, [userId, isAdmin, id, supabase]);
 
   const refreshAiEnrichments = useCallback(
     async (workspaceId: string) => {
@@ -244,10 +232,18 @@ export default function AdminWorkspaceDetailPage() {
   );
 
   useEffect(() => {
-    // Admin profile is loaded from Supabase when the authenticated user changes.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadProfile();
-  }, [loadProfile]);
+    const controller = new AbortController();
+    if (!userId) {
+      queueMicrotask(() => { if (!controller.signal.aborted) setAccess(null); });
+    } else {
+      void supabase.rpc("is_admin").abortSignal(controller.signal).then(({ data, error: profileError }) => {
+        if (controller.signal.aborted) return;
+        if (profileError) console.error("Failed to check moderator access", profileError);
+        setAccess({ userId, allowed: data === true });
+      });
+    }
+    return () => controller.abort();
+  }, [supabase, userId]);
 
   useEffect(() => {
     if (isAdmin) {
