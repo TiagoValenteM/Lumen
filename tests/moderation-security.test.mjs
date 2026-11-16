@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { after, before, test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { uuid_ossp } from "@electric-sql/pglite/contrib/uuid_ossp";
+import { createSessionAssessment } from "../lib/features/find-a-spot/session-availability.ts";
 
 const member = "00000000-0000-0000-0000-000000000001";
 const admin = "00000000-0000-0000-0000-000000000002";
@@ -492,6 +493,44 @@ test("Zurich café and coworking evidence separates ordinary hours from date-spe
       photo: slug === "westhive-hardturm-zurich" ? "/images/zurich-hardturmstrasse-161-tschubby.jpg" : null,
     })),
   ]);
+});
+
+test("Büro Züri confirms free desk windows while Kraftwerk only confirms café hours", async () => {
+  await role("postgres");
+  await db.exec(`
+    INSERT INTO public.cities (name,country,slug)
+    SELECT 'Zürich','Switzerland','zurich-buero-test'
+    WHERE NOT EXISTS (SELECT FROM public.cities WHERE name='Zürich' AND country='Switzerland')
+  `);
+  const source = await readFile(new URL("../supabase/checks/publish-verified-zurich-kraftwerk-buero-20261117.sql", import.meta.url), "utf8");
+  const checkDate = "2026-11-17T12:00:00Z";
+  const dated = source.replaceAll("now()", `TIMESTAMPTZ '${checkDate}'`);
+  await db.exec(dated);
+  await db.exec(dated);
+  const venues = (await db.query(`
+    SELECT w.slug,w.laptop_friendly,h.published
+    FROM public.workspaces w JOIN public.workspace_session_hours h ON h.workspace_id=w.id
+    WHERE w.slug IN ('buero-zueri-zurich','kraftwerk-cafe-zurich') ORDER BY w.slug
+  `)).rows;
+  assert.equal(venues.length, 2);
+  const [office, cafe] = venues;
+  assert.equal(office.laptop_friendly, true);
+  assert.equal(cafe.laptop_friendly, null);
+  const assesses = ({ published }, startAt, durationMinutes = 120) => createSessionAssessment({
+    now: Date.parse(checkDate), startAt: Date.parse(startAt), durationMinutes,
+  })({ timeZone: published.timeZone, opening: { ...published.opening, checkedAt: checkDate },
+    laptopAccess: { ...published.laptopAccess, checkedAt: checkDate } });
+  assert.equal(assesses(office, "2026-11-21T10:00Z").availability, "fits");
+  assert.equal(assesses(office, "2026-11-21T15:00Z").availability, "does_not_fit");
+  assert.equal(assesses(office, "2026-12-25T09:00Z").availability, "does_not_fit");
+  for (const date of ["2026-12-24", "2026-12-31", "2027-01-02"]) {
+    assert.equal(assesses(office, `${date}T10:00Z`).availability, "unknown");
+  }
+  assert.deepEqual(assesses(cafe, "2026-11-23T09:00Z"), {
+    availability: "unknown", missing: ["Laptop access unknown for part of this session"],
+  });
+  assert.equal(assesses(cafe, "2026-11-23T19:00Z").availability, "does_not_fit");
+  assert.equal(assesses(cafe, "2026-12-21T09:00Z").availability, "does_not_fit");
 });
 
 test("merging Lisbon retains workspace IDs, profile links and published evidence", async () => {
