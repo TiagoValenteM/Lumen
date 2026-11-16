@@ -10,7 +10,7 @@ import { FACT_CHECK_MAX_AGE_MS, type SpotCandidate } from "@/lib/features/find-a
 const checkDate = new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
 export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate; city: string; now: number }) {
-  const { place, reasons, toCheck, distance } = candidate;
+  const { place, reasons, toCheck, distance, sessionEvidence } = candidate;
   const directions = getWorkspaceDirections(place);
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const showPhoto = place.photoUrl?.startsWith("https://") && brokenPhoto !== place.photoUrl;
@@ -36,6 +36,10 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
         {toCheck.length ? <p className="w-fit rounded-md bg-muted/65 px-2 py-1 text-xs text-muted-foreground [overflow-wrap:anywhere]"><span className="font-medium text-foreground">Check:</span> {toCheck.join(" · ")}</p> : (
           <p className="flex items-start gap-1.5 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{reasons.join(" · ")}</span></p>
         )}
+        {sessionEvidence && <p className="text-xs text-muted-foreground">
+          {toCheck.length > 0 && "Published hours cover this session. "}{sessionEvidence.note}{" "}
+          <a href={sessionEvidence.source} className="font-medium text-foreground underline underline-offset-2">Venue hours and laptop policy</a>
+        </p>}
         {checked <= now && now - checked <= FACT_CHECK_MAX_AGE_MS && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" aria-hidden="true" /> Work facts checked {checkDate.format(checked)}</p>
         )}

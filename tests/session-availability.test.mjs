@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createSessionAvailability } from "../lib/features/find-a-spot/session-availability.ts";
 import { matchSpots } from "../lib/features/find-a-spot/matching.ts";
+import { parseSpotSearch, spotSearchHref } from "../lib/features/find-a-spot/preferences.ts";
+import { parseLocalSessionStart } from "../lib/features/find-a-spot/session-start.ts";
+import { getPilotSessionEvidence } from "../lib/features/find-a-spot/session-hours-pilot.ts";
 
 const minutes = (hour, minute = 0) => hour * 60 + minute;
 function setup(iso, durationMinutes, weekly, exceptions = {}, timeZone = "Europe/Zurich") {
@@ -56,4 +59,53 @@ test("matcher leaves unknown hours unconfirmed and excludes a definite conflict"
   assert.equal(unknown.matches.length, 0);
   assert.deepEqual(unknown.details[0].toCheck, ["Opening hours and laptop access for this session"]);
   assert.deepEqual(matchSpots([place], prefs, { now, sessionAvailability: () => "does_not_fit" }), { matches: [], details: [] });
+});
+
+test("scheduled links use a canonical UTC minute and reject invalid calendar dates", () => {
+  const url = "/find?city=new-york&session=2026-11-18T04%3A00Z";
+  assert.equal(spotSearchHref(parseSpotSearch(new URL(url, "https://example.com").searchParams)), url);
+  for (const invalid of ["2026-02-31T15:00Z", "2026-11-16T24:00Z", "2026-11-17T12:30", "today"]) {
+    assert.equal(parseSpotSearch(new URLSearchParams({ session: invalid })).sessionStart, null);
+  }
+  assert.equal(spotSearchHref(parseSpotSearch(new URLSearchParams("session=now"))), "/find?session=now");
+});
+
+test("local inputs reject elapsed times and DST gaps or repetitions", () => {
+  const previous = process.env.TZ;
+  process.env.TZ = "Europe/Zurich";
+  try {
+    const now = Date.parse("2026-01-01T00:00Z");
+    assert.deepEqual(parseLocalSessionStart("2026-11-18T10:00", now), { start: "2026-11-18T09:00Z" });
+    assert.ok(parseLocalSessionStart("2026-03-29T02:15", now).error);
+    assert.ok(parseLocalSessionStart("2026-10-25T02:15", now).error);
+    assert.ok(parseLocalSessionStart("2025-11-18T10:00", now).error);
+  } finally {
+    if (previous === undefined) delete process.env.TZ;
+    else process.env.TZ = previous;
+  }
+});
+
+test("published pilot evidence is bound to the listing and only qualifies the session it actually supports", () => {
+  const place = { id: "54f3915e-e27b-4927-94c8-afeaaa023956", slug: "fiction-bar-cafe-new-york",
+    address: "308 Hooper Street, Brooklyn, New York, New York, 11211",
+    laptop_friendly: true, time_limit_hours: null, checkedAt: null, has_wifi: null };
+  const unknown = { ...place, id: "different", time_limit_hours: 3 };
+  assert.equal(getPilotSessionEvidence({ ...place, address: "A different location" }), null);
+  const prefs = { minutes: 120, activity: "general", wifi: false, power: false };
+  const now = Date.parse("2026-11-16T21:30Z");
+  const evaluate = (iso, duration) => createSessionAvailability({ now, startAt: Date.parse(iso), durationMinutes: duration });
+  const evidence = getPilotSessionEvidence(place);
+  const run = (iso, preferences = prefs) => matchSpots([place, unknown], preferences, {
+    now,
+    sessionAvailability: (p) => evaluate(iso, preferences.minutes)(getPilotSessionEvidence(p)?.schedule),
+    sessionEvidence: (p) => getPilotSessionEvidence(p) ?? undefined,
+  });
+  const covered = run("2026-11-18T04:00Z");
+  assert.equal(covered.matches[0].place.id, place.id);
+  assert.equal(covered.matches[0].sessionEvidence.source, evidence.source);
+  assert.equal(covered.details[0].place.id, unknown.id);
+  assert.equal(run("2026-11-18T04:00Z", { ...prefs, wifi: true }).matches.length, 0);
+  assert.equal(run("2026-11-18T04:00Z", { ...prefs, minutes: 180 }).details.length, 1);
+  assert.equal(run("2026-11-18T11:00Z").details.length, 1);
+  assert.equal(run("2026-11-26T16:00Z").details.length, 2);
 });

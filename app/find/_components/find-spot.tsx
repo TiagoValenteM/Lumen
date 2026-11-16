@@ -11,6 +11,9 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { PageContainer } from "@/components/shared/lumen-page";
 import { applyInterpretation, parseSpotSearch, SPOT_RADII, spotSearchHref, type SpotSearch } from "@/lib/features/find-a-spot/preferences";
 import { distanceBetweenKm, hasSpotCoordinates, matchSpots } from "@/lib/features/find-a-spot/matching";
+import { createSessionAvailability } from "@/lib/features/find-a-spot/session-availability";
+import { getPilotSessionEvidence } from "@/lib/features/find-a-spot/session-hours-pilot";
+import { useSessionClock } from "../_hooks/use-session-clock";
 import { useSpotData } from "../_hooks/use-spot-data";
 import { SpotRequest } from "./spot-request";
 import { SpotFilterDisclosure } from "./spot-filters";
@@ -29,11 +32,21 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
     if (!located || !listing) return null;
     return new Map(listing.places.filter(hasSpotCoordinates).map((place) => [place.id, distanceBetweenKm({ latitude, longitude }, place)]));
   }, [latitude, listing, located, longitude]);
-  const results = useMemo(() => listing && matchSpots(listing.places, search, {
-    now: listing.loadedAt,
-    radiusKm: distances ? search.radiusKm ?? undefined : undefined,
-    distanceKm: distances ? (place) => distances.get(place.id) ?? null : undefined,
-  }), [distances, listing, search]);
+  const clock = useSessionClock(search.sessionStart !== null);
+  const now = Math.max(clock ?? 0, listing?.loadedAt ?? 0);
+  const startAt = search.sessionStart === "now" ? now : search.sessionStart ? Date.parse(search.sessionStart) : null;
+  const sessionExpired = startAt !== null && startAt < now;
+  const results = useMemo(() => {
+    if (!listing) return listing;
+    const session = startAt === null ? null : createSessionAvailability({ startAt, durationMinutes: search.minutes, now });
+    return matchSpots(listing.places, search, {
+      now,
+      radiusKm: distances ? search.radiusKm ?? undefined : undefined,
+      distanceKm: distances ? (place) => distances.get(place.id) ?? null : undefined,
+      sessionAvailability: session ? (place) => session(getPilotSessionEvidence(place)?.schedule) : undefined,
+      sessionEvidence: session ? (place) => getPilotSessionEvidence(place) ?? undefined : undefined,
+    });
+  }, [distances, listing, now, search, startAt]);
 
   function updateSearch(patch: Partial<SpotSearch>) {
     const current = parseSpotSearch(new URLSearchParams(window.location.search));
@@ -42,6 +55,7 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
   }
 
   const relaxation = search.radiusKm ? { label: "Search the whole city", apply: () => updateSearch({ radiusKm: null }) }
+    : search.sessionStart ? { label: "Search without session hours", apply: () => updateSearch({ sessionStart: null }) }
     : search.minutes > 60 ? { label: "Try a 1-hour stay", apply: () => updateSearch({ minutes: 60 }) }
     : search.activity !== "general" ? { label: "Try general work", apply: () => updateSearch({ activity: "general" }) }
     : search.wifi ? { label: "Make Wi-Fi optional", apply: () => updateSearch({ wifi: false }) }
@@ -88,7 +102,8 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
             const current = parseSpotSearch(new URLSearchParams(window.location.search));
             updateSearch(applyInterpretation(current, result));
           }} />
-          <SpotFilterDisclosure preferences={search} radiusKm={search.radiusKm} onChange={updateSearch} />
+          <SpotFilterDisclosure preferences={search} radiusKm={search.radiusKm} sessionStart={search.sessionStart}
+            sessionExpired={sessionExpired} onSessionChange={(sessionStart) => updateSearch({ sessionStart })} onChange={updateSearch} />
           {city && <div role="status" className="text-sm text-muted-foreground empty:sr-only">
             {locationError ? "Location unavailable. You can still search this city." : located ? "Distances are straight-line, not walking distances." : null}
             {!located && search.radiusKm !== null && <p>The {search.radiusKm} km limit needs your location. <button className="font-medium underline underline-offset-2" onClick={() => updateSearch({ radiusKm: null })}>Search the whole city</button></p>}
@@ -97,7 +112,8 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
         {cities === null || (city && listing === null) ? (
           <div role="status" className="space-y-2 border-t border-border/60 pt-5"><p className="text-sm">Couldn’t load {cities === null ? "cities" : "places"}.</p><Button variant="outline" size="sm" onClick={retry}>Try again</Button></div>
         ) : city && listing && results && (located || search.radiusKm === null) ? (
-          <SpotResults scope={spotSearchHref(search)} {...results} limited={listing.limited} city={city.slug} now={listing.loadedAt} relaxation={relaxation}
+          <SpotResults scope={spotSearchHref(search)} {...results} limited={listing.limited} city={city.slug} now={now}
+            sessionHours={search.sessionStart !== null} relaxation={relaxation}
             showMap={showMap} onToggleMap={() => setShowMap((visible) => !visible)} />
         ) : (
           <p role="status" className="flex items-center gap-2 border-t border-border/60 pt-5 text-sm text-muted-foreground"><MapPin className="size-4 shrink-0" aria-hidden="true" />

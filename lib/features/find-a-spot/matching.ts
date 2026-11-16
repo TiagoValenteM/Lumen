@@ -24,6 +24,7 @@ export type SpotCandidate = {
   reasons: string[];
   toCheck: string[];
   distance: number | null;
+  sessionEvidence?: { source: string; note: string; maxMinutes: number };
 };
 
 export const FACT_CHECK_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
@@ -38,6 +39,7 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
   radiusKm?: number;
   distanceKm?: (place: SpotPlace) => number | null;
   sessionAvailability?: (place: SpotPlace) => SessionAvailability;
+  sessionEvidence?: (place: SpotPlace) => SpotCandidate["sessionEvidence"];
 }) {
   const matches: SpotCandidate[] = [];
   const details: SpotCandidate[] = [];
@@ -54,17 +56,20 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
     if (options.radiusKm !== undefined && distance !== null && distance > options.radiusKm) continue;
     const availability = options.sessionAvailability?.(place);
     if (availability === "does_not_fit") continue;
+    const sessionEvidence = availability === "fits" ? options.sessionEvidence?.(place) : undefined;
 
     const reasons: string[] = [];
     const toCheck: string[] = [];
     const checked = Date.parse(place.checkedAt ?? "");
     const recentCheck = checked <= options.now && options.now - checked <= FACT_CHECK_MAX_AGE_MS;
-    if (!recentCheck) toCheck.push("Current work policies");
+    if (!recentCheck && (!sessionEvidence || preferences.wifi || preferences.power || preferences.activity !== "general")) {
+      toCheck.push("Current work policies");
+    }
     if (place.laptop_friendly === true && recentCheck) reasons.push("Laptops welcome");
-    else if (place.laptop_friendly !== true) toCheck.push("Laptop policy");
+    else if (place.laptop_friendly !== true && !sessionEvidence) toCheck.push("Laptop policy");
     if (limit !== null && recentCheck) reasons.push(`${limit}-hour stay limit`);
     else if (place.time_limit_hours === 0 && recentCheck) reasons.push("No stated stay limit");
-    else if (limit === null) toCheck.push("Stay limit");
+    else if (limit === null && !sessionEvidence) toCheck.push("Stay limit");
 
     for (const [required, actual, label] of [
       [preferences.wifi, place.has_wifi, "Wi-Fi"],
@@ -84,14 +89,15 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
     if (availability === "fits") reasons.push("Hours and laptop access cover this session");
     if (availability === "unknown") toCheck.push("Opening hours and laptop access for this session");
 
-    (toCheck.length ? details : matches).push({ place, reasons, toCheck, distance });
+    (toCheck.length ? details : matches).push({ place, reasons, toCheck, distance, ...(sessionEvidence && { sessionEvidence }) });
   }
 
   const compare = (a: SpotCandidate, b: SpotCandidate) => {
     const distanceOrder = (a.distance ?? Infinity) - (b.distance ?? Infinity);
     const evidenceOrder = (Date.parse(b.place.checkedAt ?? "") || 0) - (Date.parse(a.place.checkedAt ?? "") || 0);
     const amenitiesOrder = b.reasons.length - a.reasons.length;
-    return a.toCheck.length - b.toCheck.length || distanceOrder || evidenceOrder || amenitiesOrder ||
+    return Number(Boolean(b.sessionEvidence)) - Number(Boolean(a.sessionEvidence)) ||
+      a.toCheck.length - b.toCheck.length || distanceOrder || evidenceOrder || amenitiesOrder ||
       (a.place.id < b.place.id ? -1 : Number(a.place.id > b.place.id));
   };
   return { matches: matches.sort(compare), details: details.sort(compare) };

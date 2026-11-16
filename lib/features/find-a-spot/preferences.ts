@@ -17,6 +17,7 @@ export type SpotInterpretation = {
 export type SpotSearch = SpotPreferences & {
   city: string;
   radiusKm: (typeof SPOT_RADII)[number] | null;
+  sessionStart: string | null;
 };
 
 export const DEFAULT_PREFERENCES: SpotPreferences = {
@@ -105,6 +106,14 @@ export function canSendRequest(text: string) {
     !/(?:https?:|www\.|@|\b(?:sk-|api[_ -]?key|password|bearer\b)|\b\d{6,}\b|[-+]?\d{1,3}\.\d{3,})/i.test(text);
 }
 
+export function parseSessionStart(value: string | null) {
+  if (value === "now") return value;
+  if (!value || !/^20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}Z$/.test(value)) return null;
+  const instant = new Date(value);
+  return Number.isFinite(instant.getTime()) && instant.toISOString().slice(0, 16) + "Z" === value
+    ? value : null;
+}
+
 export function parseSpotSearch(params: Pick<URLSearchParams, "get">): SpotSearch {
   const city = params.get("city") ?? "";
   const activity = params.get("activity");
@@ -117,6 +126,7 @@ export function parseSpotSearch(params: Pick<URLSearchParams, "get">): SpotSearc
     wifi: params.get("wifi") === "1",
     power: params.get("power") === "1",
     radiusKm: SPOT_RADII.find((value) => value === radius) ?? null,
+    sessionStart: parseSessionStart(params.get("session")),
   };
 }
 
@@ -128,5 +138,6 @@ export function spotSearchHref(search: SpotSearch) {
   if (search.wifi) params.set("wifi", "1");
   if (search.power) params.set("power", "1");
   if (search.radiusKm !== null) params.set("radius", String(search.radiusKm));
+  if (search.sessionStart) params.set("session", search.sessionStart);
   return params.size ? `/find?${params}` : "/find";
 }

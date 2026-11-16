@@ -4,6 +4,7 @@ import { useId } from "react";
 import { ChevronDown, Headphones, Laptop, Phone, SlidersHorizontal, Wifi, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DURATIONS, type SpotPreferences } from "@/lib/features/find-a-spot/preferences";
+import { SpotSessionFilter } from "./spot-session-filter";
 
 const activities = [
   { value: "general", label: "Work", icon: Laptop },
@@ -12,9 +13,12 @@ const activities = [
 ] as const;
 const choice = "inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground peer-checked:bg-background peer-checked:text-foreground peer-checked:shadow-sm peer-focus-visible:ring-2 peer-focus-visible:ring-ring";
 
-export function SpotFilterDisclosure({ preferences, radiusKm, onChange }: {
+export function SpotFilterDisclosure({ preferences, radiusKm, sessionStart, sessionExpired, onSessionChange, onChange }: {
   preferences: SpotPreferences;
   radiusKm: number | null;
+  sessionStart: string | null;
+  sessionExpired: boolean;
+  onSessionChange: (start: string | null) => void;
   onChange: (preferences: Partial<SpotPreferences>) => void;
 }) {
   const summary = [
@@ -23,6 +27,7 @@ export function SpotFilterDisclosure({ preferences, radiusKm, onChange }: {
     preferences.wifi && "Wi-Fi",
     preferences.power && "Outlets",
     radiusKm !== null && `${radiusKm} km`,
+    sessionStart && "Session hours",
   ].filter(Boolean).join(" · ");
 
   return (
@@ -33,8 +38,9 @@ export function SpotFilterDisclosure({ preferences, radiusKm, onChange }: {
         <span className="min-w-0 flex-1 text-end">{summary}</span>
         <ChevronDown className="size-4 shrink-0 group-open:rotate-180 motion-safe:transition-transform" aria-hidden="true" />
       </summary>
-      <div className="rounded-b-lg bg-muted/40 px-3 py-3">
+      <div className="space-y-2 rounded-b-lg bg-muted/40 px-3 py-3">
         <SpotFilters preferences={preferences} onChange={onChange} />
+        <SpotSessionFilter start={sessionStart} inactive={sessionExpired} onChange={onSessionChange} />
       </div>
     </details>
   );

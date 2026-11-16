@@ -15,13 +15,14 @@ const SpotMap = dynamic(() => import("./spot-map").then((module) => module.SpotM
 const MATCH_BATCH = 5;
 const DETAIL_BATCH = 3;
 
-export function SpotResults({ matches, details, city, scope, limited, now, relaxation, showMap, onToggleMap }: {
+export function SpotResults({ matches, details, city, scope, limited, now, sessionHours, relaxation, showMap, onToggleMap }: {
   matches: SpotCandidate[];
   details: SpotCandidate[];
   city: string;
   scope: string;
   limited: boolean;
   now: number;
+  sessionHours: boolean;
   relaxation?: { label: string; apply: () => void };
   showMap: boolean;
   onToggleMap: () => void;
@@ -77,7 +78,9 @@ export function SpotResults({ matches, details, city, scope, limited, now, relax
           {!hasMatches && relaxation && <Button variant="outline" size="sm" className="min-h-11" onClick={relaxation.apply}><RotateCcw aria-hidden="true" /> {relaxation.label}</Button>}
         </div>
       </div>
-      <p className="mt-3 text-sm text-muted-foreground">Opening hours and seat availability aren’t checked here.</p>
+      <p className="mt-3 text-sm text-muted-foreground">{sessionHours
+        ? "Session hours are checked for selected places only. Hours can change and seats are not guaranteed."
+        : "Opening hours and seat availability aren’t checked here."}</p>
     </section>
   );
 }

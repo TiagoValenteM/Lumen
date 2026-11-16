@@ -10,6 +10,7 @@ export type VerifiedHours = {
   exceptionsCheckedThrough: string;
   weekly: Partial<Record<Day, Windows>>;
   exceptions: Readonly<Record<string, Windows>>;
+  maxSessionMinutes?: number;
 };
 
 export type VenueSessionSchedule = {
@@ -39,10 +40,13 @@ function coversMinute(windows: Windows | undefined, minute: number) {
   return windows.some(([start, end]) => start <= minute && minute < end);
 }
 
-function checkHours(hours: VerifiedHours | null, minutes: LocalMinute[], now: number): SessionAvailability {
+function checkHours(hours: VerifiedHours | null, minutes: LocalMinute[], now: number, duration: number): SessionAvailability {
   const checked = Date.parse(hours?.checkedAt ?? "");
   if (!hours?.source.trim() || !Number.isFinite(checked) || checked > now ||
     now - checked > MAX_CHECK_AGE || !isCalendarDate(hours.exceptionsCheckedThrough)) return "unknown";
+
+  if (hours.maxSessionMinutes !== undefined && (!Number.isInteger(hours.maxSessionMinutes) ||
+    hours.maxSessionMinutes <= 0)) return "unknown";
 
   let unknown = false;
   for (const { day, date, minute } of minutes) {
@@ -55,7 +59,8 @@ function checkHours(hours: VerifiedHours | null, minutes: LocalMinute[], now: nu
     if (covered === false) return "does_not_fit";
     if (covered === undefined) unknown = true;
   }
-  return unknown ? "unknown" : "fits";
+  if (unknown) return "unknown";
+  return hours.maxSessionMinutes !== undefined && duration > hours.maxSessionMinutes ? "does_not_fit" : "fits";
 }
 
 export function createSessionAvailability({ startAt, durationMinutes, now }: {
@@ -96,8 +101,8 @@ export function createSessionAvailability({ startAt, durationMinutes, now }: {
     const minutes = localMinutes(timeZone);
     if (!minutes?.length) return "unknown";
 
-    const opening = checkHours(schedule.opening, minutes, now);
-    const laptop = checkHours(schedule.laptopAccess, minutes, now);
+    const opening = checkHours(schedule.opening, minutes, now, durationMinutes);
+    const laptop = checkHours(schedule.laptopAccess, minutes, now, durationMinutes);
     if (opening === "does_not_fit" || laptop === "does_not_fit") return "does_not_fit";
     return opening === "fits" && laptop === "fits" ? "fits" : "unknown";
   };
