@@ -12,7 +12,6 @@ import { PageContainer } from "@/components/shared/lumen-page";
 import { applyInterpretation, parseSpotSearch, SPOT_RADII, spotSearchHref, type SpotSearch } from "@/lib/features/find-a-spot/preferences";
 import { distanceBetweenKm, hasSpotCoordinates, matchSpots } from "@/lib/features/find-a-spot/matching";
 import { createSessionAvailability } from "@/lib/features/find-a-spot/session-availability";
-import { getPilotSessionEvidence } from "@/lib/features/find-a-spot/session-hours-pilot";
 import { useSessionClock } from "../_hooks/use-session-clock";
 import { useSpotData } from "../_hooks/use-spot-data";
 import { SpotRequest } from "./spot-request";
@@ -23,7 +22,7 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
   const { user } = useAuth();
   const params = useSearchParams();
   const search = useMemo(() => parseSpotSearch(params), [params]);
-  const { city, cities, listing, retry } = useSpotData(search.city);
+  const { city, cities, listing, hours, retry } = useSpotData(search.city, search.sessionStart !== null);
   const { latitude, longitude, loading: locating, error: locationError, requestLocation } = useGeolocation();
   const [useDistance, setUseDistance] = useState(false);
   const [showMap, setShowMap] = useState(false);
@@ -37,16 +36,16 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
   const startAt = search.sessionStart === "now" ? now : search.sessionStart ? Date.parse(search.sessionStart) : null;
   const sessionExpired = startAt !== null && startAt < now;
   const results = useMemo(() => {
-    if (!listing) return listing;
+    if (!listing || (startAt !== null && hours === undefined)) return null;
     const session = startAt === null ? null : createSessionAvailability({ startAt, durationMinutes: search.minutes, now });
     return matchSpots(listing.places, search, {
       now,
       radiusKm: distances ? search.radiusKm ?? undefined : undefined,
       distanceKm: distances ? (place) => distances.get(place.id) ?? null : undefined,
-      sessionAvailability: session ? (place) => session(getPilotSessionEvidence(place)?.schedule) : undefined,
-      sessionEvidence: session ? (place) => getPilotSessionEvidence(place) ?? undefined : undefined,
+      sessionAvailability: session ? (place) => session(hours?.get(place.id)?.schedule) : undefined,
+      sessionEvidence: session ? (place) => hours?.get(place.id) : undefined,
     });
-  }, [distances, listing, now, search, startAt]);
+  }, [distances, hours, listing, now, search, startAt]);
 
   function updateSearch(patch: Partial<SpotSearch>) {
     const current = parseSpotSearch(new URLSearchParams(window.location.search));
@@ -117,7 +116,8 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
             showMap={showMap} onToggleMap={() => setShowMap((visible) => !visible)} />
         ) : (
           <p role="status" className="flex items-center gap-2 border-t border-border/60 pt-5 text-sm text-muted-foreground"><MapPin className="size-4 shrink-0" aria-hidden="true" />
-            {cities === undefined ? "Loading cities…" : cities.length === 0 ? "No cities have published places yet." : !city ? (search.city ? "That city isn’t available. Choose another city." : "Choose a city to see places.") : listing === undefined ? `Loading places in ${city.name}…` : "Share your location or search the whole city to see results."}
+            {cities === undefined ? "Loading cities…" : cities.length === 0 ? "No cities have published places yet." : !city ? (search.city ? "That city isn’t available. Choose another city." : "Choose a city to see places.") : listing === undefined ? `Loading places in ${city.name}…`
+              : search.sessionStart !== null && hours === undefined ? "Checking session hours…" : "Share your location or search the whole city to see results."}
           </p>
         )}
       </PageContainer>

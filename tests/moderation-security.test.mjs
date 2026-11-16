@@ -72,6 +72,7 @@ before(async () => {
     "20261112000300_limit_geocoding_requests.sql",
     "20261112000400_submit_workspace_with_city_proposal.sql",
     "20261112000500_verify_workspace_work_facts.sql",
+    "20261116000100_manage_workspace_session_hours.sql",
   ]) await apply(name);
 });
 
@@ -83,6 +84,71 @@ const newPlace = (id, city, photos, details = {}) => row(
   "SELECT public.submit_workspace_with_photos($1, $2, 'Switzerland', $3, $4) AS id",
   [id, city, JSON.stringify({ name: "First place", latitude: 47, longitude: 8, ...details }), photos],
 );
+
+test("only moderators can publish venue hours; drafts, withdrawn and stale evidence never leak", async () => {
+  const id = randomUUID();
+  const name = "Session Hours Cafe";
+  await role("authenticated", member);
+  await newPlace(id, "Hours Test City", [uploadedPhoto(member)], { name, address: "1 Test Street" });
+  await role("authenticated", admin);
+  const update = (revision, snapshot, action, payload) => row(
+    "SELECT public.update_workspace_session_hours($1,$2,$3,$4,$5) AS result", [id, revision, snapshot, action, payload]);
+  const read = () => row("SELECT public.read_workspace_session_hours($1) AS result", [id]);
+  const publicRows = () => row("SELECT count(workspace_id)::int AS count FROM public.workspace_session_hours WHERE workspace_id = $1", [id]);
+  const { date } = await row("SELECT ((now() AT TIME ZONE 'UTC')::date + 7)::text AS date");
+  const policy = { source: "https://example.org/hours", coverageSource: "https://example.org/holidays",
+    exceptionsCheckedThrough: date, weekly: { Mon: [[480, 1080]] }, exceptions: { [date]: [] } };
+  const payload = { timeZone: "UTC", opening: policy, laptopAccess: { ...policy, maxSessionMinutes: 90 }, note: "Verified note" };
+  const snapshot = async () => row("SELECT name,address,city_id AS \"cityId\",latitude::float,longitude::float FROM workspaces WHERE id=$1", [id]);
+  const pendingSnapshot = await snapshot();
+  const first = (await update(null, pendingSnapshot, "draft", payload)).result;
+  assert.equal(first.revision, 1);
+  await denied(update(1, pendingSnapshot, "verify", payload), "22023");
+  await role("anon");
+  assert.equal((await publicRows()).count, 0);
+  await denied(read());
+  await role("authenticated", member);
+  await denied(read());
+  await denied(update(1, pendingSnapshot, "verify", payload));
+  await denied(db.query("UPDATE public.workspace_session_hours SET published='{}' WHERE workspace_id=$1", [id]));
+
+  await role("authenticated", admin);
+  await db.query("UPDATE workspaces SET status='approved' WHERE id=$1", [id]);
+  const saved = await snapshot();
+  assert.equal((await read()).result.revision, 2);
+  await denied(update(1, saved, "verify", payload), "40001");
+  await denied(update(2, { ...saved, address: "Wrong venue" }, "verify", payload), "40001");
+  for (const invalid of [
+    { ...payload, timeZone: "+02:00" },
+    { ...payload, opening: { ...policy, source: "javascript:alert(1)" } },
+    { ...payload, opening: { ...policy, exceptionsCheckedThrough: "2026-02-31" } },
+    { ...payload, opening: { ...policy, exceptions: { "2026-02-31": [] } } },
+    { ...payload, opening: { ...policy, weekly: { Mon: [[600, 650], [620, 700]] } } },
+    { ...payload, opening: { ...policy, weekly: { Mon: {} } } },
+    { ...payload, laptopAccess: { ...policy, maxSessionMinutes: 1.5 } },
+  ]) await denied(update(2, saved, "verify", invalid), "22023");
+
+  assert.equal((await update(2, saved, "verify", payload)).result.revision, 3);
+  const draft = { ...payload, note: "Draft only" };
+  const updated = (await update(3, saved, "draft", draft)).result;
+  assert.equal(updated.published.note, "Verified note");
+  assert.equal(updated.draft.note, "Draft only");
+  await role("anon");
+  assert.equal((await publicRows()).count, 1);
+  assert.equal((await row("SELECT published->>'note' AS note FROM public.workspace_session_hours WHERE workspace_id=$1", [id])).note, "Verified note");
+  await denied(db.query("SELECT draft,checked_by FROM public.workspace_session_hours WHERE workspace_id=$1", [id]));
+  await role("authenticated", admin);
+  assert.equal((await update(4, saved, "withdraw", null)).result.published, null);
+  assert.equal((await update(5, saved, "verify", draft)).result.revision, 6);
+  await db.query("UPDATE workspaces SET latitude=46 WHERE id=$1", [id]);
+  assert.equal((await read()).result.published, null);
+  const changed = await snapshot();
+  assert.equal((await update(7, changed, "verify", draft)).result.revision, 8);
+  await role("postgres");
+  await db.query("UPDATE public.workspace_session_hours SET checked_at=now()-interval '31 days' WHERE workspace_id=$1", [id]);
+  await role("anon");
+  assert.equal((await publicRows()).count, 0);
+});
 
 test("work fact checks require a moderator and saved facts, and expire when the facts change", async () => {
   const id = randomUUID();

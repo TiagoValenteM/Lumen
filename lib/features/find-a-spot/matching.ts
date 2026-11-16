@@ -1,5 +1,6 @@
 import type { SpotPreferences } from "./preferences";
 import type { SessionAvailability } from "./session-availability";
+import type { SessionEvidence } from "../session-hours/repository";
 
 export type SpotPlace = {
   id: string;
@@ -24,7 +25,7 @@ export type SpotCandidate = {
   reasons: string[];
   toCheck: string[];
   distance: number | null;
-  sessionEvidence?: { source: string; note: string; maxMinutes: number };
+  sessionEvidence?: Pick<SessionEvidence, "source" | "laptopSource" | "note" | "maxMinutes">;
 };
 
 export const FACT_CHECK_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
@@ -69,7 +70,7 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
     else if (place.laptop_friendly !== true && !sessionEvidence) toCheck.push("Laptop policy");
     if (limit !== null && recentCheck) reasons.push(`${limit}-hour stay limit`);
     else if (place.time_limit_hours === 0 && recentCheck) reasons.push("No stated stay limit");
-    else if (limit === null && !sessionEvidence) toCheck.push("Stay limit");
+    else if (limit === null && sessionEvidence?.maxMinutes === undefined) toCheck.push("Stay limit");
 
     for (const [required, actual, label] of [
       [preferences.wifi, place.has_wifi, "Wi-Fi"],

@@ -7,6 +7,11 @@ const fiction = {
   laptop_friendly: true, time_limit_hours: null, workspace_photos: [],
 };
 const unknown = { ...fiction, id: "unknown", slug: "unknown", name: "Unverified Cafe", address: "Somewhere else" };
+const policy = {
+  source: "https://fictionbk.com/about", coverageSource: "https://fictionbk.com/events",
+  exceptionsCheckedThrough: "2026-11-22", exceptions: {},
+  weekly: { Mon: [[0, 120], [420, 1440]], Tue: [[0, 120], [420, 1440]], Wed: [[0, 120], [420, 1440]] },
+};
 
 test.skip(!process.env.LUMEN_E2E_BASE_URL, "Set LUMEN_E2E_BASE_URL to a running app.");
 test.use({ timezoneId: "Europe/Zurich", viewport: { width: 320, height: 800 } });
@@ -15,7 +20,10 @@ test("the session filter verifies a scheduled overnight visit without promoting 
   await page.clock.setFixedTime(new Date("2026-11-16T21:30Z"));
   await page.route("**/rest/v1/**", (route) => {
     const table = new URL(route.request().url()).pathname.split("/").at(-1);
-    return route.fulfill({ json: table === "cities" ? [city] : table === "workspaces" ? [fiction, unknown] : [] });
+    return route.fulfill({ json: table === "cities" ? [city] : table === "workspaces" ? [fiction, unknown]
+      : table === "workspace_session_hours" ? [{ workspace_id: fiction.id, checked_at: "2026-11-16T21:00Z",
+        published: { timeZone: "America/New_York", note: "Two-hour limit", opening: policy, laptopAccess: { ...policy, maxSessionMinutes: 120 } } }]
+      : [] });
   });
   await page.goto(`/find?city=${city.slug}`);
   const disclosure = page.locator("summary").filter({ hasText: "Filters" });

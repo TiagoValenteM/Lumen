@@ -4,7 +4,6 @@ import { createSessionAvailability } from "../lib/features/find-a-spot/session-a
 import { matchSpots } from "../lib/features/find-a-spot/matching.ts";
 import { parseSpotSearch, spotSearchHref } from "../lib/features/find-a-spot/preferences.ts";
 import { parseLocalSessionStart } from "../lib/features/find-a-spot/session-start.ts";
-import { getPilotSessionEvidence } from "../lib/features/find-a-spot/session-hours-pilot.ts";
 
 const minutes = (hour, minute = 0) => hour * 60 + minute;
 function setup(iso, durationMinutes, weekly, exceptions = {}, timeZone = "Europe/Zurich") {
@@ -85,20 +84,23 @@ test("local inputs reject elapsed times and DST gaps or repetitions", () => {
   }
 });
 
-test("published pilot evidence is bound to the listing and only qualifies the session it actually supports", () => {
+test("published evidence only qualifies the session and stay limit it actually supports", () => {
   const place = { id: "54f3915e-e27b-4927-94c8-afeaaa023956", slug: "fiction-bar-cafe-new-york",
     address: "308 Hooper Street, Brooklyn, New York, New York, 11211",
     laptop_friendly: true, time_limit_hours: null, checkedAt: null, has_wifi: null };
   const unknown = { ...place, id: "different", time_limit_hours: 3 };
-  assert.equal(getPilotSessionEvidence({ ...place, address: "A different location" }), null);
+  const hours = { source: "https://example.org/", checkedAt: "2026-11-16T21:00Z",
+    exceptionsCheckedThrough: "2026-11-22", exceptions: {}, weekly: { Tue: [[0, 120], [420, 1440]], Wed: [[0, 120], [420, 1440]] } };
+  const evidence = { source: hours.source, laptopSource: hours.source, note: "", maxMinutes: 120,
+    schedule: { timeZone: "America/New_York", opening: hours, laptopAccess: { ...hours, maxSessionMinutes: 120 } } };
+  const lookup = (p) => p.id === place.id ? evidence : undefined;
   const prefs = { minutes: 120, activity: "general", wifi: false, power: false };
   const now = Date.parse("2026-11-16T21:30Z");
   const evaluate = (iso, duration) => createSessionAvailability({ now, startAt: Date.parse(iso), durationMinutes: duration });
-  const evidence = getPilotSessionEvidence(place);
   const run = (iso, preferences = prefs) => matchSpots([place, unknown], preferences, {
     now,
-    sessionAvailability: (p) => evaluate(iso, preferences.minutes)(getPilotSessionEvidence(p)?.schedule),
-    sessionEvidence: (p) => getPilotSessionEvidence(p) ?? undefined,
+    sessionAvailability: (p) => evaluate(iso, preferences.minutes)(lookup(p)?.schedule),
+    sessionEvidence: lookup,
   });
   const covered = run("2026-11-18T04:00Z");
   assert.equal(covered.matches[0].place.id, place.id);

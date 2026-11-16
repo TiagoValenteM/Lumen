@@ -38,7 +38,11 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
         )}
         {sessionEvidence && <p className="text-xs text-muted-foreground">
           {toCheck.length > 0 && "Published hours cover this session. "}{sessionEvidence.note}{" "}
-          <a href={sessionEvidence.source} className="font-medium text-foreground underline underline-offset-2">Venue hours and laptop policy</a>
+          <a href={sessionEvidence.source} className="font-medium text-foreground underline underline-offset-2">
+            {sessionEvidence.source === sessionEvidence.laptopSource ? "Venue hours and laptop policy" : "Venue hours"}
+          </a>
+          {sessionEvidence.source !== sessionEvidence.laptopSource && <> · <a href={sessionEvidence.laptopSource}
+            className="font-medium text-foreground underline underline-offset-2">Laptop policy</a></>}
         </p>}
         {checked <= now && now - checked <= FACT_CHECK_MAX_AGE_MS && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" aria-hidden="true" /> Work facts checked {checkDate.format(checked)}</p>

@@ -38,6 +38,7 @@ import { Eye, Loader2, Shield, ArrowLeft, Save, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { AdminWorkDetailsSection } from "./_components/admin-work-details-section";
 import { WorkFactVerification } from "./_components/work-fact-verification";
+import { SessionHoursEditor } from "./_components/session-hours-editor";
 import { AiEnrichmentPanel } from "./_components/ai-enrichment-panel";
 import { LocationSection } from "./_components/location-section";
 import { PhotoModeration } from "./_components/photo-moderation";
@@ -761,6 +762,15 @@ export default function AdminWorkspaceDetailPage() {
             <AdminWorkDetailsSection form={form} onChange={setForm}
               verification={<WorkFactVerification supabase={supabase} workspace={workspace} form={form}
                 busy={saving || hasStagedAiChanges} />} />
+            <SessionHoursEditor client={supabase} workspaceId={workspace.id}
+              place={{ name: workspace.name, address: workspace.address, cityId: workspace.city_id,
+                latitude: workspace.latitude, longitude: workspace.longitude }}
+              isApproved={workspace.status === "approved" && workspace.latitude !== null && workspace.longitude !== null}
+              blocked={saving || hasStagedAiChanges || form.name !== workspace.name ||
+                form.address !== (workspace.address ?? "") || form.city_name !== (workspace.city_name ?? "") ||
+                form.country !== (workspace.country ?? "") || form.latitude !== workspace.latitude ||
+                form.longitude !== workspace.longitude || form.status !== workspace.status ||
+                form.laptop_friendly !== workspace.laptop_friendly || form.time_limit_hours !== workspace.time_limit_hours} />
             {hasStagedAiChanges && (
               <p className="rounded-md border border-primary/15 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
                 AI suggestions are staged in this form. Save changes before opening the saved preview or public page.

@@ -55,4 +55,6 @@ After migration, admin authority comes from `lumen_private.admin_roles`, not `pr
 
 ## Find a Spot Pilot
 
+For moderator-managed session hours, apply `20261116000100_manage_workspace_session_hours.sql` before deploying the finder update. This creates a separate evidence table, preserves the existing pilot's original verification timestamp, and adds private research drafts. No legacy hours or workspace rows are overwritten. Verify that guests can read only current published hours, not draft data or moderator identities. Do not replay historical migrations.
+
 After the work-fact migration, run the [read-only pilot counts](../../supabase/checks/find-a-spot-pilot.sql) to find cities with enough checked listings. Existing work facts start unchecked. Choose a pilot city and verify real laptop policies, stay limits, Wi-Fi and outlets in moderation. See the [Find a Spot notes](../product/find-a-spot.md) for the AI flag and pilot criteria.
