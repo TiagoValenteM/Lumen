@@ -422,7 +422,7 @@ test("the verified library pilot records distinct exceptions and never assumes a
     SELECT v.* FROM (VALUES ('Zürich','Switzerland','zurich-pilot'), ('New York','United States','new-york-pilot')) v(name,country,slug)
     WHERE NOT EXISTS (SELECT FROM public.cities c WHERE c.name=v.name AND c.country=v.country)
   `);
-  const source = await readFile(new URL("../supabase/checks/publish-verified-libraries-20261116.sql", import.meta.url), "utf8");
+  const source = await readFile(new URL("../supabase/data-patches/publish-verified-libraries-20261116.sql", import.meta.url), "utf8");
   const dated = source.replaceAll("now()", "TIMESTAMPTZ '2026-11-16 12:00:00Z'");
   await db.exec(dated);
   await db.exec(dated);
@@ -445,7 +445,7 @@ test("ETH schedules preserve campus-specific exceptions and personal-laptop unkn
     SELECT 'Zürich','Switzerland','eth-zurich-test'
     WHERE NOT EXISTS (SELECT FROM public.cities WHERE name='Zürich' AND country='Switzerland')
   `);
-  const source = await readFile(new URL("../supabase/checks/publish-verified-zurich-eth-libraries-20261116.sql", import.meta.url), "utf8");
+  const source = await readFile(new URL("../supabase/data-patches/publish-verified-zurich-eth-libraries-20261116.sql", import.meta.url), "utf8");
   const dated = source.replaceAll("now()", "TIMESTAMPTZ '2026-11-16 12:00:00Z'");
   await db.exec(dated);
   await db.exec(dated);
@@ -470,7 +470,7 @@ test("Zurich café and coworking evidence separates ordinary hours from date-spe
     SELECT 'Zürich','Switzerland','zurich-cafe-test'
     WHERE NOT EXISTS (SELECT FROM public.cities WHERE name='Zürich' AND country='Switzerland')
   `);
-  const source = await readFile(new URL("../supabase/checks/publish-verified-zurich-cafe-coworking-20261117.sql", import.meta.url), "utf8");
+  const source = await readFile(new URL("../supabase/data-patches/publish-verified-zurich-cafe-coworking-20261117.sql", import.meta.url), "utf8");
   const dated = source.replaceAll("now()", "TIMESTAMPTZ '2026-11-17 12:00:00Z'");
   await db.exec(dated);
   await db.exec(dated);
@@ -502,7 +502,7 @@ test("Büro Züri confirms free desk windows while Kraftwerk only confirms café
     SELECT 'Zürich','Switzerland','zurich-buero-test'
     WHERE NOT EXISTS (SELECT FROM public.cities WHERE name='Zürich' AND country='Switzerland')
   `);
-  const source = await readFile(new URL("../supabase/checks/publish-verified-zurich-kraftwerk-buero-20261117.sql", import.meta.url), "utf8");
+  const source = await readFile(new URL("../supabase/data-patches/publish-verified-zurich-kraftwerk-buero-20261117.sql", import.meta.url), "utf8");
   const checkDate = "2026-11-17T12:00:00Z";
   const dated = source.replaceAll("now()", `TIMESTAMPTZ '${checkDate}'`);
   await db.exec(dated);

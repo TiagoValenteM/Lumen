@@ -223,7 +223,7 @@ function buildSql(payload) {
 
   for (const workspace of payload.workspaces) {
     if (workspace.geocoding_status !== "matched") {
-      lines.push(`-- No geocoding match for ${workspace.name} (${workspace.slug}); left unchanged.`, "");
+      lines.push("-- No geocoding match for one lead; left unchanged.", "");
       continue;
     }
 
@@ -251,7 +251,8 @@ function buildSql(payload) {
         `  location_confidence = ${sqlNumber(workspace.location_confidence)},`,
         `  location_raw = COALESCE(location_raw, '{}'::jsonb) || ${sqlJson(geocodingJson)},`,
         `  admin_notes = CONCAT_WS(E'\\n', admin_notes, ${sql(note)})`,
-        `WHERE slug = ${sql(workspace.slug)};`,
+        `WHERE slug = ${sql(workspace.slug)} AND status IN ('pending', 'under_review')`,
+        "  AND location_source = 'external_lead' AND (latitude IS NULL OR longitude IS NULL);",
       ].join("\n"),
       "",
     );
