@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { canonicalCitySlug } from "@/lib/features/cities/lisbon";
 import { loadSpotCities, loadSpotPlaces, type SpotCity } from "@/lib/features/find-a-spot/spot-data";
 import { readCitySessionHours, type SessionEvidence } from "@/lib/features/session-hours/repository";
 
@@ -15,7 +16,9 @@ export function useSpotData(slug: string, sessionActive: boolean) {
   const [hours, setHours] = useState<LoadResult<Map<string, SessionEvidence>>>();
   const directoryKey = String(revision);
   const cities = directory?.key === directoryKey ? directory.data : undefined;
-  const city = cities?.find((item) => item.slug === slug);
+  const canonical = canonicalCitySlug(slug);
+  const city = cities?.find((item) => item.slug === slug) ??
+    (canonical !== slug ? cities?.find((item) => item.slug === canonical) : undefined);
   const cityId = city?.id;
   const listingKey = `${revision}:${cityId ?? ""}`;
 

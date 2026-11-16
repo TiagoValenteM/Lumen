@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeCountryName } from "@/lib/features/locations/country-name";
+import { LEGACY_LISBON_SLUG, LISBON_SLUG, normalizeCityName } from "@/lib/features/cities/lisbon";
 import type { AdminWorkspaceFormState, WorkspacePhotoRow } from "./types";
 
 export const STATUS_OPTIONS = ["pending", "under_review", "approved", "rejected"];
@@ -109,14 +110,14 @@ export async function resolveWorkspaceCity(
     return { cityId, citySlug: nextCitySlug };
   }
 
-  let cityQuery = supabase
-    .from("cities")
-    .select("id, slug, country")
-    .ilike("name", form.city_name);
-
   const country = normalizeCountryName(form.country);
+  const name = normalizeCityName(form.city_name, country);
+  const isLisbon = name === "Lisboa" && country.toLowerCase() === "portugal";
+  const cities = supabase.from("cities").select("id, slug, country");
+  let cityQuery = isLisbon ? cities.in("slug", [LISBON_SLUG, LEGACY_LISBON_SLUG]) : cities.ilike("name", name);
+
   if (country !== "Switzerland") {
-    cityQuery = country ? cityQuery.eq("country", country) : cityQuery.or("country.is.null,country.eq.Unknown");
+    cityQuery = country ? cityQuery.eq("country", isLisbon ? "Portugal" : country) : cityQuery.or("country.is.null,country.eq.Unknown");
   }
   const { data: candidates, error: cityFetchError } = await cityQuery.order("id");
   if (cityFetchError) throw cityFetchError;
@@ -134,8 +135,8 @@ export async function resolveWorkspaceCity(
   const { data: newCity, error: cityInsertError } = await supabase
     .from("cities")
     .insert({
-      name: form.city_name,
-      slug: citySlug(form.city_name, country),
+      name,
+      slug: isLisbon ? LISBON_SLUG : citySlug(name, country),
       country: country || "Unknown",
       latitude: form.latitude,
       longitude: form.longitude,

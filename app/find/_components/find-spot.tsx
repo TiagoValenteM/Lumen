@@ -49,7 +49,7 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
 
   function updateSearch(patch: Partial<SpotSearch>) {
     const current = parseSpotSearch(new URLSearchParams(window.location.search));
-    const href = spotSearchHref({ ...current, ...patch });
+    const href = spotSearchHref({ ...current, city: city?.slug ?? current.city, ...patch });
     if (href !== spotSearchHref(current)) window.history.pushState(null, "", href);
   }
 

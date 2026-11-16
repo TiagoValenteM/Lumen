@@ -437,6 +437,56 @@ test("the verified library pilot records distinct exceptions and never assumes a
   ]);
 });
 
+test("ETH schedules preserve campus-specific exceptions and personal-laptop unknowns", async () => {
+  await role("postgres");
+  await db.exec(`
+    INSERT INTO public.cities (name,country,slug)
+    SELECT 'Zürich','Switzerland','eth-zurich-test'
+    WHERE NOT EXISTS (SELECT FROM public.cities WHERE name='Zürich' AND country='Switzerland')
+  `);
+  const source = await readFile(new URL("../supabase/checks/publish-verified-zurich-eth-libraries-20261116.sql", import.meta.url), "utf8");
+  const dated = source.replaceAll("now()", "TIMESTAMPTZ '2026-11-16 12:00:00Z'");
+  await db.exec(dated);
+  await db.exec(dated);
+  const { rows: places } = await db.query(`
+    SELECT w.slug, w.time_limit_hours AS stay, h.published->'laptopAccess'->'maxSessionMinutes' AS laptop_limit,
+      h.published->'opening'->'exceptions'->'2026-11-21' AS eth_day,
+      h.published->'opening'->'exceptions'->'2026-12-24' AS christmas_eve,
+      h.published->'opening'->'exceptions'->'2027-01-03' AS end_of_closure
+    FROM public.workspaces w JOIN public.workspace_session_hours h ON h.workspace_id=w.id
+    WHERE w.slug LIKE 'eth-%' ORDER BY w.slug
+  `);
+  assert.deepEqual(places, [
+    { slug: "eth-architecture-civil-engineering-library-zurich", stay: null, laptop_limit: null, eth_day: null, christmas_eve: [[480,720]], end_of_closure: [] },
+    { slug: "eth-library-reading-room-zurich", stay: null, laptop_limit: null, eth_day: [], christmas_eve: [[480,720]], end_of_closure: [] },
+  ]);
+});
+
+test("merging Lisbon retains workspace IDs, profile links and published evidence", async () => {
+  const [first, second, legacyPlace] = [randomUUID(), randomUUID(), randomUUID()];
+  await role("postgres");
+  await db.query("INSERT INTO public.cities (id,name,slug,country) VALUES ($1,'Lisbon','lisbon','Portugal'),($2,'Lisboa','lisboa-portugal','Portugal')", [first, second]);
+  await db.query("INSERT INTO public.workspaces (id,city_id,name,slug,status) VALUES ($1,$2,'Legacy cafe','legacy-cafe','approved')", [legacyPlace, second]);
+  await db.query("UPDATE public.profiles SET city_id=$1 WHERE id=$2", [second, member]);
+  await db.query("INSERT INTO public.workspace_session_hours (workspace_id,published,checked_at,revision) VALUES ($1,$2,'2026-11-16T08:00Z',2)", [legacyPlace, { timeZone: "Europe/Lisbon" }]);
+  await db.query("INSERT INTO public.workspace_work_fact_checks (workspace_id,checked_by,checked_at) VALUES ($1,$2,'2026-11-16T08:00Z')", [legacyPlace, admin]);
+  await apply("20261116000300_merge_lisbon_city.sql");
+  assert.deepEqual(await row("SELECT id,name,workspace_count FROM public.cities WHERE slug='lisbon'"), { id: first, name: "Lisboa", workspace_count: 1 });
+  assert.equal(await row("SELECT id FROM public.cities WHERE id=$1", [second]), undefined);
+  assert.equal((await row("SELECT city_id FROM public.workspaces WHERE id=$1", [legacyPlace])).city_id, first);
+  assert.equal((await row("SELECT city_id FROM public.profiles WHERE id=$1", [member])).city_id, first);
+  assert.deepEqual((await row("SELECT published,revision FROM public.workspace_session_hours WHERE workspace_id=$1", [legacyPlace])),
+    { published: { timeZone: "Europe/Lisbon" }, revision: 3 });
+  assert.equal((await row("SELECT checked_by FROM public.workspace_work_fact_checks WHERE workspace_id=$1", [legacyPlace])).checked_by, admin);
+  await denied(db.query("INSERT INTO public.cities (name,slug,country) VALUES ('LISBON','duplicate-lisbon','Portugal')"), "23505");
+  await role("authenticated", anotherMember);
+  const submitted = randomUUID();
+  await row("SELECT public.submit_workspace_with_photos($1,'Lisbon','Portugal',$2,$3)",
+    [submitted, { name: "New Lisbon place", latitude: 38.72, longitude: -9.14 }, [uploadedPhoto(anotherMember)]]);
+  assert.deepEqual(await row("SELECT city_id,proposed_city_name FROM public.workspaces WHERE id=$1",[submitted]),
+    { city_id: first, proposed_city_name: null });
+});
+
 test("stale AI runs can be recovered without unlocking a fresh run", async () => {
   await role("service_role");
   const run = await enqueue(otherPlace, admin, true);

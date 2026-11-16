@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { resolveAvatarUrl } from "@/lib/utils";
 import { submitWorkspaceReview } from "@/lib/features/workspaces/submit-review";
 import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
+import { LEGACY_LISBON_SLUG, LISBON_SLUG } from "@/lib/features/cities/lisbon";
 import { authHref, workspaceReviewPath, WRITE_REVIEW_HASH } from "@/lib/features/auth/return-path";
 import { useToast } from "@/hooks/useToast";
 import { useSavedWorkspace } from "@/hooks/useSavedWorkspace";
@@ -106,13 +107,19 @@ export default function WorkspacePage() {
         setCity(cityData);
 
         // Fetch workspace
-        const { data: workspaceData } = await supabase
+        const findWorkspace = (cityId: string) => supabase
           .from('workspaces')
           .select('*')
           .eq('slug', workspaceSlug)
-          .eq('city_id', cityData.id)
+          .eq('city_id', cityId)
           .eq('status', 'approved')
           .single();
+        let { data: workspaceData } = await findWorkspace(cityData.id);
+        // Keep redirected workspace links live before the city merge (and during rollback).
+        if (!workspaceData && citySlug === LISBON_SLUG) {
+          const { data: legacyCity } = await supabase.from("cities").select("id").eq("slug", LEGACY_LISBON_SLUG).maybeSingle();
+          if (legacyCity) ({ data: workspaceData } = await findWorkspace(legacyCity.id));
+        }
 
         if (workspaceData) {
           const [{ data: photosData }, checks] = await Promise.all([
