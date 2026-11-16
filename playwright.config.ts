@@ -11,7 +11,7 @@ if (startServer && (baseURL !== localURL || process.env.NEXT_PUBLIC_SUPABASE_URL
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  use: { baseURL },
+  use: { baseURL, trace: startServer ? "retain-on-failure" : "off" },
   forbidOnly: Boolean(process.env.CI),
   webServer: startServer ? [{
     command: "node tests/support/auth-fixture-server.mjs",

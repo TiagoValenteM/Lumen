@@ -2,7 +2,13 @@
 
 ## Start with a decision
 
-Open [Find a Spot in New York](https://lumen-lime.vercel.app/find?city=new-york-united-states) and enter `Somewhere quiet for two hours, with Wi-Fi`. Show the filters it selects, then open the map. Point out a result under **Details to check** and explain what information would move it into **Matches**. There may be no confirmed matches for that request; the app does not relax the filters or claim a place is open.
+Open [Find a Spot in Zürich](https://lumen-lime.vercel.app/find?city=z-rich-schweiz-suisse-svizzera-svizra) and enter `Somewhere quiet for two hours, with Wi-Fi`. Show the filters it selects, then open the map. Enable **Open for my session** and choose a start time. **Matches** cover the full requested session when supported by current venue evidence; **Places to check** identifies what is missing. A scheduled match is not a reservation.
+
+| Desktop search | Mobile session controls | Venue evidence and actions |
+| --- | --- | --- |
+| [Find a Spot with map](find-a-spot.png) | [Session filters on a phone](session-filters-mobile.png) | [Café du Bonheur detail](workspace-detail.png) and [credited photo](workspace-photo.png) |
+
+These are guest captures from the live app. To recapture, install Chromium with `pnpm exec playwright install chromium` and run `pnpm showcase:capture <future-UTC-session>` from the repository root. Pick a weekday during current Büro Züri and Westhive visitor hours. The script blocks write requests and does not sign in. The map keeps its displayed attribution; see [the venue sources](../product/zurich-cafe-coworking-sources.md) for the café photograph credit.
 
 ## Follow one listing through the system
 
@@ -14,4 +20,4 @@ With a staging account, use Add a Place to search for an address and adjust the 
 - [AI review transaction](../../supabase/migrations/20261112000200_make_ai_review_atomic.sql): the workspace update and recorded field decisions commit together.
 - [Permission tests](../../tests/moderation-security.test.mjs): tests change database roles to check what members, moderators, and the server can do, independent of the UI.
 
-The next product milestone is a city with enough checked listings for a reliable shortlist. The [pilot notes](../product/find-a-spot.md) describe what to verify and which claims the finder still cannot make.
+The [pilot notes](../product/find-a-spot.md) describe what to verify and which claims the finder still cannot make.

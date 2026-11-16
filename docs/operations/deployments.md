@@ -38,11 +38,12 @@ After migration, admin authority comes from `lumen_private.admin_roles`, not `pr
 
 ## Browser smoke tests
 
-- GitHub checks run the fixture-based browser suite against the compiled app with a local server and no production credentials. The session-hours test runs the real migration in a disposable PostgreSQL database and covers draft visibility, concurrent edits, holiday closure, and withdrawal.
+- GitHub checks run Chromium and WebKit against the compiled app with a local server and no production credentials. The session-hours test runs the real migration in a disposable PostgreSQL database and covers draft visibility, concurrent edits, holiday closure, and withdrawal.
 - The [development guide](../engineering/development.md) covers the local checks. The database suite exercises SQL privileges and RLS in embedded PostgreSQL, without staging credentials.
 - The browser smoke test needs a running app connected to a disposable staging database with the migrations applied. Create one regular test account and one moderator test account there. Install Chromium with `pnpm exec playwright install chromium`, then run `pnpm test:e2e` with these environment variables:
   - `LUMEN_E2E_ALLOW_WRITES=staging` and `LUMEN_E2E_BASE_URL` (the staging app).
   - `LUMEN_E2E_SUPABASE_URL`, `LUMEN_E2E_SUPABASE_PUBLISHABLE_KEY`, and `LUMEN_E2E_SUPABASE_SECRET_KEY` (the same staging database).
+  - `LUMEN_E2E_CONFIRM_DATABASE_ORIGIN` (the exact staging Supabase origin, without a trailing slash). The test rejects the known production domain and Supabase project; still verify the staging Vercel app is connected to the same isolated project.
   - `LUMEN_E2E_MEMBER_EMAIL`, `LUMEN_E2E_MEMBER_PASSWORD`, `LUMEN_E2E_ADMIN_EMAIL`, and `LUMEN_E2E_ADMIN_PASSWORD`.
 - The browser test inserts and removes a disposable place and city, uses deterministic AI suggestions, and verifies that Find a Spot treats unknown facts correctly. Separately submit a real staging place to verify the OpenRouter provider, background execution and geocoding credentials.
 - Check the city map and map pin on desktop and mobile. MapLibre 5.24.1 includes the maintainer's sanitizer backport and avoids the WebGL2-only 6.x upgrade. The npm audit feed may still flag it because its affected range omits the patched 5.x branch; see [the maintainer advisory](https://github.com/maplibre/maplibre-gl-js/security/advisories/GHSA-jrc7-96c5-q579).

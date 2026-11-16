@@ -4,7 +4,7 @@ Lumen uses Next.js App Router, TypeScript, Supabase PostgreSQL/Auth/Storage, and
 
 ## Three paths through the app
 
-**Find a place.** [Find a Spot](../../app/find) loads a city's approved listings and their work-fact check dates. A [pure matcher](../../lib/features/find-a-spot/matching.ts) returns matches and places that still need verification. Plain-English requests and manual controls set the same URL filters. Exact device location stays in the browser, and the map loads on demand.
+**Find a place.** [Find a Spot](../../app/find) loads approved listings and work-fact check dates. A [pure matcher](../../lib/features/find-a-spot/matching.ts) separates matches from places that still need verification. [Session evaluation](../../lib/features/find-a-spot/session-availability.ts) checks the whole visit against the venue's opening and laptop schedules, including holiday exceptions. Plain-English requests and manual controls set the same URL filters. Exact device location stays in the browser, and the map loads on demand.
 
 **Submit a place.** [Add a Place](../../app/add-workspace) combines address search with an adjustable map pin. The [geocoding routes](../../app/api/geocode) authenticate the user and enforce server-side quotas before contacting providers. The submission RPC commits the place and its photo records together and accepts retries with the same draft ID. A proposed city stays off the public directory until approval.
 
@@ -18,7 +18,7 @@ Lumen uses Next.js App Router, TypeScript, Supabase PostgreSQL/Auth/Storage, and
 | [`components/`](../../components) | Shared interface primitives and reusable feature components. |
 | [`lib/features/`](../../lib/features) | Domain logic shared by routes: matching, submissions, location lookup, and moderation. |
 | [`lib/supabase/`](../../lib/supabase) | Browser, server, and privileged Supabase clients. |
-| [`supabase/`](../../supabase) | Migrations, policies, and database checks. |
+| [`supabase/`](../../supabase/README.md) | Versioned migrations, read-only checks, dated data patches, and staging fixtures. |
 | [`tests/`](../../tests) | Matching, location, and AI tests; PostgreSQL permission tests; a staging browser suite. |
 | [`scripts/`](../../scripts) | Staging bootstrap and [operator-only import tools](../operations/location-imports.md). |
 

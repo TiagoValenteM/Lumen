@@ -1,27 +1,40 @@
 # Lumen
 
-Find a cafe, library, or coworking space where you can get some work done. Lumen helps you decide where to go based on laptop policies, stay limits, Wi-Fi, and outlets, and shows which details still need checking.
+Find a café, library, or coworking desk that fits the work you need to do. Lumen helps you plan around laptop rules, verified opening hours, Wi-Fi, outlets, and stay limits. It shows what still needs a check instead of treating missing data as a match.
 
-[Try Find a Spot](https://lumen-lime.vercel.app/find?city=new-york-united-states) · [Browse cities](https://lumen-lime.vercel.app/cities) · [Read the architecture](docs/engineering/architecture.md)
+[Live demo](https://lumen-lime.vercel.app/find?city=z-rich-schweiz-suisse-svizzera-svizra) · [Product walkthrough](docs/showcase/walkthrough.md) · [Architecture](docs/engineering/architecture.md) · [Checks](https://github.com/TiagoValenteM/Lumen/actions/workflows/checks.yml)
 
-[![Find a Spot showing New York results, work filters, and a map](docs/showcase/find-a-spot.png)](https://lumen-lime.vercel.app/find?city=new-york-united-states)
+![Find a Spot showing verified coworking options and a map of Zurich](docs/showcase/find-a-spot.png)
 
-## Try it in two minutes
+## Try the app
 
-1. Open [Find a Spot in New York](https://lumen-lime.vercel.app/find?city=new-york-united-states) and type `Somewhere quiet for two hours, with Wi-Fi`. The app turns the request into filters you can edit.
-2. Open the map or inspect a listing. If a fact is missing or out of date, the place appears under **Details to check** instead of **Matches**. Opening hours and seat availability aren't verified by the finder.
-3. Visit [Lisbon](https://lumen-lime.vercel.app/cities/lisbon) for the city directory experience, or see the [mobile view](docs/showcase/lisbon-mobile.png). Browsing needs no account; an account lets you save places, mark visits, review venues, and submit corrections or new listings.
+1. Open [Find a Spot in Zürich](https://lumen-lime.vercel.app/find?city=z-rich-schweiz-suisse-svizzera-svizra). Enter `Somewhere quiet for two hours, with Wi-Fi` or set those filters directly.
+2. Turn on **Open for my session** and pick a start time. **Matches** fit the selected filters; **Places to check** explains missing or out-of-date evidence. A match does not guarantee an available seat.
+3. Open the map or a [place detail](https://lumen-lime.vercel.app/cities/z-rich-schweiz-suisse-svizzera-svizra/cafe-du-bonheur-zurich). Browse without signing in, or sign in to save, review, report a visit, or submit a place.
 
-## Engineering decisions
+See the [mobile filters](docs/showcase/session-filters-mobile.png) and [place detail](docs/showcase/workspace-detail.png). These are captures of the public app, not design mockups.
 
-- **Match on evidence.** The [matching function](lib/features/find-a-spot/matching.ts) distinguishes missing, negative, and stale facts. The same filters drive the shortlist and map. Plain-English parsing works without an AI service.
-- **Make submissions safe to retry.** The [submission transaction](supabase/migrations/20261112000400_submit_workspace_with_city_proposal.sql) writes the listing and photo records together. A first-place submission can propose a city, but that city stays off the public directory until approval.
-- **Keep publishing with the reviewer.** Optional AI research proposes field edits. The moderator chooses what to save, and the [review transaction](supabase/migrations/20261112000200_make_ai_review_atomic.sql) records the accepted fields alongside the workspace update.
+## What the code demonstrates
 
-## Run it locally
+| Decision | Implementation |
+| --- | --- |
+| **Uncertainty is part of the result.** | The [matching engine](lib/features/find-a-spot/matching.ts) distinguishes missing, negative, and stale facts. [Session checks](lib/features/find-a-spot/session-availability.ts) evaluate the full visit in the venue's timezone, including holidays and overnight windows. |
+| **A place is private until approved.** | The [submission transaction](supabase/migrations/20261112000400_submit_workspace_with_city_proposal.sql) writes a listing and photo records together. The first submission can propose a city without exposing it publicly. |
+| **AI proposes; reviewers publish.** | Optional AI research suggests field edits. The [review transaction](supabase/migrations/20261112000200_make_ai_review_atomic.sql) records approved edits alongside the saved changes. Visit reports and expiring evidence enter a [private review queue](supabase/migrations/20261116000200_review_workspace_session_evidence.sql). |
 
-Lumen uses Next.js App Router, TypeScript, Tailwind CSS, Supabase, and MapLibre. The [development guide](docs/engineering/development.md) covers Node.js, pnpm, an isolated database, and environment variables. [GitHub Actions](https://github.com/TiagoValenteM/Lumen/actions/workflows/checks.yml) runs lint, type checks, tests, and a production build.
+**Stack:** Next.js App Router, TypeScript, Tailwind CSS, Supabase PostgreSQL/Auth/Storage, MapLibre, and Vercel.
 
-[Demo walkthrough](docs/showcase/walkthrough.md) · [Documentation index](docs/index.md) · [Deployment runbook](docs/operations/deployments.md)
+## Develop and verify
+
+Use Node.js 24 and pnpm 10. Code and PostgreSQL tests do not need Supabase credentials:
+
+```sh
+pnpm install --frozen-lockfile
+pnpm test
+```
+
+- [Local setup and browser tests](docs/engineering/development.md)
+- [Documentation index](docs/index.md) and [deployment runbook](docs/operations/deployments.md)
+- [Contributing](CONTRIBUTING.md) and [private security reporting](SECURITY.md)
 
 Built by [Tiago Valente](https://github.com/TiagoValenteM). Proudly developed in Switzerland.
