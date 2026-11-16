@@ -462,6 +462,37 @@ test("ETH schedules preserve campus-specific exceptions and personal-laptop unkn
   ]);
 });
 
+test("Zurich café and coworking evidence separates ordinary hours from date-specific access", async () => {
+  await role("postgres");
+  await db.exec(`
+    INSERT INTO public.cities (name,country,slug)
+    SELECT 'Zürich','Switzerland','zurich-cafe-test'
+    WHERE NOT EXISTS (SELECT FROM public.cities WHERE name='Zürich' AND country='Switzerland')
+  `);
+  const source = await readFile(new URL("../supabase/checks/publish-verified-zurich-cafe-coworking-20261117.sql", import.meta.url), "utf8");
+  const dated = source.replaceAll("now()", "TIMESTAMPTZ '2026-11-17 12:00:00Z'");
+  await db.exec(dated);
+  await db.exec(dated);
+  const { rows: venues } = await db.query(`
+    SELECT w.slug, w.type, w.laptop_friendly, w.has_wifi,
+      h.draft->'opening'->'weekly'->'Sat' AS saturday_draft,
+      h.published->'opening'->'exceptions'->'2026-12-24' AS christmas,
+      h.published->'laptopAccess'->'maxSessionMinutes' AS day_pass,
+      p.url AS photo
+    FROM public.workspaces w JOIN public.workspace_session_hours h ON h.workspace_id=w.id
+    LEFT JOIN public.workspace_photos p ON p.workspace_id=w.id AND p.is_approved
+    WHERE w.slug IN ('cafe-du-bonheur-zurich','westhive-hardturm-zurich','westhive-paradeplatz-zurich') ORDER BY w.slug
+  `);
+  assert.deepEqual(venues, [
+    { slug: "cafe-du-bonheur-zurich", type: "cafe", laptop_friendly: true, has_wifi: null,
+      saturday_draft: [[600,1080]], christmas: null, day_pass: null, photo: "/images/zurich-bullingerplatz-roland-fischer.jpg" },
+    ...["westhive-hardturm-zurich","westhive-paradeplatz-zurich"].map((slug) => ({
+      slug, type: "coworking", laptop_friendly: true, has_wifi: true,
+      saturday_draft: null, christmas: [], day_pass: 750, photo: null,
+    })),
+  ]);
+});
+
 test("merging Lisbon retains workspace IDs, profile links and published evidence", async () => {
   const [first, second, legacyPlace] = [randomUUID(), randomUUID(), randomUUID()];
   await role("postgres");

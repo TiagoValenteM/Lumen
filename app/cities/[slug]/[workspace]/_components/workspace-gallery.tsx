@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceImage } from "@/components/features/workspace";
+import { getCuratedPhotoCredit } from "@/lib/features/workspaces/curated-photo-credits";
 import type { Photo } from "@/lib/types";
 import { ChevronLeft, ChevronRight, Images } from "lucide-react";
 
@@ -25,6 +26,7 @@ export function WorkspaceGallery({ photos, workspaceName }: WorkspaceGalleryProp
   };
 
   if (!selectedPhoto) return null;
+  const credit = getCuratedPhotoCredit(selectedPhoto.url);
 
   return (
     <div className="overflow-hidden rounded-xl border border-border/30 bg-card/70 shadow-md shadow-black/5 dark:shadow-black/20">
@@ -62,11 +64,16 @@ export function WorkspaceGallery({ photos, workspaceName }: WorkspaceGalleryProp
         </div>
       </div>
 
-      {(selectedPhoto.caption || orderedPhotos.length > 1) && (
+      {(selectedPhoto.caption || credit || orderedPhotos.length > 1) && (
         <div className="space-y-3 p-3">
           {selectedPhoto.caption && (
             <p className="text-sm text-muted-foreground">{selectedPhoto.caption}</p>
           )}
+          {credit && <p className="text-xs text-muted-foreground">
+            Photo: {credit.author}. <a className="underline underline-offset-2" href={credit.source}>Wikimedia Commons</a>
+            {" · "}<a className="underline underline-offset-2" href={credit.licenseUrl}>{credit.license}</a>
+            {" · Resized; cropped to fit."}
+          </p>}
 
           {orderedPhotos.length > 1 && (
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
