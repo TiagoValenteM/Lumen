@@ -3,8 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { Building2, Check, Navigation, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Building2, Check, Coffee, Landmark, Navigation, ShieldCheck } from "lucide-react";
 import { getWorkspaceDirections } from "@/lib/features/locations/directions";
 import { FACT_CHECK_MAX_AGE_MS, type SpotCandidate } from "@/lib/features/find-a-spot/matching";
 
@@ -16,11 +15,13 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const showPhoto = place.photoUrl?.startsWith("https://") && brokenPhoto !== place.photoUrl;
   const checked = Date.parse(place.checkedAt ?? "");
+  const PlaceIcon = place.type === "library" ? Landmark : place.type === "cafe" ? Coffee : Building2;
   return (
-    <li className="grid min-w-0 grid-cols-[3.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 py-4 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:gap-x-4">
-      <div className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
+    <li className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-x-2 gap-y-1 py-3 sm:grid-cols-[3.75rem_minmax(0,1fr)_auto] sm:gap-x-4">
+      <div className="relative grid aspect-square w-full place-items-center overflow-hidden rounded-md text-muted-foreground sm:bg-muted">
         {showPhoto && place.photoUrl ? <Image unoptimized src={place.photoUrl} alt="" fill sizes="72px" referrerPolicy="no-referrer"
-          className="object-cover" onError={() => setBrokenPhoto(place.photoUrl)} /> : <Building2 className="size-5" aria-hidden="true" />}
+          className="hidden object-cover sm:block" onError={() => setBrokenPhoto(place.photoUrl)} /> : null}
+        <PlaceIcon className={showPhoto ? "size-4 sm:hidden" : "size-4 sm:size-5"} aria-hidden="true" />
       </div>
       <div className="min-w-0 space-y-1.5">
         <p className="text-xs capitalize text-muted-foreground">
@@ -32,16 +33,16 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
           </Link>
         </h3>
         {place.address && <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{place.address}</p>}
-        {toCheck.length ? <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Check:</span> {toCheck.join(" · ")}</p> : (
+        {toCheck.length ? <p className="w-fit rounded-md bg-muted/65 px-2 py-1 text-xs text-muted-foreground [overflow-wrap:anywhere]"><span className="font-medium text-foreground">Check:</span> {toCheck.join(" · ")}</p> : (
           <p className="flex items-start gap-1.5 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{reasons.join(" · ")}</span></p>
         )}
         {checked <= now && now - checked <= FACT_CHECK_MAX_AGE_MS && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" aria-hidden="true" /> Work facts checked {checkDate.format(checked)}</p>
         )}
       </div>
-      {directions && <Button variant="outline" size="sm" asChild className="col-start-2 min-h-9 w-fit sm:col-start-3 sm:self-start">
-        <a href={directions} target="_blank" rel="noopener noreferrer" aria-label={`Directions to ${place.name} (opens in a new tab)`}><Navigation aria-hidden="true" /> Directions</a>
-      </Button>}
+      {directions && <a href={directions} target="_blank" rel="noopener noreferrer"
+        className="col-start-2 inline-flex min-h-11 w-fit items-center gap-1.5 rounded-sm text-sm font-medium underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:col-start-3 sm:self-start"
+        aria-label={`Directions to ${place.name} (opens in a new tab)`}><Navigation className="size-4" aria-hidden="true" /> Directions</a>}
     </li>
   );
 }

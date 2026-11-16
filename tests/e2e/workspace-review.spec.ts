@@ -111,6 +111,9 @@ test("the first place in a new city stays private until a moderator publishes it
       const ask = publicPage.getByRole("textbox", { name: "What kind of spot do you need?" });
       await ask.fill("Work for two hours with Wi-Fi");
       await ask.press("Enter");
+      const filters = publicPage.locator("summary").filter({ hasText: "Filters" });
+      await expect(filters).toContainText("Wi-Fi");
+      await filters.click();
       await expect(publicPage.getByRole("checkbox", { name: "Wi-Fi", exact: true })).toBeChecked();
       await expect(toCheck.getByRole("link", { name: placeName, exact: true })).toBeVisible();
       await expect(matches.getByRole("link", { name: placeName, exact: true })).toHaveCount(0);
