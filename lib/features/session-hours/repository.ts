@@ -14,6 +14,7 @@ export type SessionEvidence = {
   laptopSource: string;
   note: string;
   maxMinutes?: number;
+  checkedAt?: string;
 };
 export type PlaceSnapshot = { name: string; address: string | null; cityId: string | null; latitude: number | null; longitude: number | null };
 export type HoursAction = "draft" | "verify" | "withdraw";
@@ -44,6 +45,7 @@ export async function readCitySessionHours(client: SupabaseClient, cityId: strin
     result.set(workspace_id, {
       source: payload.opening.source, laptopSource: payload.laptopAccess.source, note: payload.note,
       maxMinutes: payload.laptopAccess.maxSessionMinutes,
+      checkedAt: checked_at,
       schedule: { timeZone: payload.timeZone, opening: { ...payload.opening, checkedAt: checked_at },
         laptopAccess: { ...payload.laptopAccess, checkedAt: checked_at } },
     });

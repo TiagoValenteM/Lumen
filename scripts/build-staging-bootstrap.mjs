@@ -28,6 +28,7 @@ const rollout = [
   "20261112000600_limit_spot_interpretation.sql",
   "20261113000100_normalize_swiss_city_country.sql",
   "20261116000100_manage_workspace_session_hours.sql",
+  "20261116000200_review_workspace_session_evidence.sql",
 ];
 
 const transactionBody = (sql) => sql.trim().replace(/^BEGIN;\s*/, "").replace(/\s*COMMIT;$/, "");

@@ -254,6 +254,14 @@ export default function AdminWorkspaceDetailPage() {
   }, [isAdmin, loadWorkspace]);
 
   useEffect(() => {
+    if (!workspace?.id || loading) return;
+    const target = window.location.hash.slice(1);
+    if (target === "place-reports" || target === "session-hours-title") {
+      document.getElementById(target)?.scrollIntoView();
+    }
+  }, [loading, workspace?.id]);
+
+  useEffect(() => {
     if (!workspace?.id || !AI_ACTIVE_STATUSES.has(String(latestAiStatus))) return;
 
     const workspaceId = workspace.id;

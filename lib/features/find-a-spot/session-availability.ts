@@ -1,4 +1,6 @@
 export type SessionAvailability = "fits" | "does_not_fit" | "unknown";
+export type SessionAssessment = { availability: SessionAvailability; missing: string[] };
+type HoursOutcome = SessionAvailability | "unchecked" | "outside_coverage" | "unknown_day";
 
 type Day = "Sun" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat";
 type MinuteWindow = readonly [start: number, end: number];
@@ -40,34 +42,38 @@ function coversMinute(windows: Windows | undefined, minute: number) {
   return windows.some(([start, end]) => start <= minute && minute < end);
 }
 
-function checkHours(hours: VerifiedHours | null, minutes: LocalMinute[], now: number, duration: number): SessionAvailability {
+function checkHours(hours: VerifiedHours | null, minutes: LocalMinute[], now: number, duration: number): HoursOutcome {
   const checked = Date.parse(hours?.checkedAt ?? "");
   if (!hours?.source.trim() || !Number.isFinite(checked) || checked > now ||
-    now - checked > MAX_CHECK_AGE || !isCalendarDate(hours.exceptionsCheckedThrough)) return "unknown";
+    now - checked > MAX_CHECK_AGE || !isCalendarDate(hours.exceptionsCheckedThrough)) return "unchecked";
 
   if (hours.maxSessionMinutes !== undefined && (!Number.isInteger(hours.maxSessionMinutes) ||
-    hours.maxSessionMinutes <= 0)) return "unknown";
+    hours.maxSessionMinutes <= 0)) return "unchecked";
 
-  let unknown = false;
+  let outsideCoverage = false;
+  let unknownDay = false;
   for (const { day, date, minute } of minutes) {
     if (date > hours.exceptionsCheckedThrough) {
-      unknown = true;
+      outsideCoverage = true;
       continue;
     }
     const windows = Object.hasOwn(hours.exceptions, date) ? hours.exceptions[date] : hours.weekly[day];
     const covered = coversMinute(windows, minute);
     if (covered === false) return "does_not_fit";
-    if (covered === undefined) unknown = true;
+    if (covered === undefined) unknownDay = true;
   }
-  if (unknown) return "unknown";
+  if (outsideCoverage) return "outside_coverage";
+  if (unknownDay) return "unknown_day";
   return hours.maxSessionMinutes !== undefined && duration > hours.maxSessionMinutes ? "does_not_fit" : "fits";
 }
 
-export function createSessionAvailability({ startAt, durationMinutes, now }: {
+type SessionInput = {
   startAt: number;
   durationMinutes: number;
   now: number;
-}) {
+};
+
+export function createSessionAssessment({ startAt, durationMinutes, now }: SessionInput) {
   const endAt = startAt + durationMinutes * MINUTE;
   const valid = Number.isSafeInteger(startAt) && Number.isSafeInteger(now) && startAt >= now &&
     Number.isInteger(durationMinutes) && durationMinutes > 0 && durationMinutes <= MAX_SESSION_MINUTES &&
@@ -95,15 +101,25 @@ export function createSessionAvailability({ startAt, durationMinutes, now }: {
     return result;
   }
 
-  return (schedule: VenueSessionSchedule | null | undefined): SessionAvailability => {
+  return (schedule: VenueSessionSchedule | null | undefined): SessionAssessment => {
     const timeZone = schedule?.timeZone;
-    if (!valid || !schedule || !timeZone || /^[+-]/.test(timeZone)) return "unknown";
+    if (!valid) return { availability: "unknown", missing: ["Choose a valid future session"] };
+    if (!schedule) return { availability: "unknown", missing: ["Opening hours not verified", "Laptop access not verified"] };
+    if (!timeZone || /^[+-]/.test(timeZone)) return { availability: "unknown", missing: ["Venue timezone not verified"] };
     const minutes = localMinutes(timeZone);
-    if (!minutes?.length) return "unknown";
+    if (!minutes?.length) return { availability: "unknown", missing: ["Venue timezone not verified"] };
 
     const opening = checkHours(schedule.opening, minutes, now, durationMinutes);
     const laptop = checkHours(schedule.laptopAccess, minutes, now, durationMinutes);
-    if (opening === "does_not_fit" || laptop === "does_not_fit") return "does_not_fit";
-    return opening === "fits" && laptop === "fits" ? "fits" : "unknown";
+    if (opening === "does_not_fit" || laptop === "does_not_fit") return { availability: "does_not_fit", missing: [] };
+    const missing = ([["Opening hours", opening], ["Laptop access", laptop]] as const).flatMap(([label, outcome]) =>
+      outcome === "fits" ? [] : [outcome === "outside_coverage" ? `${label} not checked for this date`
+        : outcome === "unknown_day" ? `${label} unknown for part of this session` : `${label} not verified`]);
+    return { availability: missing.length ? "unknown" : "fits", missing };
   };
+}
+
+export function createSessionAvailability(input: SessionInput) {
+  const assess = createSessionAssessment(input);
+  return (schedule: VenueSessionSchedule | null | undefined) => assess(schedule).availability;
 }

@@ -52,7 +52,10 @@ test("the session filter verifies a scheduled overnight visit without promoting 
   await page.getByRole("button", { name: "Set start", exact: true }).click();
   await expect(details.getByRole("link", { name: fiction.name, exact: true })).toBeVisible();
   await expect(matches).toHaveCount(0);
-  await expect(details.getByText(/opening hours and laptop access for this session/i)).toHaveCount(2);
+  await expect(details.getByText("Opening hours not checked for this date")).toBeVisible();
+  await expect(details.getByText("Laptop access not checked for this date")).toBeVisible();
+  await expect(details.getByText("Opening hours not verified")).toBeVisible();
+  await expect(details.getByText("Laptop access not verified")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(320);
 
   await page.getByLabel(/your local time/).fill("2026-11-15T10:00");

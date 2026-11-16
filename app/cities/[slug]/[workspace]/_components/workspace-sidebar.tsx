@@ -19,9 +19,11 @@ import { getStayLimitLabel } from "@/lib/features/workspaces/work-facts";
 import { getWorkspaceDirections } from "@/lib/features/locations/directions";
 import type { WorkspaceDetail } from "@/lib/types";
 import { Bookmark, BookmarkCheck, Clock, DollarSign, Globe, Loader2, MapPin, MapPinCheck, MessageSquare, Phone, Users } from "lucide-react";
+import { VenueVisitObservation } from "./venue-visit-observation";
 
 type WorkspaceSidebarProps = {
   workspace: WorkspaceDetail;
+  citySlug: string;
   userSignedIn: boolean;
   hasVisited: boolean;
   isSaved: boolean;
@@ -41,6 +43,7 @@ type WorkspaceSidebarProps = {
 
 export function WorkspaceSidebar({
   workspace,
+  citySlug,
   userSignedIn,
   hasVisited,
   isSaved,
@@ -140,6 +143,7 @@ export function WorkspaceSidebar({
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <VenueVisitObservation key={workspace.id} workspaceId={workspace.id} city={citySlug} slug={workspace.slug} signedIn={userSignedIn} />
         </CardContent>
       </Card>
 

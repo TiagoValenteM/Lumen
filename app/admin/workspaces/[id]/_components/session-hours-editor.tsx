@@ -29,7 +29,7 @@ export function SessionHoursEditor(props: Props) {
   return (
     <section aria-labelledby="session-hours-title" className="space-y-3 border-y border-border/60 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="session-hours-title" className="flex items-center gap-2 font-semibold"><Clock3 aria-hidden="true" className="size-4" /> Session hours</h2>
+        <h2 id="session-hours-title" className="flex scroll-mt-24 items-center gap-2 font-semibold"><Clock3 aria-hidden="true" className="size-4" /> Session hours</h2>
         <Button type="button" size="sm" variant="outline" aria-expanded={expanded} aria-controls={expanded ? "session-hours-editor" : undefined}
           onClick={() => setVisibility(expanded ? "collapsed" : "open")}>{expanded ? "Hide hours editor" : "Edit hours"}</Button>
       </div>

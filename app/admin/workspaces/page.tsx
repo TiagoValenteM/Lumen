@@ -319,6 +319,7 @@ export default function AdminWorkspacesPage() {
           description="Review, approve, or edit submitted workspaces."
           actions={
             <>
+            <Button asChild variant="outline"><Link href="/admin/workspaces/session-review">Session review</Link></Button>
             <Input
               placeholder="Search by name, city, country, or slug"
               value={search}

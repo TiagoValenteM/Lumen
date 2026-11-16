@@ -19,7 +19,7 @@ type SuggestionsPanelProps = {
 
 export function SuggestionsPanel({ suggestions, savingSuggestionId, onUpdateStatus }: SuggestionsPanelProps) {
   return (
-    <div className="space-y-2">
+    <div id="place-reports" className="scroll-mt-24 space-y-2">
       <Label>Edit suggestions</Label>
       {suggestions.length === 0 ? (
         <p className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">

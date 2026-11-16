@@ -73,6 +73,7 @@ before(async () => {
     "20261112000400_submit_workspace_with_city_proposal.sql",
     "20261112000500_verify_workspace_work_facts.sql",
     "20261116000100_manage_workspace_session_hours.sql",
+    "20261116000200_review_workspace_session_evidence.sql",
   ]) await apply(name);
 });
 
@@ -380,6 +381,60 @@ test("submit, enrich once, review, save, preview, and publish under separate rol
   assert.deepEqual(await row("SELECT status, description, admin_notes FROM workspaces WHERE id = $1", [place]), {
     status: "approved", description: "Good for long work sessions.", admin_notes: null,
   });
+});
+
+test("visit observations enter moderator review without changing public session evidence", async () => {
+  const id = randomUUID();
+  const date = (await row("SELECT (now() AT TIME ZONE 'UTC')::date::text AS date")).date;
+  const submit = (doors, laptops = "unknown", stay = "unknown", day = date) =>
+    row("SELECT public.submit_workspace_visit_observation($1,$2,$3,$4,$5) AS id", [id, day, doors, laptops, stay]);
+  const queue = () => db.query("SELECT * FROM public.list_workspace_session_review()");
+  await role("anon");
+  await denied(queue());
+  await denied(submit("open"));
+  await role("authenticated", member);
+  await denied(queue());
+  await newPlace(id, "Visit Test City", [uploadedPhoto(member)], { name: "Visit Test Cafe", address: "1 Visit Street" });
+  await denied(submit("open"), "22023");
+  await role("authenticated", admin);
+  await db.query("UPDATE workspaces SET status='approved' WHERE id=$1", [id]);
+  await role("authenticated", member);
+  await denied(submit("unknown"), "22023");
+  await denied(submit("closed", "allowed"), "22023");
+  await denied(submit("open", "allowed", "unknown", "2000-01-01"), "22023");
+  const report = await submit("open", "restricted", "limit_seen");
+  await denied(submit("closed"), "23505");
+  await role("anon");
+  assert.equal(await row("SELECT workspace_id FROM workspace_session_hours WHERE workspace_id=$1", [id]), undefined);
+  await role("authenticated", admin);
+  assert.equal((await queue()).rows.find((item) => item.workspace_id === id).reason, "visit_report");
+  await db.query("UPDATE workspace_edit_suggestions SET status='reviewing' WHERE id=$1", [report.id]);
+  assert.equal((await queue()).rows.find((item) => item.workspace_id === id).visit_reports, 1);
+  await db.query("UPDATE workspace_edit_suggestions SET status='resolved' WHERE id=$1", [report.id]);
+  assert.equal((await queue()).rows.find((item) => item.workspace_id === id).reason, "unchecked");
+});
+
+test("the verified library pilot records distinct exceptions and never assumes a stay limit", async () => {
+  await role("postgres");
+  await db.exec(`
+    INSERT INTO public.cities (name,country,slug)
+    SELECT v.* FROM (VALUES ('Zürich','Switzerland','zurich-pilot'), ('New York','United States','new-york-pilot')) v(name,country,slug)
+    WHERE NOT EXISTS (SELECT FROM public.cities c WHERE c.name=v.name AND c.country=v.country)
+  `);
+  const source = await readFile(new URL("../supabase/checks/publish-verified-libraries-20261116.sql", import.meta.url), "utf8");
+  const dated = source.replaceAll("now()", "TIMESTAMPTZ '2026-11-16 12:00:00Z'");
+  await db.exec(dated);
+  await db.exec(dated);
+  const result = await db.query(`
+    SELECT w.slug, w.time_limit_hours AS stay, h.published->'laptopAccess'->'exceptions'->'2026-11-26' AS thanksgiving,
+           h.published->'opening'->'exceptions'->'2026-12-26' AS boxing_day
+    FROM public.workspaces w JOIN public.workspace_session_hours h ON h.workspace_id=w.id
+    WHERE w.slug IN ('zentralbibliothek-zurich','brooklyn-public-library-central-new-york') ORDER BY w.slug
+  `);
+  assert.deepEqual(result.rows, [
+    { slug: "brooklyn-public-library-central-new-york", stay: null, thanksgiving: [], boxing_day: null },
+    { slug: "zentralbibliothek-zurich", stay: null, thanksgiving: null, boxing_day: [[540, 1140]] },
+  ]);
 });
 
 test("stale AI runs can be recovered without unlocking a fresh run", async () => {

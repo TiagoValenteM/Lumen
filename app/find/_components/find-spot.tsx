@@ -11,7 +11,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { PageContainer } from "@/components/shared/lumen-page";
 import { applyInterpretation, parseSpotSearch, SPOT_RADII, spotSearchHref, type SpotSearch } from "@/lib/features/find-a-spot/preferences";
 import { distanceBetweenKm, hasSpotCoordinates, matchSpots } from "@/lib/features/find-a-spot/matching";
-import { createSessionAvailability } from "@/lib/features/find-a-spot/session-availability";
+import { createSessionAssessment } from "@/lib/features/find-a-spot/session-availability";
 import { useSessionClock } from "../_hooks/use-session-clock";
 import { useSpotData } from "../_hooks/use-spot-data";
 import { SpotRequest } from "./spot-request";
@@ -37,12 +37,12 @@ export function FindSpot({ aiEnabled }: { aiEnabled: boolean }) {
   const sessionExpired = startAt !== null && startAt < now;
   const results = useMemo(() => {
     if (!listing || (startAt !== null && hours === undefined)) return null;
-    const session = startAt === null ? null : createSessionAvailability({ startAt, durationMinutes: search.minutes, now });
+    const session = startAt === null ? null : createSessionAssessment({ startAt, durationMinutes: search.minutes, now });
     return matchSpots(listing.places, search, {
       now,
       radiusKm: distances ? search.radiusKm ?? undefined : undefined,
       distanceKm: distances ? (place) => distances.get(place.id) ?? null : undefined,
-      sessionAvailability: session ? (place) => session(hours?.get(place.id)?.schedule) : undefined,
+      sessionAssessment: session ? (place) => session(hours?.get(place.id)?.schedule) : undefined,
       sessionEvidence: session ? (place) => hours?.get(place.id) : undefined,
     });
   }, [distances, hours, listing, now, search, startAt]);

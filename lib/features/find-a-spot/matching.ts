@@ -1,5 +1,5 @@
 import type { SpotPreferences } from "./preferences";
-import type { SessionAvailability } from "./session-availability";
+import type { SessionAssessment, SessionAvailability } from "./session-availability";
 import type { SessionEvidence } from "../session-hours/repository";
 
 export type SpotPlace = {
@@ -18,6 +18,8 @@ export type SpotPlace = {
   good_for_calls: boolean | null;
   checkedAt: string | null;
   photoUrl: string | null;
+  website?: string | null;
+  phone?: string | null;
 };
 
 export type SpotCandidate = {
@@ -25,7 +27,7 @@ export type SpotCandidate = {
   reasons: string[];
   toCheck: string[];
   distance: number | null;
-  sessionEvidence?: Pick<SessionEvidence, "source" | "laptopSource" | "note" | "maxMinutes">;
+  sessionEvidence?: Pick<SessionEvidence, "source" | "laptopSource" | "note" | "maxMinutes" | "checkedAt">;
 };
 
 export const FACT_CHECK_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
@@ -40,6 +42,7 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
   radiusKm?: number;
   distanceKm?: (place: SpotPlace) => number | null;
   sessionAvailability?: (place: SpotPlace) => SessionAvailability;
+  sessionAssessment?: (place: SpotPlace) => SessionAssessment;
   sessionEvidence?: (place: SpotPlace) => SpotCandidate["sessionEvidence"];
 }) {
   const matches: SpotCandidate[] = [];
@@ -55,7 +58,8 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
     const computedDistance = options.distanceKm?.(place);
     const distance = typeof computedDistance === "number" && Number.isFinite(computedDistance) && computedDistance >= 0 ? computedDistance : null;
     if (options.radiusKm !== undefined && distance !== null && distance > options.radiusKm) continue;
-    const availability = options.sessionAvailability?.(place);
+    const assessment = options.sessionAssessment?.(place);
+    const availability = assessment?.availability ?? options.sessionAvailability?.(place);
     if (availability === "does_not_fit") continue;
     const sessionEvidence = availability === "fits" ? options.sessionEvidence?.(place) : undefined;
 
@@ -88,7 +92,7 @@ export function matchSpots(places: readonly SpotPlace[], preferences: SpotPrefer
     }
     if (options.radiusKm !== undefined && distance === null) toCheck.push("Distance");
     if (availability === "fits") reasons.push("Hours and laptop access cover this session");
-    if (availability === "unknown") toCheck.push("Opening hours and laptop access for this session");
+    if (availability === "unknown") toCheck.push(...(assessment?.missing ?? ["Opening hours and laptop access for this session"]));
 
     (toCheck.length ? details : matches).push({ place, reasons, toCheck, distance, ...(sessionEvidence && { sessionEvidence }) });
   }

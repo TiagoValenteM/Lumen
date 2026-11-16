@@ -311,6 +311,7 @@ export default function WorkspacePage() {
 
           <WorkspaceSidebar
             workspace={workspace}
+            citySlug={citySlug}
             userSignedIn={Boolean(user)}
             hasVisited={hasVisited}
             isSaved={isSaved}

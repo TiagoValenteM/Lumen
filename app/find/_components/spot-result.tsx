@@ -15,6 +15,8 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
   const [brokenPhoto, setBrokenPhoto] = useState<string | null>(null);
   const showPhoto = place.photoUrl?.startsWith("https://") && brokenPhoto !== place.photoUrl;
   const checked = Date.parse(place.checkedAt ?? "");
+  const website = place.website && /^https?:\/\//i.test(place.website) ? place.website : null;
+  const phone = place.phone && /^\+?[\d ().-]{6,26}$/.test(place.phone) ? place.phone : null;
   const PlaceIcon = place.type === "library" ? Landmark : place.type === "cafe" ? Coffee : Building2;
   return (
     <li className="grid min-w-0 grid-cols-[1.25rem_minmax(0,1fr)] gap-x-2 gap-y-1 py-3 sm:grid-cols-[3.75rem_minmax(0,1fr)_auto] sm:gap-x-4">
@@ -33,7 +35,16 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
           </Link>
         </h3>
         {place.address && <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{place.address}</p>}
-        {toCheck.length ? <p className="w-fit rounded-md bg-muted/65 px-2 py-1 text-xs text-muted-foreground [overflow-wrap:anywhere]"><span className="font-medium text-foreground">Check:</span> {toCheck.join(" · ")}</p> : (
+        {toCheck.length ? <div className="space-y-1 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+          <p className="font-medium text-foreground">Still to confirm</p>
+          <ul className="flex flex-wrap gap-x-2 gap-y-1" aria-label="Missing confirmations">
+            {toCheck.map((item) => <li key={item} className="rounded-md bg-muted/65 px-2 py-1">{item}</li>)}
+          </ul>
+          {(phone || website) && <p className="flex flex-wrap gap-3">
+            {phone && <a href={`tel:${phone.replace(/[^\d+]/g, "")}`} className="py-1 underline underline-offset-2">Call venue</a>}
+            {website && <a href={website} className="py-1 underline underline-offset-2">Venue website</a>}
+          </p>}
+        </div> : (
           <p className="flex items-start gap-1.5 text-sm"><Check className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><span>{reasons.join(" · ")}</span></p>
         )}
         {sessionEvidence && <p className="text-xs text-muted-foreground">
@@ -43,6 +54,7 @@ export function SpotResult({ candidate, city, now }: { candidate: SpotCandidate;
           </a>
           {sessionEvidence.source !== sessionEvidence.laptopSource && <> · <a href={sessionEvidence.laptopSource}
             className="font-medium text-foreground underline underline-offset-2">Laptop policy</a></>}
+          {sessionEvidence.checkedAt && <> · Checked {checkDate.format(new Date(sessionEvidence.checkedAt))}</>}
         </p>}
         {checked <= now && now - checked <= FACT_CHECK_MAX_AGE_MS && (
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" aria-hidden="true" /> Work facts checked {checkDate.format(checked)}</p>
