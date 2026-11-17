@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { WorkspaceImage } from "@/components/features/workspace";
+import { WorkspaceImage } from "@/components/features/workspaces";
 import { getCuratedPhotoCredit } from "@/lib/features/workspaces/curated-photo-credits";
 import type { Photo } from "@/lib/types";
 import { ChevronLeft, ChevronRight, Images } from "lucide-react";

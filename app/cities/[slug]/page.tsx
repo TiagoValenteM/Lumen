@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { WorkspaceCard } from "@/components/features/workspace";
+import { WorkspaceCard } from "@/components/features/workspaces";
 import { CityCollectionStrip } from "./_components/city-collection-strip";
 import { CityDiscoveryControls } from "./_components/city-discovery-controls";
 import { CityMapSection } from "./_components/city-map-section";

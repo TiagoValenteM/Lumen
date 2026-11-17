@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { StayLimitField, WorkFactSelect } from "@/components/features/workspace/work-fact-fields";
+import { StayLimitField, WorkFactSelect } from "@/components/features/workspaces/work-fact-fields";
 import {
   Select,
   SelectContent,

@@ -46,6 +46,31 @@ hooks/
 
 Do not put route-specific business logic in `lib/utils`.
 
+### Names And Ownership
+
+- Use lowercase `kebab-case` for custom directories and file names. Preserve Next.js conventions such as `[slug]`, `_components`, `page.tsx`, and `route.ts`.
+- Use plural names for entity domains, such as `workspaces`, `reviews`, and `cities`. Capability names such as `auth`, `navigation`, and `session-hours` do not need an artificial plural.
+- Keep domain names aligned across `components/features` and `lib/features` when both contain that domain. Component file names can remain singular, such as `workspaces/workspace-card.tsx`.
+- Keep shared database and cross-domain types in `lib/types`. Keep feature-specific types beside their feature and route-only types beside their route. Do not create a second root `types/` directory or placeholder directories.
+- Internal folder renames must update all imports without renaming route segments, changing public URLs, or changing behavior.
+
+### Component Placement
+
+Choose the narrowest owner for each component:
+
+```txt
+app/<route>/_components/        One route's sections and controls
+components/features/<domain>/  Domain UI reused across routes
+components/shared/             Cross-domain product layouts and integrations
+components/ui/                 Domain-independent UI primitives
+```
+
+For example, workspace cards and work-fact fields belong in `components/features/workspaces`; review forms and review lists belong in `components/features/reviews`. The page shell, location picker, and image uploader belong in `components/shared` because they support multiple domains. Buttons, inputs, and dialogs belong in `components/ui` and must not depend on feature modules.
+
+Keep queries, mutations, validation, and other business workflows in `lib/features/<domain>` rather than component folders. A route-specific hook stays in `app/<route>/_hooks`; only hooks genuinely shared across routes belong in the root `hooks` directory.
+
+Do not move a component only because it has multiple callers within one route. Do not add compatibility re-export folders after an internal rename; update callers directly. Existing short `index.ts` exports may expose a feature's public components, but avoid combining unrelated domains in one barrel.
+
 ## Lumen UI Components
 
 Use `components/ui` only for shadcn-style primitives: buttons, cards, inputs, dialogs, badges, and form controls.

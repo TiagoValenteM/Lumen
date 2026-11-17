@@ -2,7 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StayLimitField, WorkFactSelect } from "@/components/features/workspace/work-fact-fields";
+import { StayLimitField, WorkFactSelect } from "@/components/features/workspaces/work-fact-fields";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AddWorkspaceFormData, UpdateAddWorkspaceField } from "../_lib/types";

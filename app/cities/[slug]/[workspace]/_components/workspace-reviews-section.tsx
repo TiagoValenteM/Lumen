@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ReviewForm, ReviewsList } from "@/components/features/review";
+import { ReviewForm, ReviewsList } from "@/components/features/reviews";
 import type { ProfileSummary, Review } from "@/lib/types";
 import { MessageSquare } from "lucide-react";
 import { WRITE_REVIEW_HASH } from "@/lib/features/auth/return-path";

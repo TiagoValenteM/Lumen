@@ -1,7 +1,7 @@
 "use client";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { WorkFactSelect } from "@/components/features/workspace/work-fact-fields";
+import { WorkFactSelect } from "@/components/features/workspaces/work-fact-fields";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
