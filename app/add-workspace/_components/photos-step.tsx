@@ -17,8 +17,8 @@ export function PhotosStep({ uploadedPhotos, onPhotoMoved, onPhotoUploaded, onPh
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Photos</CardTitle>
-        <CardDescription>Add one clear photo now. More can be added if they help reviewers understand the place.</CardDescription>
+        <CardTitle>Photos (required)</CardTitle>
+        <CardDescription>Add at least one clear photo to continue. You can upload up to five.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <ImageUpload
@@ -79,7 +79,7 @@ export function PhotosStep({ uploadedPhotos, onPhotoMoved, onPhotoUploaded, onPh
           </div>
         )}
 
-        {uploadedPhotos.length === 0 && <p className="text-sm text-muted-foreground">No photos uploaded yet. At least one photo is recommended.</p>}
+        {uploadedPhotos.length === 0 && <p className="text-sm text-muted-foreground">At least one photo is required before you can review and submit this place.</p>}
       </CardContent>
     </Card>
   );

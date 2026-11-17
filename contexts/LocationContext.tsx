@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { useGeolocation } from "@/hooks/useGeolocation";
 
 interface LocationContextType {

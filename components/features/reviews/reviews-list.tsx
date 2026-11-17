@@ -27,7 +27,6 @@ export function ReviewsList({ reviews, profilesById }: ReviewsListProps) {
             className="rounded-xl border border-border/35 bg-card/50 p-5 shadow-sm shadow-black/5 dark:shadow-black/20"
           >
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-5">
-              {/* User Avatar */}
               <div className="flex-shrink-0">
                 {avatarUrl ? (
                   <Image
@@ -44,7 +43,6 @@ export function ReviewsList({ reviews, profilesById }: ReviewsListProps) {
                 )}
               </div>
 
-              {/* Review Content */}
               <div className="flex-1 min-w-0 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                   <div className="space-y-1.5">

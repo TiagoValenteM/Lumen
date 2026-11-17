@@ -71,6 +71,13 @@ Keep queries, mutations, validation, and other business workflows in `lib/featur
 
 Do not move a component only because it has multiple callers within one route. Do not add compatibility re-export folders after an internal rename; update callers directly. Existing short `index.ts` exports may expose a feature's public components, but avoid combining unrelated domains in one barrel.
 
+### Cleanup And Documentation
+
+- Describe the current product in README and product docs. Remove abandoned mockups and superseded implementation plans rather than presenting them as active work.
+- Before deleting an export or component, check all imports, re-exports, route handlers, and script entry points. TypeScript rejects unused locals and parameters, but an exported module can still have no callers.
+- Keep comments that explain constraints, security boundaries, or non-obvious decisions. Remove comments that only repeat the adjacent markup.
+- Retain versioned database migrations, source attribution, evidence limits, and operational recovery instructions. Historical migrations are required to recreate and test the current schema; they are not dead code.
+
 ## Lumen UI Components
 
 Use `components/ui` only for shadcn-style primitives: buttons, cards, inputs, dialogs, badges, and form controls.
@@ -88,36 +95,26 @@ Use `components/shared/lumen-page.tsx` for Lumen product-level layout patterns:
 
 When a route repeats shell, header, loading, access, empty, or metric-card markup, prefer these shared components. Keep route-local `_components` for content-specific sections such as AI review tables, photo moderation, location editing, and city merge rows.
 
-## Feature Module Plan
+## Feature Modules
 
-Move shared business behavior toward domain folders. File names should describe the job they do, not the CRUD pattern they happen to use.
+Keep shared business behavior in domain folders. File names describe their job, not a generic CRUD category. Existing modules include:
 
 ```txt
 lib/features/
   cities/
-    city-repository.ts
-    city-lifecycle.ts
-    city-normalization.ts
+    city-workspace-mapper.ts
+    workspace-discovery.ts
   locations/
-    geocoding.ts
-    reverse-geocoding.ts
-    location-normalization.ts
-  moderation/
-    workspace-review-actions.ts
-    photo-review-actions.ts
-    suggestion-review-actions.ts
-  workspace-submissions/
-    submission-actions.ts
-    submission-repository.ts
-    duplicate-detection.ts
-    submission-validation.ts
+    geocode-fallback.ts
+    geocode-guard.ts
+    workspace-city-proposals.ts
   workspaces/
-    workspace-queries.ts
-    workspace-mappers.ts
+    submit-review.ts
+    work-facts.ts
     workability-report.ts
 ```
 
-Use this split as the target shape:
+When introducing a new module, use a descriptive responsibility suffix where helpful:
 
 - `*-repository.ts`: isolated Supabase reads/writes and migration compatibility fallbacks.
 - `*-actions.ts`: server actions or route-callable workflows that compose repositories and validation.

@@ -73,6 +73,14 @@ test("adding a place returns to the last draft step after sign-in", async ({ pag
     JSON.parse(localStorage.getItem(`lumen:add-place-draft:v1:${id}`) ?? "{}").currentStep, member.id)).toBe(3);
   await page.goto("/login?redirect=%2Fadd-workspace");
   await expect(page.getByText("Step 3 of 6", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByText("Step 5 of 6", { exact: true })).toBeVisible();
+  await expect(page.getByText("Photos (required)", { exact: true })).toBeVisible();
+  await expect(page.getByText("At least one photo is required before you can review and submit this place.", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "Add at least one photo before reviewing your submission." })).toBeVisible();
+  await expect(page.getByText("Step 5 of 6", { exact: true })).toBeVisible();
 });
 
 test("a visit report returns after sign-in, validates inline, and sends an observation for review", async ({ page }) => {

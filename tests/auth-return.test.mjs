@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { authHref, getAuthReturnPath, workspaceReviewPath } from "../lib/features/auth/return-path.ts";
-import { getResumableStep } from "../app/add-workspace/_lib/validation.ts";
+import { getAddWorkspaceValidationMessage, getResumableStep, isAddWorkspaceStepValid } from "../app/add-workspace/_lib/validation.ts";
 
 test("auth returns only to the add-place and review flows", () => {
   const review = workspaceReviewPath("zürich", "coffee-shop");
@@ -23,4 +23,14 @@ test("a submission draft resumes the last valid step without bypassing prerequis
   assert.equal(getResumableStep(6, place, []), 5);
   assert.equal(getResumableStep(6, place, ["photo"]), 6);
   assert.equal(getResumableStep(6, { ...place, latitude: null }, ["photo"]), 1);
+});
+
+test("a photo is required both before review and before submission", () => {
+  const place = { name: "Cafe", type: "cafe", latitude: 0, longitude: 0, city_name: "City", country: "Country" };
+  for (const step of [5, 6]) {
+    assert.equal(isAddWorkspaceStepValid(step, place, []), false);
+    assert.match(getAddWorkspaceValidationMessage(step, place, []), /at least one photo/);
+    assert.equal(isAddWorkspaceStepValid(step, place, ["photo"]), true);
+    assert.equal(getAddWorkspaceValidationMessage(step, place, ["photo"]), null);
+  }
 });
