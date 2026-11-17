@@ -30,3 +30,20 @@ pnpm build
 ```
 
 Unit and embedded PostgreSQL tests run without Supabase credentials. The build may need network access for fonts. The [deployment runbook](../operations/deployments.md#browser-smoke-tests) lists what the write-enabled Playwright suite needs on a disposable staging database.
+
+## Browser tests without credentials
+
+```bash
+pnpm exec playwright install chromium webkit
+pnpm test:e2e:local --browser=chromium
+pnpm test:e2e:local --browser=webkit
+```
+
+The command compiles a separate fixture build with loopback configuration and shuts down its test servers afterwards. Stop any development server sharing the same build directory first. It does not use the Supabase project in `.env.local`. On a failure, open the generated trace under `test-results/` with `pnpm exec playwright show-trace <trace.zip>`. GitHub Actions runs both browser engines and uploads traces only for fixture failures.
+
+| Layer | What it exercises |
+| --- | --- |
+| Unit | Availability, time zones, URL filters, AI parsing, and import safeguards. |
+| Database integration | PostgreSQL migrations, transactional imports, moderation, RLS, and concurrent edits in PGlite. |
+| Browser, isolated | Public browsing, maps, navigation, sign-in return paths, photos, and moderation flows with fixtures. |
+| Browser, staging only | Real account, Storage and publication flow; enable only with the disposable target described in the runbook. |

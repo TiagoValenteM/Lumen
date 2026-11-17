@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
+import { assertStagingTarget } from "../support/staging-target.mjs";
 
 const settings = {
   baseUrl: process.env.LUMEN_E2E_BASE_URL,
@@ -19,6 +20,7 @@ test.skip(
 );
 
 test("the first place in a new city stays private until a moderator publishes it", async ({ page, browser }) => {
+  assertStagingTarget(settings.baseUrl!, settings.url!, process.env.LUMEN_E2E_CONFIRM_DATABASE_ORIGIN ?? "");
   const options = { auth: { persistSession: false, autoRefreshToken: false } };
   const member = createClient(settings.url!, settings.publishableKey!, options);
   const service = createClient(settings.url!, settings.secretKey!, options);

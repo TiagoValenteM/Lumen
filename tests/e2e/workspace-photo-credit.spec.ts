@@ -26,4 +26,6 @@ for (const venue of [
   await expect(photo).toHaveClass(new RegExp(venue.fit));
   await expect(page.getByRole("link", { name: "CC BY-SA 3.0" })).toHaveAttribute("href", "https://creativecommons.org/licenses/by-sa/3.0/");
   await expect(page.getByRole("link", { name: "Wikimedia Commons" })).toHaveAttribute("href", venue.source);
+  await expect(page.getByText("Productivity", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Amenities", { exact: true })).toHaveCount(0);
 });

@@ -53,7 +53,7 @@ This creates:
 - `data/location-leads/laptopfriendly-workspace-import.json`
 - `data/location-leads/laptopfriendly-workspace-import.sql`
 
-Rows default to `status = pending`, which means they can appear in the admin review area after insertion but will not appear on public city pages until approved.
+Rows default to `status = pending`. The only other permitted import status is `under_review`. Generated SQL does not replace existing city or workspace rows, and unverified Wi-Fi, outlets, laptop access and stay limits are left unknown.
 
 Enrich imported leads with OpenStreetMap/Nominatim coordinates:
 
@@ -66,7 +66,7 @@ This creates:
 - `data/location-leads/laptopfriendly-workspace-import-enriched.json`
 - `data/location-leads/laptopfriendly-workspace-location-fix.sql`
 
-Run the location fix SQL after the initial import SQL if the rows were inserted with partial addresses or missing coordinates.
+The location fix only targets pending or under-review external leads with missing coordinates. Review the address match before applying it. It cannot update a published place.
 
 Build optional pending photo candidates from open/reusable sources:
 
@@ -84,10 +84,10 @@ Push the generated import file to Supabase:
 
 ```bash
 pnpm locations:import:push --dry-run
-pnpm locations:import:push --status pending
+pnpm locations:import:push --apply --target https://<project-ref>.supabase.co --status pending
 ```
 
-This requires `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`. Do not expose that key in client code or commit it.
+Dry run is the default. Writes require the exact configured Supabase origin and a server-only `SUPABASE_SECRET_KEY` or legacy `SUPABASE_SERVICE_ROLE_KEY`. Existing slugs are skipped, not replaced. Review and run against staging first; do not put credentials in client code or commit them.
 
 Supported city keys are currently:
 

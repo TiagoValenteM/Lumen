@@ -6,7 +6,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { getErrorMessage } from "@/lib/utils/error";
-import { readWorkspaceCityProposals } from "@/lib/features/locations/workspace-city-proposals";
 import {
   Card,
   CardContent,
@@ -44,18 +43,17 @@ import { LocationSection } from "./_components/location-section";
 import { PhotoModeration } from "./_components/photo-moderation";
 import { SuggestionsPanel } from "./_components/suggestions-panel";
 import { saveAdminWorkspace } from "./_lib/save-workspace";
+import { readAdminAiEnrichments, readAdminWorkspace } from "./_lib/read-workspace";
 import { emptyWorkspaceForm, toWorkspaceForm } from "./_lib/workspace-form";
 import {
   createWorkspacePhoto,
   deleteWorkspace,
   deleteWorkspacePhoto,
   deleteWorkspacePhotoStorageObject,
-  isMissingColumnError,
   setWorkspacePrimaryPhoto,
   STATUS_OPTIONS,
   updateWorkspacePhoto,
   WORKSPACE_TYPE_OPTIONS,
-  workspaceSelect,
 } from "./_lib/admin-workspace-actions";
 import type {
   AdminWorkspaceFormState,
@@ -64,12 +62,10 @@ import type {
   EditSuggestionRow,
   WorkspaceDetailMinimal,
   WorkspacePhotoRow,
-  WorkspaceQueryRow,
 } from "./_lib/types";
 
 const AI_ACTIVE_STATUSES = new Set(["queued", "researching", "extracting", "pending"]);
 const AI_REVIEWABLE_STATUSES = new Set(["ready_for_review", "completed"]);
-const AI_ENRICHMENT_SELECT = "id, created_at, updated_at, status, provider, model, run_mode, suggested_fields, field_evidence, unknown_fields, field_decisions, run_metadata, field_sources, citations, error_message";
 
 export default function AdminWorkspaceDetailPage() {
   const { user, loading: authLoading } = useAuth();
@@ -110,126 +106,43 @@ export default function AdminWorkspaceDetailPage() {
   const latestAiStatus = aiEnrichments[0]?.status;
   const latestAiUpdate = aiEnrichments[0]?.updated_at ?? aiEnrichments[0]?.created_at;
 
-  const loadWorkspace = useCallback(async () => {
-    if (!userId || !isAdmin || !id) return;
+  const loadWorkspace = useCallback(async (signal: AbortSignal) => {
+    if (!id || signal.aborted) return;
     setLoading(true);
     setError(null);
+    setWorkspace(null);
     try {
-      let includeLocationMetadata = true;
-      let { data, error: fetchError } = await supabase
-        .from("workspaces")
-        .select(workspaceSelect(true))
-        .eq("id", id)
-        .maybeSingle();
-      if (fetchError && isMissingColumnError(fetchError)) {
-        includeLocationMetadata = false;
-        const fallback = await supabase
-          .from("workspaces")
-          .select(workspaceSelect(false))
-          .eq("id", id)
-          .maybeSingle();
-        data = fallback.data;
-        fetchError = fallback.error;
-      }
-      if (fetchError) throw fetchError;
-      setHasLocationMetadataColumns(includeLocationMetadata);
-      if (!data) {
+      const result = await readAdminWorkspace(supabase, id, signal);
+      if (signal.aborted) return;
+      if (!result) {
         setError("Workspace not found.");
-        setLoading(false);
         return;
       }
-      const row = data as unknown as WorkspaceQueryRow;
-      const [notes, proposals] = await Promise.all([
-        supabase.rpc("get_workspace_admin_notes", { workspace_uuid: id }),
-        readWorkspaceCityProposals(supabase, row.city_id ? [] : [id]),
-      ]);
-      if (notes.error && notes.error.code !== "PGRST202") throw notes.error;
-      const cityField = Array.isArray(row.city) ? row.city[0] ?? null : row.city;
-      const proposal = proposals.get(id) ?? null;
-      const mapped: WorkspaceDetailMinimal = {
-        ...row,
-        id: row.id,
-        name: row.name,
-        slug: row.slug,
-        status: row.status,
-        short_description: row.short_description,
-        address: row.address,
-        city_id: row.city_id,
-        submitted_by: row.submitted_by ?? null,
-        city_slug: cityField?.slug ?? null,
-        city_proposal: proposal,
-        city_name: cityField?.name ?? proposal?.name ?? null,
-        country: cityField?.country ?? proposal?.country ?? null,
-        latitude: row.latitude,
-        longitude: row.longitude,
-        location_source: includeLocationMetadata ? row.location_source : null,
-        location_provider: includeLocationMetadata ? row.location_provider : null,
-        location_provider_id: includeLocationMetadata ? row.location_provider_id : null,
-        location_confidence: includeLocationMetadata ? row.location_confidence : null,
-        location_raw: includeLocationMetadata ? row.location_raw : null,
-        rejection_reason: includeLocationMetadata ? row.rejection_reason : null,
-        admin_notes: notes.error ? row.admin_notes ?? null : notes.data,
-      };
-      setWorkspace(mapped);
-      setForm(toWorkspaceForm(mapped));
-      const { data: photoRows, error: photosError } = await supabase
-        .from("workspace_photos")
-        .select("id, url, caption, is_primary, is_approved")
-        .eq("workspace_id", row.id)
-        .order("is_primary", { ascending: false });
-      if (photosError) throw photosError;
-      setPhotos((photoRows as WorkspacePhotoRow[] | null) || []);
-
-      const { data: suggestionRows, error: suggestionsError } = await supabase
-        .from("workspace_edit_suggestions")
-        .select("id, created_at, kind, message, status")
-        .eq("workspace_id", row.id)
-        .order("created_at", { ascending: false });
-      if (!suggestionsError) {
-        setSuggestions((suggestionRows as EditSuggestionRow[] | null) || []);
-      } else if (!isMissingColumnError(suggestionsError)) {
-        console.warn("Could not load edit suggestions", suggestionsError);
-      }
-
-      const { data: enrichmentRows, error: enrichmentError } = await supabase
-        .from("workspace_ai_enrichments")
-        .select(AI_ENRICHMENT_SELECT)
-        .eq("workspace_id", row.id)
-        .order("created_at", { ascending: false });
-      if (!enrichmentError) {
-        setAiEnrichments((enrichmentRows as AiEnrichmentRow[] | null) || []);
-      } else if (!isMissingColumnError(enrichmentError)) {
-        console.warn("Could not load AI enrichment", enrichmentError);
-      }
+      setHasLocationMetadataColumns(result.includeLocationMetadata);
+      setWorkspace(result.workspace);
+      setForm(toWorkspaceForm(result.workspace));
+      setPhotos(result.photos);
+      setSuggestions(result.suggestions);
+      setAiEnrichments(result.enrichments);
       setAiStagedMessage(null);
       setStagedAiReview(null);
     } catch (err) {
+      if (signal.aborted) return;
       console.error("Failed to load workspace", err);
       setError("Could not load workspace. Please try again.");
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
-  }, [userId, isAdmin, id, supabase]);
+  }, [id, supabase]);
 
-  const refreshAiEnrichments = useCallback(
-    async (workspaceId: string) => {
-      const { data, error: enrichmentError } = await supabase
-        .from("workspace_ai_enrichments")
-        .select(AI_ENRICHMENT_SELECT)
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false });
-
-      if (!enrichmentError) {
-        setAiEnrichments((data as AiEnrichmentRow[] | null) || []);
-        return;
-      }
-
-      if (!isMissingColumnError(enrichmentError)) {
-        console.warn("Could not refresh AI enrichment", enrichmentError);
-      }
-    },
-    [supabase],
-  );
+  const refreshAiEnrichments = useCallback(async (workspaceId: string, signal?: AbortSignal) => {
+    try {
+      const rows = await readAdminAiEnrichments(supabase, workspaceId, signal);
+      if (!signal?.aborted) setAiEnrichments(rows);
+    } catch (error) {
+      if (!signal?.aborted) console.warn("Could not refresh AI enrichment", error);
+    }
+  }, [supabase]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -246,12 +159,11 @@ export default function AdminWorkspaceDetailPage() {
   }, [supabase, userId]);
 
   useEffect(() => {
-    if (isAdmin) {
-      // Workspace details are loaded from Supabase after admin access is confirmed.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      loadWorkspace();
-    }
-  }, [isAdmin, loadWorkspace]);
+    if (!isAdmin) return;
+    const controller = new AbortController();
+    queueMicrotask(() => { void loadWorkspace(controller.signal); });
+    return () => controller.abort();
+  }, [isAdmin, loadWorkspace, userId]);
 
   useEffect(() => {
     if (!workspace?.id || loading) return;
@@ -262,25 +174,25 @@ export default function AdminWorkspaceDetailPage() {
   }, [loading, workspace?.id]);
 
   useEffect(() => {
-    if (!workspace?.id || !AI_ACTIVE_STATUSES.has(String(latestAiStatus))) return;
+    if (!isAdmin || !workspace?.id || workspace.id !== id || !AI_ACTIVE_STATUSES.has(String(latestAiStatus))) return;
 
     const workspaceId = workspace.id;
-    let cancelled = false;
+    const controller = new AbortController();
     let timer: number | undefined;
     async function poll() {
       if (latestAiUpdate && Date.now() - Date.parse(latestAiUpdate) >= 180_000) {
-        await fetch(`/api/workspaces/${workspaceId}/enrich`, { cache: "no-store" }).catch(() => null);
+        await fetch(`/api/workspaces/${workspaceId}/enrich`, { cache: "no-store", signal: controller.signal }).catch(() => null);
       }
-      if (cancelled) return;
-      await refreshAiEnrichments(workspaceId);
-      if (!cancelled) timer = window.setTimeout(poll, 4000);
+      if (controller.signal.aborted) return;
+      await refreshAiEnrichments(workspaceId, controller.signal);
+      if (!controller.signal.aborted) timer = window.setTimeout(poll, 4000);
     }
     timer = window.setTimeout(poll, 0);
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
-  }, [latestAiStatus, latestAiUpdate, refreshAiEnrichments, workspace?.id]);
+  }, [id, isAdmin, latestAiStatus, latestAiUpdate, refreshAiEnrichments, workspace?.id]);
 
   const handleSave = async () => {
     if (!user || !isAdmin || !workspace || saving || rejectingAiFields || discardingAiEnrichment) return;
@@ -554,7 +466,7 @@ export default function AdminWorkspaceDetailPage() {
     );
   }
 
-  if (loading) {
+  if (loading || (workspace && workspace.id !== id)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex items-center gap-2 text-muted-foreground">
@@ -570,7 +482,7 @@ export default function AdminWorkspaceDetailPage() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardHeader>
-            <CardTitle>Workspace not found</CardTitle>
+            <CardTitle>{error || "Workspace not found."}</CardTitle>
             <CardDescription>Try returning to the admin list.</CardDescription>
           </CardHeader>
           <CardContent>

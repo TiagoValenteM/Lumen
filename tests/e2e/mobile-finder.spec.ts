@@ -76,3 +76,25 @@ test("shared filters still show checked matches without mixing them with uncerta
   await expect(page.getByRole("list", { name: "Matching places" }).getByRole("link", { name: place.name, exact: true })).toBeVisible();
   await expect(page.getByRole("list", { name: "Places with details to check" })).toHaveCount(0);
 });
+
+test("desktop results show curated images and fall back when a photo cannot load", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const photoUrl = "/images/zurich-bullingerplatz-roland-fischer.jpg";
+  await page.route("**/rest/v1/**", (route) => {
+    const url = new URL(route.request().url());
+    const rows = url.pathname.endsWith("/cities") ? [city] : url.pathname.endsWith("/workspaces") ? [
+      { ...place, workspace_photos: [{ url: photoUrl, is_primary: true, is_approved: true }] },
+      { ...place, id: "missing-photo", name: "Place with no image file",
+        workspace_photos: [{ url: "/images/missing-test-photo.jpg", is_primary: true, is_approved: true }] },
+    ] : [];
+    return route.fulfill({ json: rows });
+  });
+  await page.route("**/images/missing-test-photo.jpg", (route) => route.fulfill({ status: 404 }));
+  await page.goto(`/find?city=${city.slug}`);
+  const picture = page.locator(`img[src$="${photoUrl}"]`);
+  await expect(picture).toBeVisible();
+  await expect.poll(() => picture.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBeGreaterThan(0);
+  const missing = page.getByRole("listitem").filter({ has: page.getByRole("link", { name: "Place with no image file" }) });
+  await expect(missing.locator("img")).toHaveCount(0);
+  await expect(missing.locator("svg.lucide-landmark")).toBeVisible();
+});
