@@ -143,7 +143,9 @@ test("the first place in a new city stays private until a moderator publishes it
     await page.getByRole("combobox", { name: "Workspace status" }).click();
     await page.getByRole("option", { name: "approved", exact: true }).click();
     await page.getByRole("button", { name: "Save changes" }).first().click();
+    await expect.poll(async () => (await service.from("workspaces").select("status").eq("id", id).single()).data?.status).toBe("approved");
     await expect(page.getByRole("link", { name: "Public view" }).first()).toHaveAttribute("href", publicPath);
+    expect((await service.from("cities").select("id").eq("slug", citySlug)).data).toHaveLength(1);
     await page.getByRole("button", { name: "Mark known facts checked" }).click();
     await expect(page.getByRole("status").filter({ hasText: /^Checked / })).toBeVisible();
 
