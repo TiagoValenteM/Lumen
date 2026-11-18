@@ -56,7 +56,7 @@ test("the first place in a new city stays private until a moderator publishes it
   const publicPath = `/cities/${citySlug}/${slug}`;
   let id = "";
   let photoPath = "";
-  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aN1sAAAAASUVORK5CYII=", "base64");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAIAAAABgCAIAAABaGO0eAAAACXBIWXMAAAPoAAAD6AG1e1JrAAABWElEQVR4nO3VSREDQRADwYVXaIaFeRuGHp0RQlC6vveL3g7Ch/6bRpABMaDLLdSAGNA8hhrQHIQJ6qZ8QAxoHkMNaA7CBHVTPiAGNI+hBjQHYYK6KR8QA5rHUAOagzBB3ZQPiAHNY6gBzUGYoG7KB8SA5jHUgOYgTFA35QNiQPMYakBzECaom/IBMaB5DDWgOQgT1E35gBjQPIYa0ByECeqmfEAMaB5DDWgOwgR1Uz4gBjSPoQY0B2GCuikfEAOax1ADmoMwQd2UD4gBzWOoAc1BmKBuygfEgOYx1IDmIExQN+UDYkDzGGpAcxAmqJvyATGgeQw1oDkIE9RN+YAY0DyGGtAchAnqpnxADGgeQw1oDsIEdVM+IAY0j6EGNAdhgropHxADmsdQA5qDMEHdlA+IAc1jqAHNQZigbsoHxIDmMdSA5iBMUDflA2JA8xhqQHMQJqg5i4n+kQwTdnCiI1MAAAAASUVORK5CYII=", "base64");
   const suggestion = "A quiet table by the window works well for focused laptop sessions.";
   const memberBrowser = await browser.newContext({ baseURL: settings.baseUrl, viewport: { width: 390, height: 844 } });
   await guardBrowserDatabase(memberBrowser);
