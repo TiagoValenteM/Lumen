@@ -39,7 +39,7 @@ pnpm test:e2e:local --browser=chromium
 pnpm test:e2e:local --browser=webkit
 ```
 
-The command compiles a separate fixture build with loopback configuration and shuts down its test servers afterwards. Stop any development server sharing the same build directory first. It does not use the Supabase project in `.env.local`. On a failure, open the generated trace under `test-results/` with `pnpm exec playwright show-trace <trace.zip>`. GitHub Actions runs both browser engines and uploads traces only for fixture failures.
+The command compiles a separate fixture build with loopback configuration and shuts down its test servers afterwards. Stop any development server sharing the same build directory first. It does not use the Supabase project in `.env.local`. On a failure, open the generated trace under `test-results/` with `pnpm exec playwright show-trace <trace.zip>`. GitHub Actions runs both browser engines and uploads traces only for fixture failures. Its official Playwright container includes browser binaries and system dependencies, avoiding a fresh OS package installation on each run. When updating `@playwright/test`, update the workflow's container version and verified digest together.
 
 | Layer | What it exercises |
 | --- | --- |
