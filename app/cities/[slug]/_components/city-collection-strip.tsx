@@ -11,16 +11,16 @@ export function CityCollectionStrip({ collections, onSelect }: CityCollectionStr
   if (!collections.length) return null;
 
   return (
-    <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="mb-6 flex flex-wrap gap-2 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
       {collections.map((collection) => (
         <button
           key={collection.label}
           type="button"
-          className="rounded-lg border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+          className="flex min-h-11 items-center gap-2 rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 sm:block sm:p-4"
           onClick={() => onSelect(collection)}
         >
           <span className="text-sm font-medium">{collection.label}</span>
-          <span className="mt-2 block text-2xl font-semibold tabular-nums">{collection.count}</span>
+          <span className="font-semibold tabular-nums sm:mt-2 sm:block sm:text-2xl">{collection.count}</span>
         </button>
       ))}
     </div>

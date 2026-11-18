@@ -501,12 +501,12 @@ export default function AdminWorkspaceDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-10 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
             <h1 className="text-3xl font-bold">Edit workspace</h1>
             <p className="text-muted-foreground text-sm">Admin-only edit for submitted workspaces.</p>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2 sm:justify-end">
             <Button
               onClick={handleSave}
               disabled={saving || rejectingAiFields || discardingAiEnrichment}

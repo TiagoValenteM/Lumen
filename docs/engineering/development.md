@@ -47,3 +47,5 @@ The command compiles a separate fixture build with loopback configuration and sh
 | Database integration | PostgreSQL migrations, transactional imports, moderation, RLS, and concurrent edits in PGlite. |
 | Browser, isolated | Public browsing, maps, navigation, sign-in return paths, photos, and moderation flows with fixtures. |
 | Browser, staging only | Real account, Storage and publication flow; enable only with the disposable target described in the runbook. |
+
+The city-discovery regression suite checks 320, 390, 768, 1024 and 1440 px layouts plus phone landscape. It covers the shared scroll frame, compact mobile collections, filter recovery, the add-place link, and granted/denied geolocation. The moderation and review suites also check narrow-screen actions and accessible suggestion labels. Location in these tests is simulated, never the operator's real position.

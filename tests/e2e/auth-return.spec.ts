@@ -51,6 +51,17 @@ test("a visitor can sign in and resume exactly the review they opened", async ({
   await page.getByRole("button", { name: "Write review", exact: true }).click();
   await expect(form.getByLabel(/Your Review/)).toHaveValue("Useful work spot");
   await expect(form.getByRole("button", { name: "4 stars", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await form.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("button", { name: "Suggest an Edit", exact: true }).click();
+  const suggestion = page.getByRole("dialog", { name: "Suggest an edit", exact: true });
+  await expect(suggestion.getByLabel("What should we check?", { exact: true })).toHaveRole("combobox");
+  await expect(suggestion.getByLabel("Details", { exact: true })).toHaveRole("textbox");
+  await suggestion.getByRole("button", { name: "Send suggestion", exact: true }).click();
+  await expect(suggestion.getByRole("alert")).toContainText("at least 10 characters");
+  const errorId = await suggestion.getByRole("alert").getAttribute("id");
+  await expect(suggestion.getByLabel("Details", { exact: true })).toHaveAttribute("aria-describedby", errorId!);
+  await suggestion.getByRole("button", { name: "Close", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Suggest an Edit", exact: true })).toBeFocused();
 });
 
 test("adding a place returns to the last draft step after sign-in", async ({ page }) => {

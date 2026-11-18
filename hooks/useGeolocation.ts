@@ -25,7 +25,7 @@ export function useGeolocation() {
         ...prev,
         error: "Geolocation is not supported by your browser",
       }));
-      return;
+      return Promise.resolve(false);
     }
 
     setLocation((prev) => ({ ...prev, loading: true, error: null }));
@@ -47,7 +47,7 @@ export function useGeolocation() {
         });
     }
 
-    navigator.geolocation.getCurrentPosition(
+    return new Promise<boolean>((resolve) => navigator.geolocation.getCurrentPosition(
       (position) => {
         setLocation({
           latitude: position.coords.latitude,
@@ -56,6 +56,7 @@ export function useGeolocation() {
           loading: false,
           permissionStatus: "granted",
         });
+        resolve(true);
       },
       (error) => {
         let errorMessage = "Unable to retrieve your location";
@@ -93,13 +94,17 @@ export function useGeolocation() {
               loading: false,
             }));
         }
+        resolve(false);
       },
       {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0,
       }
-    );
+    )).catch(() => {
+      setLocation((prev) => ({ ...prev, loading: false, error: "Unable to retrieve your location. Please try again." }));
+      return false;
+    });
   }, []);
 
   return {

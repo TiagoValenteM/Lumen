@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Map as MapIcon, MapPin, SlidersHorizontal } from "lucide-react";
+import { Loader2, Map as MapIcon, MapPin, SlidersHorizontal } from "lucide-react";
 
 type CityDiscoveryControlsProps = {
-  canUseLocationSort: boolean;
+  locationLoading: boolean;
   hasMappablePlaces: boolean;
   isClosestSort: boolean;
   showFilters: boolean;
@@ -15,7 +15,7 @@ type CityDiscoveryControlsProps = {
 };
 
 export function CityDiscoveryControls({
-  canUseLocationSort,
+  locationLoading,
   hasMappablePlaces,
   isClosestSort,
   showFilters,
@@ -41,11 +41,12 @@ export function CityDiscoveryControls({
         variant={isClosestSort ? "default" : "outline"}
         size="sm"
         className="gap-2"
-        disabled={!canUseLocationSort}
+        disabled={locationLoading}
+        aria-busy={locationLoading}
         onClick={onUseNearMe}
       >
-        <MapPin className="h-4 w-4" />
-        Near me
+        {locationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+        {locationLoading ? "Finding location..." : "Near me"}
       </Button>
       <Button
         variant={showFilters ? "default" : "outline"}

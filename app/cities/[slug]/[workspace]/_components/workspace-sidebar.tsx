@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -60,6 +62,7 @@ export function WorkspaceSidebar({
   onSuggestionMessageChange,
   onSubmitSuggestion,
 }: WorkspaceSidebarProps) {
+  const suggestionId = useId();
   return (
     <div className="space-y-6 lg:sticky lg:top-20">
       <Card>
@@ -67,7 +70,7 @@ export function WorkspaceSidebar({
           <CardTitle>Plan your visit</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-3">
             <Button variant={hasVisited ? "default" : "outline"} size="lg" className="flex-1 gap-2" onClick={onToggleVisited}>
               <MapPinCheck className="h-5 w-5" />
               {hasVisited ? "Been Here" : "Mark as Visited"}
@@ -96,9 +99,9 @@ export function WorkspaceSidebar({
               </DialogHeader>
               <div className="min-w-0 space-y-4">
                 <div className="space-y-2">
-                  <Label>What should we check?</Label>
+                  <Label htmlFor={`${suggestionId}-kind`}>What should we check?</Label>
                   <Select value={suggestionKind} onValueChange={(value) => onSuggestionKindChange(value as WorkspaceSuggestionKind)}>
-                    <SelectTrigger>
+                    <SelectTrigger id={`${suggestionId}-kind`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -112,8 +115,10 @@ export function WorkspaceSidebar({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Details</Label>
+                  <Label htmlFor={`${suggestionId}-details`}>Details</Label>
                   <Textarea
+                    id={`${suggestionId}-details`}
+                    aria-describedby={suggestionError ? `${suggestionId}-error` : undefined}
                     value={suggestionMessage}
                     onChange={(event) => onSuggestionMessageChange(event.target.value)}
                     placeholder="Tell us what looks wrong and what the correct information should be."
@@ -123,7 +128,7 @@ export function WorkspaceSidebar({
                     maxLength={800}
                   />
                   <div className="flex items-start justify-between gap-3 text-xs">
-                    <p className="min-h-4 min-w-0 break-words text-destructive [overflow-wrap:anywhere]">
+                    <p id={`${suggestionId}-error`} role="alert" className="min-h-4 min-w-0 break-words text-destructive [overflow-wrap:anywhere]">
                       {suggestionError}
                     </p>
                     <span className="shrink-0 text-muted-foreground">

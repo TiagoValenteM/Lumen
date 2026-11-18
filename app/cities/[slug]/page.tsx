@@ -20,6 +20,7 @@ import { readWorkFactChecks } from "@/lib/features/workspaces/work-fact-checks";
 import { importMapLibre } from "@/lib/features/locations/load-maplibre";
 import { normalizeCountryName } from "@/lib/features/locations/country-name";
 import { workspaceMapStyle } from "@/lib/features/locations/workspace-map-style";
+import { ADD_PLACE_PATH } from "@/lib/features/auth/return-path";
 import {
   filterAndSortCityWorkspaces,
   getCityWorkspaceCollections,
@@ -52,7 +53,7 @@ function CityPageContent() {
   const params = useParams();
   const slug = params.slug as string;
   const { user } = useAuth();
-  const { latitude: userLatitude, longitude: userLongitude } = useLocation();
+  const { latitude: userLatitude, longitude: userLongitude, loading: locationLoading, error: locationError, requestLocation } = useLocation();
   const [city, setCity] = useState<City | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [selectedFilters, setSelectedFilters] = useState<Set<string>>(new Set());
@@ -455,15 +456,18 @@ function CityPageContent() {
         <CityCollectionStrip collections={cityCollections} onSelect={handleCollectionSelect} />
 
         <CityDiscoveryControls
-          canUseLocationSort={canUseLocationSort}
+          locationLoading={locationLoading}
           hasMappablePlaces={hasMappablePlaces}
           isClosestSort={sortMode === "closest"}
           showFilters={showFilters}
           showMap={showMap}
           onToggleFilters={() => setShowFilters((value) => !value)}
           onToggleMap={() => setShowMap((value) => !value)}
-          onUseNearMe={() => setSortMode("closest")}
+          onUseNearMe={async () => {
+            if (canUseLocationSort || await requestLocation()) setSortMode("closest");
+          }}
         />
+        {locationError && <p role="alert" className="mb-6 text-sm text-destructive">{locationError} You can still browse this city without your location.</p>}
 
         {/* Map View */}
         {showMap && hasMappablePlaces && (
@@ -486,7 +490,7 @@ function CityPageContent() {
               Sort places by what matters for the next work session.
             </div>
             <Select value={sortMode} onValueChange={(value) => setSortMode(value as CityWorkspaceSortMode)}>
-              <SelectTrigger className="w-full sm:w-[190px]">
+              <SelectTrigger aria-label="Sort places" className="w-full sm:w-[190px]">
                 <SelectValue placeholder="Sort" />
               </SelectTrigger>
               <SelectContent>
@@ -572,15 +576,18 @@ function CityPageContent() {
               ))}
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-lg p-12 text-center">
+            <div className="bg-card border border-border rounded-lg px-4 py-8 text-center sm:p-12">
               <Building2 className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-semibold mb-2">No workspaces yet</h3>
+              <h3 className="text-xl font-semibold mb-2">{workspaces.length ? "No places match these filters" : "No workspaces yet"}</h3>
               <p className="text-muted-foreground mb-6">
-                Be the first to add a workspace in {city.name}!
+                {workspaces.length ? "Remove some filters to see more places." : `Be the first to add a workspace in ${city.name}!`}
               </p>
-              <Button asChild>
-                <Link href="/suggest">Add Workspace</Link>
-              </Button>
+              <div className="flex flex-wrap justify-center gap-2">
+                {workspaces.length > 0 && <Button onClick={() => setSelectedFilters(new Set())}>Clear filters</Button>}
+                <Button asChild variant={workspaces.length ? "outline" : "default"}>
+                  <Link href={ADD_PLACE_PATH}>Add a place</Link>
+                </Button>
+              </div>
             </div>
           )}
         </div>

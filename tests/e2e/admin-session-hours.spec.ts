@@ -88,6 +88,18 @@ test("moderator draft, verified exception and withdrawal reach the guest finder 
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL(/\/$/);
     await page.goto(`/admin/workspaces/${place.id}`);
+    await expect(page.getByRole("heading", { name: "Edit workspace", exact: true })).toBeVisible();
+    for (const width of [320, 390, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const action of [page.getByRole("button", { name: "Save changes", exact: true }).first(),
+        page.getByRole("link", { name: "Admin preview", exact: true }).first()]) {
+        const bounds = await action.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     const editor = page.getByRole("region", { name: "Session hours" });
     await editor.getByRole("button", { name: "Edit hours" }).click();
     await expect(editor.getByText("No verified hours are published.")).toBeVisible();

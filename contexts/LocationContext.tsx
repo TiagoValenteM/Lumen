@@ -9,7 +9,7 @@ interface LocationContextType {
   error: string | null;
   loading: boolean;
   permissionStatus: "granted" | "denied" | "prompt" | null;
-  requestLocation: () => void;
+  requestLocation: () => Promise<boolean>;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
