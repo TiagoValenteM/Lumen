@@ -59,6 +59,12 @@ export async function saveAdminWorkspace(
       citySlug = city?.slug ?? null;
     }
   }
+  // A city created by an UPDATE trigger may be absent from PostgREST's embedded response.
+  if (cityId && !citySlug) {
+    const { data: city, error: cityError } = await supabase.from("cities").select("slug").eq("id", cityId).single();
+    if (cityError || !city?.slug) throw new Error("The place was saved, but its city could not be loaded. Reload before saving again.");
+    citySlug = city.slug;
+  }
   if (previousCityId && cityId && previousCityId !== cityId) {
     const { error: cleanupError } = await supabase.rpc("delete_city_if_empty", { city_uuid: previousCityId });
     if (cleanupError) {
