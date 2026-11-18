@@ -38,6 +38,18 @@ After migration, admin authority comes from `lumen_private.admin_roles`, not `pr
 
 ## Browser smoke tests
 
+### Disposable full-stack staging
+
+The **Disposable staging** GitHub workflow creates a fresh loopback-only Supabase stack for each run, applies the staging bootstrap, and provisions separate member and moderator accounts. It uses real Auth, PostgreSQL, RLS and Storage without hosted project credentials or production data. The stack and test environment file are destroyed after the run, including on failure.
+
+`workspace-review.spec.ts` fills the six-step add-place form, uploads a PNG through the UI, verifies its stored bytes and rendered preview, submits, checks guest isolation, applies a deterministic reviewer suggestion, approves the photo and place, and checks the public page and finder. It runs in Chromium and WebKit. Only the external address search is stubbed; this does not verify a live geocoding provider or OpenRouter.
+
+The workflow stores screenshots, not authentication traces, environment files or database dumps. Test credentials are masked and kept in a runner-only file. The browser aborts Auth, REST and Storage requests to any origin other than the confirmed staging database. The app is compiled against that same loopback target. Local image optimization is enabled only under the explicit staging flag and exact loopback API address; production configuration is unchanged.
+
+The fixture-based checks intentionally skip this write-enabled test; its execution belongs to the separate full-stack job. No permanent cloud staging project or Docker installation on a developer's Mac is required. Changes to this setup can be tested on a `codex/staging-*` branch without publishing to production.
+
+### Other test environments
+
 - GitHub checks run Chromium and WebKit against the compiled app with a local server and no production credentials. The session-hours test runs the real migration in a disposable PostgreSQL database and covers draft visibility, concurrent edits, holiday closure, and withdrawal.
 - The [development guide](../engineering/development.md) covers the local checks. The database suite exercises SQL privileges and RLS in embedded PostgreSQL, without staging credentials.
 - The browser smoke test needs a running app connected to a disposable staging database with the migrations applied. Create one regular test account and one moderator test account there. Install Chromium with `pnpm exec playwright install chromium`, then run `pnpm test:e2e` with these environment variables:
